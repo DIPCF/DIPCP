@@ -59,7 +59,7 @@
 		"githubUsername": "GitHub用户名",
 		"repositoryUrl": "仓库地址",
 		"loginButton": "登录并克隆仓库",
-		"loggingIn": "⏳ 登录中...",
+		"loggingIn": "登录中...",
 		"placeholders": {
 			"githubUsername": "请输入您的GitHub用户名",
 			"repositoryUrl": "https://github.com/username/repository",

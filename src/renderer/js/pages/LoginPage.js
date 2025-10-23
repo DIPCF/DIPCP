@@ -9,7 +9,7 @@ class LoginPage extends BasePage {
 			language: props.language || 'zh-CN',
 			formData: {
 				username: props.username || 'minne100',
-				repositoryUrl: props.repositoryUrl || 'https://github.com/ZelaCreator/DPCC',
+				repositoryUrl: props.repositoryUrl || 'https://github.com/ZelaCreator/SPCP',
 				accessToken: props.accessToken || ''
 			},
 			loading: false,
@@ -212,12 +212,16 @@ class LoginPage extends BasePage {
 
 		try {
 			this.setState({ loading: true });
+			// 立即禁用按钮
+			this.updateLoginButtonState('loading', this.t('login.loggingIn', '登录中...'));
 
 			// 确保formData存在
 			const formData = this.state.formData || {};
 			await this.performLogin(formData);
 		} catch (error) {
 			this.showError(error.message);
+			// 登录失败时恢复按钮状态
+			this.updateLoginButtonState('default', this.t('login.loginButton', '登录并克隆仓库'));
 		} finally {
 			this.setState({ loading: false });
 		}
@@ -331,43 +335,37 @@ class LoginPage extends BasePage {
 			console.log('App状态已更新:', permissionInfo.role);
 		}
 
-		// 8. 如果是所有者或协作者，自动同步GitHub数据
-		if (permissionInfo.role === 'owner' || permissionInfo.role === 'collaborator') {
-			console.log('开始自动同步GitHub数据...');
+		// 8. 所有用户都自动同步GitHub数据（包括访客）
+		console.log('开始自动同步GitHub数据...');
 
-			// 更新按钮状态为加载中
-			this.updateLoginButtonState('loading', '正在同步项目数据，请耐心等待...');
+		// 更新按钮状态为加载中
+		this.updateLoginButtonState('loading', '正在同步项目数据，请耐心等待...');
 
-			try {
-				// 定义进度回调函数
-				const progressCallback = (progress, downloaded, total, currentFile) => {
-					this.updateLoginButtonState('loading', `正在下载文件... ${progress}% (${downloaded}/${total}) - ${currentFile}`);
-				};
+		try {
+			// 定义进度回调函数
+			const progressCallback = (progress, downloaded, total, currentFile) => {
+				this.updateLoginButtonState('loading', `正在下载文件... ${progress}% (${downloaded}/${total}) - ${currentFile}`);
+			};
 
-				await window.GitHubService.syncRepositoryData(repoInfo.owner, repoInfo.repo, formData.accessToken, progressCallback);
-				console.log('GitHub数据同步完成');
+			await window.GitHubService.syncRepositoryData(repoInfo.owner, repoInfo.repo, formData.accessToken, progressCallback);
+			console.log('GitHub数据同步完成');
 
-				// 更新按钮状态为完成
-				this.updateLoginButtonState('success', '数据同步完成！');
+			// 更新按钮状态为完成
+			this.updateLoginButtonState('success', '数据同步完成！');
 
-				// 等待1秒让用户看到完成状态
-				await new Promise(resolve => setTimeout(resolve, 1000));
-			} catch (syncError) {
-				console.error('GitHub数据同步失败:', syncError);
-				// 更新按钮状态为错误
-				this.updateLoginButtonState('error', '数据同步失败，但登录成功');
-				// 等待1秒让用户看到错误状态
-				await new Promise(resolve => setTimeout(resolve, 1000));
-			}
+			// 等待1秒让用户看到完成状态
+			await new Promise(resolve => setTimeout(resolve, 1000));
+		} catch (syncError) {
+			console.error('GitHub数据同步失败:', syncError);
+			// 更新按钮状态为错误
+			this.updateLoginButtonState('error', '数据同步失败，但登录成功');
+			// 等待1秒让用户看到错误状态
+			await new Promise(resolve => setTimeout(resolve, 1000));
 		}
 
-		// 9. 根据权限跳转到相应页面
+		// 9. 所有用户都跳转到项目详情页面（因为数据已同步）
 		if (window.app && window.app.router) {
-			if (permissionInfo.role === 'owner' || permissionInfo.role === 'collaborator') {
-				window.app.router.navigateTo('/project-detail');
-			} else {
-				window.app.router.navigateTo('/');
-			}
+			window.app.router.navigateTo('/project-detail');
 		}
 	}
 
@@ -498,7 +496,9 @@ class LoginPage extends BasePage {
 		loginBtn.classList.remove('loading', 'success', 'error');
 
 		// 添加新的状态类
-		loginBtn.classList.add(state);
+		if (state !== 'default') {
+			loginBtn.classList.add(state);
+		}
 
 		// 更新按钮文本和状态
 		switch (state) {
@@ -516,7 +516,7 @@ class LoginPage extends BasePage {
 				break;
 			default:
 				loginBtn.disabled = false;
-				loginBtn.innerHTML = this.t('login.loginButton', '登录并克隆仓库');
+				loginBtn.innerHTML = `<span class="btn-text">${this.t('login.loginButton', '登录并克隆仓库')}</span>`;
 		}
 	}
 
