@@ -459,14 +459,14 @@ body {
 
 /* 按钮变体 */
 .btn-primary {
-	background-color: var(--primary-500);
-	border-color: var(--primary-500);
-	color: white;
+	background-color: var(--primary-500) !important;
+	border-color: var(--primary-500) !important;
+	color: white !important;
 }
 
 .btn-primary:hover:not(:disabled) {
-	background-color: var(--primary-600);
-	border-color: var(--primary-600);
+	background-color: var(--primary-600) !important;
+	border-color: var(--primary-600) !important;
 }
 
 .btn-danger {
@@ -676,21 +676,24 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	background-color: var(--primary-500) !important;
+	border-color: var(--primary-500) !important;
+	color: white !important;
 }
 
 #login-btn.loading {
-	background: var(--warning-color);
+	background: var(--warning-color) !important;
 	cursor: not-allowed;
 	opacity: 0.8;
 }
 
 #login-btn.success {
-	background: var(--success-color);
+	background: var(--success-color) !important;
 	cursor: not-allowed;
 }
 
 #login-btn.error {
-	background: var(--error-color);
+	background: var(--error-color) !important;
 	cursor: not-allowed;
 }
 
@@ -1417,6 +1420,7 @@ body {
 	font-size: var(--font-size-sm);
 	min-width: 200px;
 }
+
 
 .setting-item input[type="checkbox"] {
 	width: 18px;

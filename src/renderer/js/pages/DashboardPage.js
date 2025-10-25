@@ -1,21 +1,31 @@
 /**
  * 仪表盘页面组件
- * 完全组件化的仪表盘页面
+ * 完全组件化的仪表盘页面，提供用户信息展示、贡献申请、统计数据显示等功能
+ * @class DashboardPage
+ * @extends {BasePage}
  */
 class DashboardPage extends BasePage {
+	/**
+	 * 构造函数
+	 * @param {Object} props - 组件属性
+	 */
 	constructor(props = {}) {
 		super(props);
+
+		// 从 localStorage 获取用户信息
+		const userInfo = window.app.getUserFromStorage();
+
 		this.state = {
-			user: props.user || null,
-			userRole: props.userRole || null,
-			permissionInfo: props.permissionInfo || null,
-			stats: props.stats || {
+			user: userInfo.user,
+			userRole: userInfo.userRole,
+			permissionInfo: userInfo.permissionInfo,
+			stats: {
 				totalPoints: 150,
 				myContributions: 5,
 				pendingReviews: 2,
 				approvedContributions: 3
 			},
-			activities: props.activities || [
+			activities: [
 				{
 					icon: '📝',
 					text: '您提交了一个新的文档：SPCP 技术设计文档 v1.1',
@@ -38,15 +48,16 @@ class DashboardPage extends BasePage {
 					timeKey: 'dashboard.time3'
 				}
 			],
-			onLogout: props.onLogout || null,
-			onQuickAction: props.onQuickAction || null,
-			onApplyContribution: props.onApplyContribution || null,
 			applicationReason: '',
 			// 模态框实例
 			modal: null
 		};
 	}
 
+	/**
+	 * 渲染组件
+	 * @returns {HTMLElement} 渲染后的DOM元素
+	 */
 	render() {
 		const container = document.createElement('div');
 		container.className = 'dashboard';
@@ -62,17 +73,19 @@ class DashboardPage extends BasePage {
 		return container;
 	}
 
+	/**
+	 * 渲染页面头部
+	 * @returns {string} 头部HTML字符串
+	 */
 	renderHeader() {
-		// 使用BasePage的renderHeader方法，并添加退出项目按钮
-		const headerHtml = super.renderHeader('dashboard', false, null);
-		// 在header-right中添加退出项目按钮
-		return headerHtml.replace(
-			'<div class="header-right">',
-			`<div class="header-right">
-				<button id="exit-project-btn" class="btn danger">${this.t('dashboard.exitProject', '退出项目')}</button>`
-		);
+		// 使用BasePage的renderHeader方法
+		return super.renderHeader('dashboard', false, null);
 	}
 
+	/**
+	 * 渲染欢迎区域
+	 * @returns {string} 欢迎区域HTML字符串
+	 */
 	renderWelcome() {
 		return `
             <div class="welcome">
@@ -82,39 +95,35 @@ class DashboardPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 渲染申请区域
+	 * 根据用户角色显示不同的申请内容
+	 * @returns {string} 申请区域HTML字符串
+	 */
 	renderApplicationSection() {
-		console.log('renderApplicationSection - userRole:', this.state.userRole);
-		// 所有者不显示申请区域
-		if (this.state.userRole === 'owner') {
-			console.log('User is owner, hiding application section');
-			return '';
-		}
-
-		// 协作者不显示申请区域
-		if (this.state.userRole === 'collaborator') {
-			console.log('User is collaborator, hiding application section');
-			return '';
-		}
-
-		// 访客显示申请按钮
-		return `
-			<div class="application-section">
-				<div class="application-card">
-					<div class="application-icon">🤝</div>
-					<div class="application-content">
-						<h3>${this.t('dashboard.application.title', '成为贡献者')}</h3>
-						<p>${this.t('dashboard.application.description', '申请成为项目贡献者，参与代码开发和项目维护。')}</p>
-						<button id="apply-contribution-btn" class="btn btn-primary">
-							${this.t('dashboard.application.applyButton', '申请成为贡献者')}
-						</button>
+		// 只有访客用户显示申请区域
+		if (this.state.userRole === 'visitor') {
+			return `
+				<div class="application-section">
+					<div class="application-card">
+						<div class="application-icon">🤝</div>
+						<div class="application-content">
+							<h3>${this.t('dashboard.application.title', '成为贡献者')}</h3>
+							<p>${this.t('dashboard.application.description', '申请成为项目贡献者，参与代码开发和项目维护。')}</p>
+							<button id="apply-contribution-btn" class="btn btn-primary">
+								${this.t('dashboard.application.applyButton', '申请成为贡献者')}
+							</button>
+						</div>
 					</div>
 				</div>
-			</div>
-		`;
+			`;
+		}
+		return '';
 	}
 
 	/**
 	 * 初始化模态框
+	 * @returns {void}
 	 */
 	initModal() {
 		if (!this.state.modal) {
@@ -137,6 +146,10 @@ class DashboardPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 渲染统计网格
+	 * @returns {string} 统计网格HTML字符串
+	 */
 	renderStatsGrid() {
 		const roleInfo = this.getUserRoleInfo();
 		const userAvatar = this.getCachedUserAvatar();
@@ -186,6 +199,7 @@ class DashboardPage extends BasePage {
 
 	/**
 	 * 获取用户身份信息
+	 * @returns {Object} 包含显示名称和CSS类名的角色信息对象
 	 */
 	getUserRoleInfo() {
 		const role = this.state.userRole || 'visitor';
@@ -218,6 +232,7 @@ class DashboardPage extends BasePage {
 
 	/**
 	 * 获取缓存的用户头像
+	 * @returns {string} 用户头像URL或默认头像
 	 */
 	getCachedUserAvatar() {
 		// 首先尝试从当前用户状态获取
@@ -243,6 +258,10 @@ class DashboardPage extends BasePage {
 	}
 
 
+	/**
+	 * 渲染最近活动
+	 * @returns {string} 最近活动HTML字符串
+	 */
 	renderRecentActivity() {
 		return `
             <div class="recent-activity">
@@ -262,171 +281,81 @@ class DashboardPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 挂载组件到DOM
+	 * @param {HTMLElement} container - 挂载容器
+	 * @returns {void}
+	 */
 	mount(container) {
 		super.mount(container);
+
+		// 检查并更新用户角色（从 localStorage 读取最新状态）
+		this.checkAndUpdateUserRole();
 
 		// 绑定事件
 		this.bindEvents();
 	}
 
+	/**
+	 * 检查并更新用户角色
+	 */
+	checkAndUpdateUserRole() {
+		const userInfo = window.app.getUserFromStorage();
+		const user = userInfo.user;
+		const currentRole = userInfo.userRole;
+		const currentPermissionInfo = userInfo.permissionInfo;
+
+		// 如果用户信息、角色或权限信息发生变化，更新状态
+		if (this.state.user !== user || this.state.userRole !== currentRole || this.state.permissionInfo !== currentPermissionInfo) {
+			this.setState({
+				user: user,
+				userRole: currentRole,
+				permissionInfo: currentPermissionInfo
+			});
+			// 更新角色显示
+			this.updateUserRoleDisplay();
+		}
+	}
+
+	/**
+	 * 绑定事件监听器
+	 * @returns {void}
+	 */
 	bindEvents() {
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
-
-		// 退出项目
-		const exitProjectBtn = this.element.querySelector('#exit-project-btn');
-		if (exitProjectBtn) {
-			exitProjectBtn.addEventListener('click', () => {
-				this.showLogoutModal();
-			});
-		}
 
 		// 申请贡献按钮
 		const applyBtn = this.element.querySelector('#apply-contribution-btn');
 		if (applyBtn) {
 			applyBtn.addEventListener('click', () => {
-				this.showApplicationModal();
+				this.handleApplicationSubmit(); // 直接提交申请，不需要理由
 			});
 		}
 
-		// 确认审核状态按钮
-		const checkStatusBtn = this.element.querySelector('#check-review-status-btn');
-		if (checkStatusBtn) {
-			checkStatusBtn.addEventListener('click', () => {
-				this.checkReviewStatus();
-			});
-		}
-
-	}
-
-	/**
-	 * 显示申请模态框
-	 */
-	showApplicationModal() {
-		console.log('showApplicationModal called, user state:', this.state.user);
-		console.log('isAuthenticated:', this.state.user ? 'yes' : 'no');
-		console.log('userRole:', this.state.userRole);
-
-		// 如果用户未认证，先进行GitHub认证
-		if (!this.state.user || !this.state.user.username) {
-			console.log('User not authenticated, showing GitHub auth modal');
-			this.showGitHubAuthModal();
-			return;
-		}
-
-		// 已认证用户直接显示申请表单
-		this.initModal();
-		this.state.modal.showInput(
-			this.t('dashboard.application.modalTitle', '申请成为贡献者'),
-			this.t('dashboard.application.reasonLabel', '申请理由（可选）'),
-			this.t('dashboard.application.reasonPlaceholder', '请简要说明您希望参与项目的原因和计划...'),
-			this.state.applicationReason,
-			(reason) => {
-				this.handleApplicationSubmit(reason);
-			}
-		);
-	}
-
-	/**
-	 * 显示GitHub认证模态框
-	 */
-	showGitHubAuthModal() {
-		console.log('showGitHubAuthModal called');
-		this.initModal();
-
-		const title = this.t('github.auth.title', 'GitHub身份验证');
-		const message = this.t('github.auth.message', '请输入您的GitHub Personal Access Token以验证身份：');
-		const instructions = this.t('github.auth.instructions');
-		const placeholder = this.t('github.auth.placeholder', 'ghp_xxxxxxxxxxxxxxxxxxxx');
-
-		this.state.modal.showInput(
-			title,
-			`${message}<br><br>${instructions}`,
-			placeholder,
-			'',
-			(token) => {
-				console.log('Token received:', token ? 'yes' : 'no');
-				this.verifyGitHubToken(token);
-			}
-		);
-	}
-
-	/**
-	 * 验证GitHub Token
-	 */
-	async verifyGitHubToken(token) {
-		try {
-			// 显示加载状态
-			this.showLoading();
-
-			// 验证token
-			const userInfo = await window.GitHubService.verifyWithToken(token);
-
-			// 认证成功，保存用户信息
-			this.state.user = userInfo;
-			this.state.isAuthenticated = true;
-
-			// 保存到localStorage
-			localStorage.setItem('spcp-user', JSON.stringify(userInfo));
-
-			// 隐藏加载状态
-			this.hideLoading();
-
-			// 显示申请表单
-			this.showApplicationModal();
-
-		} catch (error) {
-			this.hideLoading();
-			this.showError('GitHub认证失败：' + error.message);
-		}
-	}
-
-	/**
-	 * 显示退出确认模态框
-	 */
-	showLogoutModal() {
-		this.initModal();
-		const warningMessage = `${this.t('dashboard.logout.warningTitle', '重要提醒')}\n\n${this.t('dashboard.logout.warningMessage', '退出后，所有未提交的本地数据将被永久删除，包括：')}\n\n${this.t('dashboard.logout.warningItem1', '• 本地编辑的文件内容')}\n${this.t('dashboard.logout.warningItem2', '• 新建但未提交的文件')}\n${this.t('dashboard.logout.warningItem3', '• 本地工作区的所有修改')}\n${this.t('dashboard.logout.warningItem4', '• 用户配置和缓存数据')}\n\n${this.t('dashboard.logout.warningNote', '请确保在退出前已保存所有重要修改！')}`;
-
-		this.state.modal.showConfirm(
-			this.t('dashboard.logout.confirmTitle', '确认退出项目'),
-			warningMessage,
-			(confirmed) => {
-				if (confirmed && this.state.onLogout) {
-					this.state.onLogout();
-				}
-			}
-		);
 	}
 
 	/**
 	 * 处理申请提交
+	 * @returns {Promise<void>}
 	 */
-	async handleApplicationSubmit(reason) {
-		this.setState({ applicationReason: reason });
+	async handleApplicationSubmit() {
+		try {
+			// 1. 显示正在申请·状态
+			this.showReviewingStatus();
+			// 2. 提交申请
+			await this.applyContribution();
+			// 3. 开始轮询工作流状态
+			await this.pollCollaboratorInvitation();
 
-		if (this.state.onApplyContribution) {
-			try {
-				// 1. 提交申请
-				const issue = await this.state.onApplyContribution(reason);
-				console.log('申请已提交，Issue:', issue);
-
-				// 2. 显示正在审核状态
-				this.showReviewingStatus(issue.number);
-
-				// 3. 开始轮询工作流状态
-				await this.pollAndAcceptInvitation(issue.number);
-
-			} catch (error) {
-				console.error('申请提交失败:', error);
-				// 根据错误类型显示不同的消息
-				if (error.message.includes('403')) {
-					this.showError('申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。');
-				} else if (error.message.includes('401')) {
-					this.showError('申请提交失败：认证失败。请检查您的GitHub Token是否有效。');
-				} else {
-					this.showError('申请提交失败：' + error.message);
-				}
+		} catch (error) {
+			// 根据错误类型显示不同的消息
+			if (error.message.includes('403')) {
+				this.showError(this.t('dashboard.application.error.insufficientPermissions', '申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。'));
+			} else if (error.message.includes('401')) {
+				this.showError(this.t('dashboard.application.error.authenticationFailed', '申请提交失败：认证失败。请检查您的GitHub Token是否有效。'));
+			} else {
+				this.showError(this.t('dashboard.application.error.general', '申请提交失败：{errorMessage}').replace('{errorMessage}', error.message));
 			}
 		}
 	}
@@ -434,7 +363,7 @@ class DashboardPage extends BasePage {
 	/**
 	 * 显示正在审核状态
 	 */
-	showReviewingStatus(issueNumber) {
+	showReviewingStatus() {
 		// 更新申请板块显示正在审核状态
 		const applicationSection = this.element.querySelector('.application-section');
 		if (applicationSection) {
@@ -444,120 +373,126 @@ class DashboardPage extends BasePage {
 					<div class="reviewing-content">
 						<h3>${this.t('dashboard.application.reviewing.title', '正在审核中')}</h3>
 						<p>${this.t('dashboard.application.reviewing.message', '您的申请正在处理中，大约需要15秒...')}</p>
-						<div class="progress-bar">
-							<div class="progress-fill" id="review-progress"></div>
-						</div>
-						<p class="reviewing-details">
-							${this.t('dashboard.application.reviewing.details', 'Issue #{issueNumber} 已创建<br>GitHub Actions 正在自动处理您的申请').replace('{issueNumber}', issueNumber)}
-						</p>
 					</div>
 				</div>
 			`;
 		}
-
-		// 开始进度条动画
-		this.startProgressAnimation();
 	}
 
 	/**
-	 * 开始进度条动画
+	 * 轮询协作者邀请
 	 */
-	startProgressAnimation() {
-		const progressFill = document.getElementById('review-progress');
-		if (!progressFill) return;
+	async pollCollaboratorInvitation() {
+		const user = this.state.user;
 
-		let progress = 0;
-		const interval = setInterval(() => {
-			progress += 2; // 每100ms增加2%，50秒完成
-			progressFill.style.width = Math.min(progress, 100) + '%';
+		const octokit = new window.Octokit({ auth: user.token });
+		const maxAttempts = 60; // 最多轮询60次，每次间隔5秒，总共5分钟
+		let attempts = 0;
+		const headers = {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
 
-			if (progress >= 100) {
-				clearInterval(interval);
-			}
-		}, 100);
-	}
+		let acceptResult;
+		let firstAccept = false;
 
-	/**
-	 * 轮询工作流状态并自动接受邀请
-	 */
-	async pollAndAcceptInvitation(issueNumber) {
-		try {
-			const user = this.state.user;
-			if (!user || !user.token) {
-				throw new Error('用户未认证');
-			}
+		while (attempts < maxAttempts) {
+			try {
+				attempts++;
+				console.log(`第 ${attempts} 次检查协作者邀请...`);
 
-			const repoInfo = this.getRepositoryInfo();
-			if (!repoInfo) {
-				throw new Error('仓库信息不可用');
-			}
+				// 使用 octokit.request 获取特定仓库的邀请列表
+				const response = await octokit.request('GET /user/repository_invitations', {
+					headers: headers
+				});
 
-			console.log('开始轮询工作流状态...');
+				const invitations = response.data;
 
-			// 等待15秒后开始轮询
-			await new Promise(resolve => setTimeout(resolve, 15000));
+				// 由于查询时已经限定了特定仓库，直接获取最新的邀请
+				const repoInvitation = invitations && invitations.length > 0 ? invitations[invitations.length - 1] : null;
 
-			// 轮询工作流状态
-			const workflowResult = await window.GitHubService.pollWorkflowStatus(
-				repoInfo.owner,
-				repoInfo.repo,
-				issueNumber,
-				user.token
-			);
+				if (repoInvitation) {
+					// 接受邀请 
+					console.log(`正在接受邀请 ID: ${repoInvitation.id}`);
 
-			if (workflowResult.success) {
-				console.log('工作流执行成功，检查协作者状态...');
-
-				// 等待几秒让邀请生效
-				await new Promise(resolve => setTimeout(resolve, 5000));
-
-				// 直接检查是否已经是协作者（因为访客可能没有权限查看邀请）
-				const isCollaborator = await window.GitHubService.checkCollaboratorStatus(
-					repoInfo.owner,
-					repoInfo.repo,
-					user.username,
-					user.token
-				);
-
-				if (isCollaborator) {
-					console.log('用户已成为协作者');
-
-					// 更新用户状态为协作者
-					this.updateUserToCollaborator();
-
-					// 显示成功消息
-					this.showSuccessStatus();
-
-				} else {
-					console.log('用户尚未成为协作者，可能邀请还在处理中');
-
-					// 尝试接受协作者邀请（如果权限允许）
 					try {
-						const invitationResult = await window.GitHubService.acceptCollaboratorInvitation(
-							repoInfo.owner,
-							repoInfo.repo,
-							user.token
-						);
-
-						if (invitationResult.success) {
-							console.log('协作者邀请已接受');
-							this.updateUserToCollaborator();
-							this.showSuccessStatus();
-						} else {
-							this.showError('申请已提交，GitHub Actions已执行，但协作者状态尚未生效。请稍后刷新页面检查。');
+						// 使用官方推荐的 octokit.request 方法
+						acceptResult = await octokit.request('PATCH /user/repository_invitations/{invitation_id}', {
+							invitation_id: repoInvitation.id,
+							headers: headers
+						});
+						if (acceptResult.status === 204) {
+							console.log('接受邀请成功，状态码:', acceptResult.status);
+							if (!firstAccept) {
+								// 不知道为什么第一次接受邀请后，需要再次提交申请，这里绝对是github的一个bug
+								firstAccept = true;
+								await new Promise(resolve => setTimeout(resolve, 60000));
+								await this.applyContribution();
+							} else {
+								// 开始轮询检查用户权限
+								await this.pollUserPermissions();
+								return;
+							}
 						}
-					} catch (invitationError) {
-						console.log('无法自动接受邀请（权限不足），但工作流已执行成功');
-						this.showError('申请已提交，GitHub Actions已执行成功。由于权限限制，无法自动接受邀请。请手动检查GitHub通知或稍后刷新页面。');
+					} catch (acceptError) {
+						console.log('接受邀请失败:', acceptError.message);
+						throw acceptError;
 					}
+				} else {
+					console.log('暂无协作者邀请，继续等待...');
 				}
-			} else {
-				throw new Error(workflowResult.error || '工作流执行失败');
-			}
 
-		} catch (error) {
-			console.error('轮询或接受邀请失败:', error);
-			this.showError('申请处理失败：' + error.message);
+				// 等待5秒后再次检查（除了最后一次）
+				if (attempts < maxAttempts) {
+					console.log('等待5秒后再次检查...');
+					await new Promise(resolve => setTimeout(resolve, 5000));
+				}
+
+			} catch (error) {
+				console.error('轮询协作者邀请时出错:', error);
+			}
+		}
+	}
+
+	/**
+	 * 轮询检查用户权限
+	 */
+	async pollUserPermissions() {
+		const user = this.state.user;
+		const repoInfo = this.getRepositoryInfo();
+
+		const octokit = new window.Octokit({ auth: user.token });
+		const maxAttempts = 30; // 最多轮询30次，每次间隔1秒，总共30秒
+		let attempts = 0;
+
+		console.log('开始轮询检查用户权限...');
+
+		while (attempts < maxAttempts) {
+			try {
+				attempts++;
+
+				// 检查用户是否已经是协作者且有写入权限
+				const repoResult = await octokit.rest.repos.get({
+					owner: repoInfo.owner,
+					repo: repoInfo.repo
+				});
+
+				const permissions = repoResult.data.permissions;
+				console.log('用户权限:', permissions);
+
+				if (permissions && permissions.push) {
+					this.showCollaboratorSuccessStatus();
+					return;
+				}
+
+				// 等待1秒后再次检查（除了最后一次）
+				if (attempts < maxAttempts) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+
+			} catch (error) {
+				console.log('检查权限时出错:', error.message);
+				// 继续轮询，不中断
+			}
 		}
 	}
 
@@ -567,178 +502,50 @@ class DashboardPage extends BasePage {
 	updateUserToCollaborator() {
 		// 更新组件状态
 		this.setState({
-			userRole: 'collaborator',
-			applicationReason: ''
+			userRole: 'collaborator'
 		});
 
 		// 更新localStorage中的用户信息
 		const userData = localStorage.getItem('spcp-user');
 		if (userData) {
 			const user = JSON.parse(userData);
+			user.permissionInfo = user.permissionInfo || {};
 			user.permissionInfo.role = 'collaborator';
-			user.permissionInfo.hasPermission = true;
 			localStorage.setItem('spcp-user', JSON.stringify(user));
 		}
+		this.updateUserRoleDisplay();
+	}
 
-		// 更新全局状态
-		if (window.app && window.app.state) {
-			window.app.state.userRole = 'collaborator';
+	/**
+	 * 更新用户角色显示
+	 */
+	updateUserRoleDisplay() {
+		const roleElement = this.element.querySelector('.role-badge');
+		if (roleElement) {
+			// 根据当前角色更新显示
+			const roleInfo = this.getUserRoleInfo();
+			roleElement.textContent = roleInfo.displayName;
+			roleElement.className = `stat-number role-badge ${roleInfo.className}`;
 		}
 	}
 
 	/**
-	 * 显示成功状态
+	 * 显示协作者成功状态
 	 */
-	showSuccessStatus() {
-		// 隐藏申请板块
+	showCollaboratorSuccessStatus() {
+		// 更新用户状态为协作者
+		this.updateUserToCollaborator();
+
 		const applicationSection = this.element.querySelector('.application-section');
 		if (applicationSection) {
-			applicationSection.style.display = 'none';
-		}
-
-		// 显示成功消息
-		this.showInfo('申请成功', '🎉 恭喜！您已成为项目协作者，现在可以访问项目页面了。');
-
-		// 重新渲染页面以更新UI
-		this.rerender();
-	}
-
-	/**
-	 * 检查审核状态
-	 */
-	async checkReviewStatus() {
-		// 显示加载状态
-		this.showLoading();
-
-		try {
-			// 查询GitHub Issues来检查审核状态
-			const reviewStatus = await this.checkGitHubReviewStatus();
-
-			this.hideLoading();
-
-			if (reviewStatus === 'approved') {
-				// 审核通过，更新用户角色
-				this.setState({
-					userRole: 'contributor'
-				});
-				// 重新渲染页面
-				this.render();
-				this.mount(document.querySelector('.dashboard'));
-				this.showInfo('审核结果', '恭喜！您的贡献者申请已通过审核，现在可以参与项目开发了。');
-			} else if (reviewStatus === 'rejected') {
-				// 审核被拒绝
-				this.setState({
-					userRole: 'visitor'
-				});
-				this.render();
-				this.mount(document.querySelector('.dashboard'));
-				this.showInfo('审核结果', '很抱歉，您的贡献者申请未被通过。您可以重新申请。');
-			} else {
-				// 仍在审核中
-				this.showInfo('审核状态', '您的申请仍在审核中，请耐心等待。我们会及时通知您审核结果。');
-			}
-		} catch (error) {
-			this.hideLoading();
-			console.error('检查审核状态失败:', error);
-			this.showError('检查审核状态失败：' + error.message);
-		}
-	}
-
-	/**
-	 * 查询GitHub审核状态
-	 */
-	async checkGitHubReviewStatus() {
-		try {
-			// 获取用户信息
-			const user = this.state.user;
-			if (!user || !user.token) {
-				throw new Error('用户未认证');
-			}
-
-			// 获取仓库信息
-			const repoInfo = this.getRepositoryInfo();
-			if (!repoInfo) {
-				throw new Error('仓库信息不可用');
-			}
-
-			// 使用认证的API调用查询Issues
-			const issues = await this.getIssuesWithAuth(repoInfo.owner, repoInfo.repo, user.token, {
-				labels: 'contribution-application',
-				state: 'all',
-				creator: user.username
-			});
-
-			if (!issues || issues.length === 0) {
-				return 'pending'; // 没有找到申请，可能还在处理中
-			}
-
-			// 查找最新的申请
-			const latestApplication = issues[0];
-
-			// 检查Issue的状态和标签
-			if (latestApplication.state === 'closed') {
-				// 检查是否有approved标签
-				const labels = latestApplication.labels || [];
-				const hasApprovedLabel = labels.some(label =>
-					label.name === 'approved' || label.name === 'contribution-approved'
-				);
-				const hasRejectedLabel = labels.some(label =>
-					label.name === 'rejected' || label.name === 'contribution-rejected'
-				);
-
-				if (hasApprovedLabel) {
-					return 'approved';
-				} else if (hasRejectedLabel) {
-					return 'rejected';
-				} else {
-					return 'pending'; // 已关闭但没有明确标签
-				}
-			} else {
-				return 'pending'; // Issue仍然开放，审核中
-			}
-
-		} catch (error) {
-			console.error('查询GitHub审核状态失败:', error);
-			throw error;
-		}
-	}
-
-	/**
-	 * 使用认证查询GitHub Issues
-	 */
-	async getIssuesWithAuth(owner, repo, token, options = {}) {
-		try {
-			let url = `https://api.github.com/repos/${owner}/${repo}/issues`;
-			const params = new URLSearchParams();
-
-			// 添加查询参数
-			if (options.state) params.append('state', options.state);
-			if (options.labels) params.append('labels', options.labels);
-			if (options.creator) params.append('creator', options.creator);
-			if (options.sort) params.append('sort', options.sort);
-			if (options.direction) params.append('direction', options.direction);
-			if (options.per_page) params.append('per_page', options.per_page);
-
-			if (params.toString()) {
-				url += '?' + params.toString();
-			}
-
-			const response = await fetch(url, {
-				headers: {
-					'Authorization': `token ${token}`,
-					'Accept': 'application/vnd.github.v3+json',
-					'User-Agent': 'SPCP-Client'
-				}
-			});
-
-			if (!response.ok) {
-				throw new Error(`Failed to fetch issues: ${response.status}`);
-			}
-
-			return await response.json();
-		} catch (error) {
-			console.error('Error fetching issues with auth:', error);
-			throw error;
+			applicationSection.innerHTML = `
+				<div class="application-success">
+					<div class="success-content">
+						<h3>✅${this.t('dashboard.application.success.title', '申请成功！')}</h3>
+						<p>${this.t('dashboard.application.success.message', '恭喜！您已成为项目协作者，现在可以参与项目开发了。')}</p>
+					</div>
+				</div>
+			`;
 		}
 	}
 
@@ -788,16 +595,31 @@ class DashboardPage extends BasePage {
 		this.state.modal.showInfo(title, message);
 	}
 
+	/**
+	 * 更新统计数据
+	 * @param {Object} stats - 统计数据对象
+	 * @returns {void}
+	 */
 	updateStats(stats) {
 		this.setState({ stats: { ...this.state.stats, ...stats } });
 		this.update();
 	}
 
+	/**
+	 * 更新活动列表
+	 * @param {Array} activities - 活动列表
+	 * @returns {void}
+	 */
 	updateActivities(activities) {
 		this.setState({ activities });
 		this.update();
 	}
 
+	/**
+	 * 更新用户信息
+	 * @param {Object} user - 用户信息对象
+	 * @returns {void}
+	 */
 	updateUser(user) {
 		this.setState({ user });
 		// 如果用户信息包含新的头像，更新localStorage缓存
@@ -816,6 +638,10 @@ class DashboardPage extends BasePage {
 		this.update();
 	}
 
+	/**
+	 * 销毁组件
+	 * @returns {void}
+	 */
 	destroy() {
 		// 清理模态框
 		if (this.state.modal) {
@@ -831,6 +657,7 @@ class DashboardPage extends BasePage {
 
 	/**
 	 * 清理用户头像缓存
+	 * @returns {void}
 	 */
 	clearAvatarCache() {
 		const userData = localStorage.getItem('spcp-user');
@@ -844,7 +671,96 @@ class DashboardPage extends BasePage {
 			}
 		}
 	}
+
+
+	/**
+	 * 创建贡献申请
+	 */
+	async createContributionApplication(owner, repo, username, email, token) {
+		try {
+			const octokit = new window.Octokit({ auth: token });
+
+			// 创建issue作为贡献申请
+			const issueTitle = `Become a collaborator - ${username}`;
+
+			// 创建issue
+			const { data } = await octokit.rest.issues.create({
+				owner, repo,
+				title: issueTitle,
+				body: ''
+			});
+			const issue = data;
+
+			return {
+				success: true,
+				applicationId: issue.id,
+				issueNumber: issue.number,
+				issueUrl: issue.html_url
+			};
+		} catch (error) {
+			console.error('创建贡献申请失败:', error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	}
+
+	/**
+	 * 申请贡献
+	 */
+	async applyContribution() {
+		try {
+			// 从localStorage获取用户信息
+			const userData = localStorage.getItem('spcp-user');
+
+			const user = JSON.parse(userData);
+
+			// 解析仓库信息
+			let repoInfo;
+			if (user.repositoryUrl) {
+				repoInfo = this.parseGitHubUrl(user.repositoryUrl);
+			} else if (user.repositoryInfo) {
+				repoInfo = user.repositoryInfo;
+			}
+
+			if (!repoInfo) {
+				throw new Error('无效的仓库地址');
+			}
+
+			// 调用createContributionApplication方法
+			const application = await this.createContributionApplication(
+				repoInfo.owner,
+				repoInfo.repo,
+				user.username,
+				user.email,
+				user.token
+			);
+
+			return application;
+		} catch (error) {
+			console.error('Error creating contribution application:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * 解析GitHub URL
+	 */
+	parseGitHubUrl(url) {
+		const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+		if (match) {
+			return {
+				owner: match[1],
+				repo: match[2].replace(/\.git$/, '')
+			};
+		}
+		return null;
+	}
 }
 
-// 注册组件
+/**
+ * 注册组件到全局
+ * @global
+ */
 window.DashboardPage = DashboardPage;

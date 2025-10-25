@@ -322,8 +322,8 @@ class TermsPage extends BasePage {
 
 	handleBack() {
 		// 返回到登录页面
-		if (window.app && window.app.router) {
-			window.app.router.navigateTo('/');
+		if (window.app && window.app.navigateTo) {
+			window.app.navigateTo('/');
 		}
 	}
 }

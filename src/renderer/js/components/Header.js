@@ -45,7 +45,7 @@ class Header extends Component {
 			const translatedText = window.I18nService && window.I18nService.t ?
 				window.I18nService.t(item.key, item.text) : item.text;
 			return `
-                <a href="${item.href}" class="nav-item ${isActive}">
+                <a href="${item.href}" class="nav-item ${isActive}" data-route="${item.href}">
                     ${translatedText}
                 </a>
             `;
@@ -75,23 +75,8 @@ class Header extends Component {
 	}
 
 	bindEvents() {
-		// 绑定导航菜单事件
-		const navItems = this.element.querySelectorAll('.nav-item');
-		navItems.forEach(item => {
-			item.addEventListener('click', (e) => {
-				e.preventDefault();
-
-				// 直接使用href属性作为路由
-				const route = item.getAttribute('href');
-
-				// 使用路由器导航
-				if (window.app && window.app.router) {
-					window.app.router.navigateTo(route);
-				}
-			});
-		});
-
-		// 绑定退出登录事件
+		// 导航菜单事件由 app.js 统一处理（通过 data-route 属性）
+		// 这里只绑定退出登录事件
 		if (this.state.onLogout) {
 			const logoutBtn = this.element.querySelector('#logout-btn');
 			if (logoutBtn) {

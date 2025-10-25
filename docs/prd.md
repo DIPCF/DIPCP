@@ -5,7 +5,7 @@
 - **项目名称**: SPCP - Serverless Project Contribution Platform
 - **版本**: v1.0
 - **创建日期**: 2025年10月21日
-- **最后更新**: 2025年10月22日
+- **最后更新**: 2025年10月24日
 - **文档类型**: 产品需求文档
 
 ## 🎯 项目概述
@@ -260,11 +260,17 @@ SPCP是一个**无服务器贡献平台**，包括桌面版、手机版和网页
 - **加载策略**: 所有JS在index.html中一次性加载，避免时序问题
 
 #### 3.2.3 集成服务
-- **GitHub API**: Octokit.js
+- **GitHub API**: @octokit/rest.js (官方GitHub REST API客户端)
 - **版本控制**: Git命令行工具
-- **认证**: GitHub OAuth 2.0
+- **认证**: GitHub Personal Access Token
 - **部署**: GitHub Pages (网页版)
 - **存储**: GitHub仓库 (所有数据)
+
+**重大技术变更 (2025年10月24日)**:
+- **API集成策略**: 完全采用官方@octokit/rest.js库，移除所有自定义GitHub API封装
+- **代码简化**: 直接使用Octokit方法调用GitHub API，避免重复造轮子
+- **维护性提升**: 自动获得最新API支持，减少维护成本
+- **类型安全**: 更好的TypeScript支持和错误处理
 
 ### 3.3 数据模型
 

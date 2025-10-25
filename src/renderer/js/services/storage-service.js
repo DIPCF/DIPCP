@@ -264,5 +264,87 @@ window.StorageService = {
 		} catch (error) {
 			console.error('Error clearing members cache:', error);
 		}
+	},
+
+	// 同步仓库数据 - 使用Octokit
+	async syncRepositoryData(owner, repo, token, progressCallback = null) {
+		try {
+			console.log(`开始同步仓库数据: ${owner}/${repo}`);
+
+			// 初始化数据库
+			await this.initDB();
+
+			// 使用Octokit获取仓库文件列表
+			const octokit = new window.Octokit({ auth: token });
+			const { data: files } = await octokit.rest.repos.getContent({ owner, repo, path: '' });
+
+			// 过滤掉.github目录的文件
+			const validFiles = files.filter(file =>
+				!(file.path.startsWith('.github/') || file.path === '.github') &&
+				file.type === 'file'
+			);
+
+			console.log(`需要下载 ${validFiles.length} 个文件`);
+
+			// 下载所有文件到fileCache
+			let downloadedCount = 0;
+			for (const file of validFiles) {
+				try {
+					const { data: fileData } = await octokit.rest.repos.getContent({
+						owner, repo, path: file.path
+					});
+
+					// 检查是否有内容
+					if (fileData.content) {
+						try {
+							// 尝试解码base64内容
+							const content = atob(fileData.content);
+
+							// 保存到fileCache
+							await this._execute('fileCache', 'put', {
+								path: file.path,
+								content: content,
+								sha: fileData.sha,
+								created: fileData.created_at,
+								modified: fileData.updated_at,
+								isLocal: false,
+								size: content.length,
+								type: file.type
+							});
+
+							downloadedCount++;
+
+							// 调用进度回调
+							if (progressCallback) {
+								const progress = Math.round((downloadedCount / validFiles.length) * 100);
+								progressCallback(progress, downloadedCount, validFiles.length, file.path);
+							}
+						} catch (decodeError) {
+							// 如果base64解码失败，跳过该文件
+							console.log(`跳过无法解码的文件: ${file.path}`);
+						}
+					} else {
+						// 没有内容，可能是空文件
+						console.log(`跳过空文件: ${file.path}`);
+					}
+				} catch (error) {
+					console.warn(`下载文件 ${file.path} 失败:`, error);
+				}
+			}
+
+			// 保存同步信息
+			const syncInfo = {
+				lastSync: new Date().toISOString(),
+				repo: `${owner}/${repo}`,
+				fileCount: downloadedCount
+			};
+			localStorage.setItem(`spcp-sync-${repo}`, JSON.stringify(syncInfo));
+
+			console.log(`仓库数据同步完成，共下载 ${downloadedCount} 个文件`);
+			return syncInfo;
+		} catch (error) {
+			console.error('同步仓库数据失败:', error);
+			throw error;
+		}
 	}
 };

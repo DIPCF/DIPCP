@@ -40,6 +40,91 @@ class DynamicLoader {
 	}
 
 	/**
+	 * 动态加载ES模块
+	 */
+	async loadESModule(src) {
+		if (this.loadedScripts.has(src)) {
+			return Promise.resolve();
+		}
+
+		if (this.loadPromises.has(src)) {
+			return this.loadPromises.get(src);
+		}
+
+		const promise = new Promise((resolve, reject) => {
+			const script = document.createElement('script');
+			script.type = 'module';
+			script.src = src;
+			script.onload = () => {
+				this.loadedScripts.add(src);
+				resolve();
+			};
+			script.onerror = () => {
+				console.error(`Failed to load ES module: ${src}`);
+				reject(new Error(`Failed to load ES module: ${src}`));
+			};
+			document.head.appendChild(script);
+		});
+
+		this.loadPromises.set(src, promise);
+		return promise;
+	}
+
+	/**
+	 * 加载外部库
+	 */
+	async loadExternalLibraries() {
+		// 加载Octokit库并设置到全局
+		const octokitScript = document.createElement('script');
+		octokitScript.type = 'module';
+		octokitScript.innerHTML = `
+			import { Octokit } from "https://esm.sh/@octokit/rest";
+			window.Octokit = Octokit;
+		`;
+		document.head.appendChild(octokitScript);
+
+		// 等待Octokit库完全加载并设置到全局
+		while (!window.Octokit) {
+			await new Promise(resolve => setTimeout(resolve, 10));
+		}
+
+		console.log('✅ Octokit库加载完成');
+
+		// 加载libsodium库
+		await this.loadLibsodium();
+	}
+
+	/**
+	 * 加载libsodium库
+	 */
+	async loadLibsodium() {
+		return new Promise((resolve, reject) => {
+			const libsodiumScript = document.createElement('script');
+			// 使用本地libsodium库
+			libsodiumScript.src = 'js/sodium.js';
+			libsodiumScript.onload = async () => {
+				try {
+					await window.sodium.ready;
+					window.libsodium = window.sodium;
+					console.log('✅ libsodium库（本地）加载完成');
+					resolve();
+				} catch (error) {
+					console.error('❌ libsodium库（本地）初始化失败:', error);
+					// 尝试使用Web Crypto API作为fallback
+					console.log('⚠️ 将使用Web Crypto API作为fallback');
+					resolve();
+				}
+			};
+			libsodiumScript.onerror = (error) => {
+				console.warn('⚠️ 本地libsodium库加载失败，将使用Web Crypto API作为fallback');
+				resolve();
+			};
+			document.head.appendChild(libsodiumScript);
+		});
+	}
+
+
+	/**
 	 * 批量加载脚本（分组并行加载）
 	 */
 	async loadScripts(scripts) {
@@ -48,8 +133,7 @@ class DynamicLoader {
 			// 第一组：基础服务
 			[
 				'js/services/storage-service.js',
-				'js/services/github-service.js',
-				'js/theme-manager.js'
+				'js/services/theme-service.js'
 			],
 			// 第二组：基础组件类
 			[
@@ -109,11 +193,7 @@ class DynamicLoader {
 				'js/pages/PrivacyPage.js',
 				'js/pages/UserProfilePage.js'
 			],
-			// 第八组：路由（依赖所有页面）
-			[
-				'js/router.js'
-			],
-			// 第九组：应用（依赖路由）
+			// 第八组：应用（依赖所有页面）
 			[
 				'js/app.js'
 			]
@@ -148,10 +228,13 @@ class DynamicLoader {
 	 * 加载所有应用脚本
 	 */
 	async loadAllScripts() {
-		// 等待i18n服务完全加载
+		// 1. 首先加载外部库
+		await this.loadExternalLibraries();
+
+		// 2. 等待i18n服务完全加载
 		await this.waitForI18nReady();
 
-		// 使用分组加载策略
+		// 3. 使用分组加载策略加载应用脚本
 		await this.loadScripts();
 	}
 

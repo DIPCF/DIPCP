@@ -1,13 +1,10 @@
 /**
- * 主题管理器
+ * 主题服务
  * 支持暗黑和明亮两种主题切换
  */
-class ThemeManager {
-	constructor() {
-		this.currentTheme = 'dark'; // 'light', 'dark' - 默认暗黑主题
-		this.listeners = [];
-		this.init();
-	}
+window.ThemeService = {
+	currentTheme: 'dark', // 'light', 'dark' - 默认暗黑主题
+	listeners: [],
 
 	/**
 	 * 初始化主题管理器
@@ -21,21 +18,21 @@ class ThemeManager {
 
 		// 应用主题
 		this.applyTheme();
-	}
+	},
 
 	/**
 	 * 获取当前主题
 	 */
 	getCurrentTheme() {
 		return this.currentTheme;
-	}
+	},
 
 	/**
 	 * 获取实际生效的主题
 	 */
 	getEffectiveTheme() {
 		return this.currentTheme;
-	}
+	},
 
 	/**
 	 * 设置主题
@@ -50,7 +47,7 @@ class ThemeManager {
 		localStorage.setItem('spcp-theme', theme);
 		this.applyTheme();
 		this.notifyListeners();
-	}
+	},
 
 	/**
 	 * 切换主题
@@ -58,7 +55,7 @@ class ThemeManager {
 	toggleTheme() {
 		const newTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
 		this.setTheme(newTheme);
-	}
+	},
 
 	/**
 	 * 应用主题
@@ -66,7 +63,7 @@ class ThemeManager {
 	applyTheme() {
 		document.documentElement.setAttribute('data-theme', this.currentTheme);
 		document.documentElement.classList.toggle('dark-theme', this.currentTheme === 'dark');
-	}
+	},
 
 
 	/**
@@ -74,7 +71,7 @@ class ThemeManager {
 	 */
 	addListener(callback) {
 		this.listeners.push(callback);
-	}
+	},
 
 	/**
 	 * 移除主题变化监听器
@@ -84,7 +81,7 @@ class ThemeManager {
 		if (index > -1) {
 			this.listeners.splice(index, 1);
 		}
-	}
+	},
 
 	/**
 	 * 通知所有监听器
@@ -97,14 +94,14 @@ class ThemeManager {
 				console.error('Theme listener error:', error);
 			}
 		});
-	}
+	},
 
 	/**
 	 * 获取主题图标
 	 */
 	getThemeIcon() {
 		return this.currentTheme === 'dark' ? '🌙' : '☀️';
-	}
+	},
 
 	/**
 	 * 获取主题名称
@@ -113,13 +110,4 @@ class ThemeManager {
 		return this.currentTheme === 'dark' ? I18nService.t('theme.dark') : I18nService.t('theme.light');
 	}
 
-}
-
-// 创建全局主题管理器实例
-window.themeManager = new ThemeManager();
-window.ThemeManager = ThemeManager;
-
-// 导出主题管理器
-if (typeof module !== 'undefined' && module.exports) {
-	module.exports = ThemeManager;
-}
+};

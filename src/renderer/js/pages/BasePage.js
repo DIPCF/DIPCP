@@ -19,8 +19,8 @@ class BasePage extends Component {
 		super.mount(container);
 
 		// 应用主题
-		if (window.themeManager) {
-			window.themeManager.applyTheme();
+		if (window.ThemeService) {
+			window.ThemeService.applyTheme();
 		}
 
 		// 应用国际化

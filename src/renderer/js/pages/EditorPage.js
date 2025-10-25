@@ -1,10 +1,25 @@
 /**
  * 编辑器页面组件
- * 完全组件化的编辑器页面
+ * 完全组件化的编辑器页面，提供文件编辑、预览、保存等功能
+ * @class EditorPage
+ * @extends {BasePage}
  */
 class EditorPage extends BasePage {
+	/**
+	 * 构造函数
+	 * @param {Object} props - 组件属性
+	 * @param {string} [props.filePath] - 文件路径
+	 * @param {string} [props.fileName] - 文件名
+	 * @param {string} [props.content] - 文件内容
+	 * @param {string} [props.mode] - 编辑模式 ('edit' 或 'view')
+	 * @param {string} [props.projectName] - 项目名称
+	 */
 	constructor(props = {}) {
 		super(props);
+
+		// 从 localStorage 获取用户信息
+		const userInfo = window.app.getUserFromStorage();
+
 		this.state = {
 			filePath: props.filePath || '',
 			fileName: props.fileName || '',
@@ -14,10 +29,10 @@ class EditorPage extends BasePage {
 			viewMode: props.mode || 'edit', // 'edit' 或 'view'
 			showInfoPanel: false,
 			infoPanelContent: null,
-			projectName: props.projectName || 'DPCC',
-			onSave: props.onSave || null,
-			onPreview: props.onPreview || null,
-			onSubmitReview: props.onSubmitReview || null,
+			projectName: props.projectName || 'SPCP',
+			user: userInfo.user,
+			userRole: userInfo.userRole,
+			permissionInfo: userInfo.permissionInfo,
 			// 功能模块状态缓存
 			moduleStates: this.loadModuleStates()
 		};
@@ -25,6 +40,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 加载模块状态缓存
+	 * @returns {Object} 模块状态对象
 	 */
 	loadModuleStates() {
 		try {
@@ -48,6 +64,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 保存模块状态缓存
+	 * @returns {void}
 	 */
 	saveModuleStates() {
 		try {
@@ -59,6 +76,9 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 更新模块状态
+	 * @param {string} moduleName - 模块名称
+	 * @param {boolean} isOpen - 是否打开
+	 * @returns {void}
 	 */
 	updateModuleState(moduleName, isOpen) {
 		const newModuleStates = {
@@ -72,6 +92,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 恢复模块状态
+	 * @returns {void}
 	 */
 	restoreModuleStates() {
 		// 防止重复调用
@@ -100,10 +121,14 @@ class EditorPage extends BasePage {
 		}, 200);
 	}
 
+	/**
+	 * 加载文件内容
+	 * @returns {Promise<void>}
+	 */
 	async loadFileContent() {
 		if (!this.state.filePath) {
 			this.setState({ content: this.t('editor.noContent', '暂无内容') });
-			this.rerender();
+			this.updateContentDOM(this.state.content);
 			return;
 		}
 
@@ -131,23 +156,27 @@ class EditorPage extends BasePage {
 						content = atob(fileData.content.content);
 					}
 					this.setState({ content: content });
-					this.rerender();
+					this.updateContentDOM(content);
 					return;
 				}
 			}
 			// 如果都失败了，显示默认内容
 			this.setState({ content: this.t('editor.noContent', '暂无内容') });
-			this.rerender();
+			this.updateContentDOM(this.state.content);
 		} catch (error) {
 			console.error('加载文件内容失败:', error);
 			this.setState({ content: this.t('editor.noContent', '暂无内容') });
-			this.rerender();
+			this.updateContentDOM(this.state.content);
 		}
 
 		// 根据缓存状态自动显示相应的模块（只调用一次）
 		this.restoreModuleStates();
 	}
 
+	/**
+	 * 渲染组件
+	 * @returns {HTMLElement} 渲染后的DOM元素
+	 */
 	render() {
 		const container = document.createElement('div');
 		container.className = 'dashboard';
@@ -173,11 +202,21 @@ class EditorPage extends BasePage {
 		return container;
 	}
 
+	/**
+	 * 渲染页面头部
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 头部HTML字符串
+	 */
 	renderHeader(getText) {
 		// 使用BasePage的renderHeader方法
 		return super.renderHeader('editor', false, null);
 	}
 
+	/**
+	 * 渲染返回按钮和面包屑
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 返回按钮HTML字符串
+	 */
 	renderBackButton(getText) {
 		return `
             <div class="breadcrumb-container">
@@ -198,6 +237,11 @@ class EditorPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 渲染工具栏
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 工具栏HTML字符串
+	 */
 	renderToolbar(getText) {
 		return `
             <div class="editor-toolbar">
@@ -215,6 +259,11 @@ class EditorPage extends BasePage {
 	}
 
 
+	/**
+	 * 渲染主要内容区域
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 主内容HTML字符串
+	 */
 	renderMainContent(getText) {
 		// 检查是否为图像文件
 		const isImageFile = this.isImageFile(this.state.fileName);
@@ -243,6 +292,8 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 渲染文本编辑器
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 文本编辑器HTML字符串
 	 */
 	renderTextEditor(getText) {
 		return `
@@ -259,6 +310,8 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 渲染图像查看器
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 图像查看器HTML字符串
 	 */
 	renderImageViewer(getText) {
 		return `
@@ -277,6 +330,8 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 检查是否为图像文件
+	 * @param {string} fileName - 文件名
+	 * @returns {boolean} 是否为图像文件
 	 */
 	isImageFile(fileName) {
 		const imageExtensions = [
@@ -289,6 +344,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 获取图像的数据URL
+	 * @returns {string} 图像数据URL
 	 */
 	getImageDataUrl() {
 		// 如果content是base64编码的，直接使用
@@ -303,6 +359,8 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 根据文件扩展名获取MIME类型
+	 * @param {string} extension - 文件扩展名
+	 * @returns {string} MIME类型
 	 */
 	getMimeType(extension) {
 		const mimeTypes = {
@@ -323,6 +381,10 @@ class EditorPage extends BasePage {
 		return mimeTypes[extension] || 'image/jpeg';
 	}
 
+	/**
+	 * 渲染编辑器工具栏
+	 * @returns {string} 编辑器工具栏HTML字符串
+	 */
 	renderEditorToolbar() {
 		const isImageFile = this.isImageFile(this.state.fileName);
 
@@ -347,6 +409,11 @@ class EditorPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 渲染预览内容
+	 * @param {Function} getText - 文本获取函数
+	 * @returns {string} 预览内容HTML字符串
+	 */
 	renderPreviewContent(getText) {
 		if (!this.state.content || typeof this.state.content !== 'string') {
 			return `<div class="empty-preview">${getText('editor.noContent', '暂无内容')}</div>`;
@@ -359,6 +426,10 @@ class EditorPage extends BasePage {
 			.replace(/  /g, '&nbsp;&nbsp;');
 	}
 
+	/**
+	 * 渲染信息面板
+	 * @returns {string} 信息面板HTML字符串
+	 */
 	renderInfoPanel() {
 		return `
             <div class="info-panel" id="infoPanel" style="display: ${this.state.showInfoPanel ? 'block' : 'none'};">
@@ -373,6 +444,11 @@ class EditorPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 挂载组件到容器
+	 * @param {HTMLElement} container - 挂载容器
+	 * @returns {Promise<void>}
+	 */
 	async mount(container) {
 		super.mount(container);
 
@@ -383,6 +459,10 @@ class EditorPage extends BasePage {
 		this.bindEvents();
 	}
 
+	/**
+	 * 绑定事件监听器
+	 * @returns {void}
+	 */
 	bindEvents() {
 		if (!this.element) {
 			return;
@@ -470,24 +550,35 @@ class EditorPage extends BasePage {
 		if (closeInfoPanel) {
 			closeInfoPanel.addEventListener('click', () => {
 				this.setState({ showInfoPanel: false });
-				this.rerender();
-				this.bindEvents();
+				this.updateInfoPanelDOM(false);
 			});
 		}
 	}
 
+	/**
+	 * 处理保存操作
+	 * @returns {Promise<void>}
+	 */
 	async handleSave() {
 		await this.saveContent();
 		this.setState({ isModified: false });
 		this.updateSaveButtonState();
 	}
 
+	/**
+	 * 处理提交审核操作
+	 * @returns {void}
+	 */
 	handleSubmitReview() {
 		console.log('提交审核功能');
 		// TODO: 实现提交审核逻辑
 		alert(this.t('editor.submitNotImplemented', '提交审核功能暂未实现'));
 	}
 
+	/**
+	 * 保存文件内容
+	 * @returns {Promise<void>}
+	 */
 	async saveContent() {
 		console.log('保存文件功能');
 
@@ -533,20 +624,22 @@ class EditorPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 切换预览模式
+	 * @returns {void}
+	 */
 	togglePreview() {
 		const previewMode = !this.state.previewMode;
 		this.setState({ previewMode });
 
-		// 更新预览内容
-		if (previewMode) {
-			this.updatePreviewContent();
-		}
-
-		// 重新渲染并绑定事件
-		this.rerender();
-		this.bindEvents();
+		// 更新预览模式DOM
+		this.updatePreviewModeDOM(previewMode);
 	}
 
+	/**
+	 * 更新预览内容
+	 * @returns {void}
+	 */
 	updatePreviewContent() {
 		const previewContent = this.element.querySelector('#previewContent');
 		if (previewContent) {
@@ -554,6 +647,10 @@ class EditorPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 更新保存按钮状态
+	 * @returns {void}
+	 */
 	updateSaveButtonState() {
 		const saveBtn = this.element.querySelector('#saveBtn');
 		if (saveBtn) {
@@ -562,44 +659,156 @@ class EditorPage extends BasePage {
 		}
 	}
 
-	setContent(content) {
-		this.setState({ content });
+	/**
+	 * 更新文件内容DOM
+	 * @param {string} content - 文件内容
+	 * @returns {void}
+	 */
+	updateContentDOM(content) {
+		if (!this.element) return;
+
 		const editor = this.element.querySelector('#markdownEditor');
 		if (editor) {
 			editor.value = content;
 		}
-		this.rerender();
-		this.bindEvents();
+
+		// 更新预览内容
+		if (this.state.previewMode) {
+			this.updatePreviewContent();
+		}
 	}
 
+	/**
+	 * 更新预览模式DOM
+	 * @param {boolean} previewMode - 是否预览模式
+	 * @returns {void}
+	 */
+	updatePreviewModeDOM(previewMode) {
+		if (!this.element) return;
+
+		const editorPanel = this.element.querySelector('#editorPanel');
+		const previewPanel = this.element.querySelector('#previewPanel');
+		const previewBtn = this.element.querySelector('#previewBtn');
+
+		if (editorPanel) {
+			editorPanel.style.display = previewMode ? 'none' : 'block';
+		}
+
+		if (previewPanel) {
+			previewPanel.style.display = previewMode ? 'flex' : 'none';
+		}
+
+		if (previewBtn) {
+			previewBtn.textContent = previewMode ? '✏️ 编辑' : '👁 预览';
+			previewBtn.classList.toggle('active', previewMode);
+		}
+
+		// 如果切换到预览模式，更新预览内容
+		if (previewMode) {
+			this.updatePreviewContent();
+		}
+	}
+
+	/**
+	 * 更新信息面板DOM
+	 * @param {boolean} show - 是否显示
+	 * @param {string} [content=''] - 面板内容
+	 * @param {string} [title=''] - 面板标题
+	 * @returns {void}
+	 */
+	updateInfoPanelDOM(show, content = '', title = '') {
+		if (!this.element) return;
+
+		const infoPanel = this.element.querySelector('#infoPanel');
+		const infoPanelContent = this.element.querySelector('#infoPanelContent');
+		const infoPanelTitle = this.element.querySelector('#infoPanelTitle');
+
+		if (infoPanel) {
+			infoPanel.style.display = show ? 'block' : 'none';
+		}
+
+		if (show && content && infoPanelContent) {
+			infoPanelContent.innerHTML = content;
+		}
+
+		if (show && title && infoPanelTitle) {
+			infoPanelTitle.textContent = title;
+		}
+	}
+
+	/**
+	 * 更新文件名DOM
+	 * @param {string} fileName - 文件名
+	 * @returns {void}
+	 */
+	updateFileNameDOM(fileName) {
+		if (!this.element) return;
+
+		const fileNameElement = this.element.querySelector('#fileName');
+		if (fileNameElement) {
+			fileNameElement.textContent = fileName;
+		}
+	}
+
+	/**
+	 * 设置文件内容
+	 * @param {string} content - 文件内容
+	 * @returns {void}
+	 */
+	setContent(content) {
+		this.setState({ content });
+		this.updateContentDOM(content);
+	}
+
+	/**
+	 * 设置文件路径
+	 * @param {string} filePath - 文件路径
+	 * @returns {void}
+	 */
 	setFilePath(filePath) {
 		this.setState({ filePath });
-		this.rerender();
-		this.bindEvents();
+		// 文件路径变化时，需要重新加载内容
+		this.loadFileContent();
 	}
 
+	/**
+	 * 设置文件名
+	 * @param {string} fileName - 文件名
+	 * @returns {void}
+	 */
 	setFileName(fileName) {
 		this.setState({ fileName });
-		this.rerender();
-		this.bindEvents();
+		this.updateFileNameDOM(fileName);
 	}
 
+	/**
+	 * 显示信息面板
+	 * @param {string} content - 面板内容
+	 * @param {string} [title='文件信息'] - 面板标题
+	 * @returns {void}
+	 */
 	showInfoPanel(content, title = '文件信息') {
 		this.setState({
 			showInfoPanel: true,
 			infoPanelContent: content
 		});
-		this.rerender();
-		this.bindEvents();
+		this.updateInfoPanelDOM(true, content, title);
 	}
 
+	/**
+	 * 隐藏信息面板
+	 * @returns {void}
+	 */
 	hideInfoPanel() {
 		this.setState({ showInfoPanel: false });
-		this.rerender();
-		this.bindEvents();
+		this.updateInfoPanelDOM(false);
 	}
 
 
+	/**
+	 * 切换文件信息显示状态
+	 * @returns {void}
+	 */
 	toggleFileInfo() {
 		const isCurrentlyVisible = this.state.moduleStates.fileInfo;
 
@@ -611,6 +820,10 @@ class EditorPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示文件信息
+	 * @returns {void}
+	 */
 	showFileInfo() {
 		const fileInfo = `
 			<div class="info-item">
@@ -633,6 +846,10 @@ class EditorPage extends BasePage {
 		this.showInfoPanel(fileInfo, this.t('editor.fileInfo', '文件信息'));
 	}
 
+	/**
+	 * 隐藏文件信息
+	 * @returns {void}
+	 */
 	hideFileInfo() {
 		// 如果文件信息在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {
@@ -642,6 +859,10 @@ class EditorPage extends BasePage {
 		this.updateModuleState('fileInfo', false);
 	}
 
+	/**
+	 * 切换编辑历史显示状态
+	 * @returns {void}
+	 */
 	toggleEditHistory() {
 		const isCurrentlyVisible = this.state.moduleStates.editHistory;
 
@@ -653,6 +874,10 @@ class EditorPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示编辑历史
+	 * @returns {void}
+	 */
 	showEditHistory() {
 		const editHistory = `
 			<div class="history-item">
@@ -667,6 +892,10 @@ class EditorPage extends BasePage {
 		this.showInfoPanel(editHistory, this.t('editor.editHistory', '编辑历史'));
 	}
 
+	/**
+	 * 隐藏编辑历史
+	 * @returns {void}
+	 */
 	hideEditHistory() {
 		// 如果编辑历史在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {
@@ -676,6 +905,10 @@ class EditorPage extends BasePage {
 		this.updateModuleState('editHistory', false);
 	}
 
+	/**
+	 * 切换协作信息显示状态
+	 * @returns {void}
+	 */
 	toggleCollaboration() {
 		const isCurrentlyVisible = this.state.moduleStates.collaboration;
 
@@ -687,6 +920,10 @@ class EditorPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示协作信息
+	 * @returns {void}
+	 */
 	showCollaboration() {
 		const collaboration = `
 			<div class="collaboration-item">
@@ -701,6 +938,10 @@ class EditorPage extends BasePage {
 		this.showInfoPanel(collaboration, this.t('editor.collaboration', '协作信息'));
 	}
 
+	/**
+	 * 隐藏协作信息
+	 * @returns {void}
+	 */
 	hideCollaboration() {
 		// 如果协作信息在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {

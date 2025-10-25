@@ -1,24 +1,34 @@
 /**
  * 项目详情页面组件
- * 完全组件化的项目详情页面
+ * 完全组件化的项目详情页面，提供文件管理、成员查看、活动记录等功能
+ * @class ProjectDetailPage
+ * @extends {BasePage}
  */
 class ProjectDetailPage extends BasePage {
+	/**
+	 * 构造函数
+	 * @param {Object} props - 组件属性
+	 */
 	constructor(props = {}) {
 		super(props);
+
+		// 从 localStorage 获取用户信息
+		const userInfo = window.app.getUserFromStorage();
+
+		// 从本地存储加载项目数据
+		const projectData = this.loadProjectDataFromStorage();
+		const filesData = this.loadFilesDataFromStorage();
+
 		this.state = {
-			project: props.project || null,
-			files: props.files || [],
+			project: projectData, // 从本地存储加载
+			files: filesData, // 从本地存储加载
 			selectedFile: null,
 			showInfoPanel: false,
 			infoPanelContent: null,
 			loading: true,
-			onFileClick: props.onFileClick || null,
-			onFileOpen: props.onFileOpen || null,
-			onFileDelete: props.onFileDelete || null,
-			onCreateFile: props.onCreateFile || null,
-			onCreateDir: props.onCreateDir || null,
-			onUploadFile: props.onUploadFile || null,
-			onCheckUpdate: props.onCheckUpdate || null,
+			user: userInfo.user,
+			userRole: userInfo.userRole,
+			permissionInfo: userInfo.permissionInfo,
 			// 模态框实例
 			modal: null,
 			// 功能模块状态缓存
@@ -29,6 +39,10 @@ class ProjectDetailPage extends BasePage {
 		};
 	}
 
+	/**
+	 * 渲染组件
+	 * @returns {HTMLElement} 渲染后的DOM元素
+	 */
 	render() {
 		const container = document.createElement('div');
 		container.className = 'dashboard';
@@ -44,11 +58,19 @@ class ProjectDetailPage extends BasePage {
 		return container;
 	}
 
+	/**
+	 * 渲染页面头部
+	 * @returns {string} 头部HTML字符串
+	 */
 	renderHeader() {
 		// 使用BasePage的renderHeader方法
 		return super.renderHeader('project-detail', false, null);
 	}
 
+	/**
+	 * 渲染面包屑导航
+	 * @returns {string} 面包屑HTML字符串
+	 */
 	renderBreadcrumb() {
 		return `
             <div class="breadcrumb-container">
@@ -70,23 +92,36 @@ class ProjectDetailPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 渲染工具栏
+	 * @returns {string} 工具栏HTML字符串
+	 */
 	renderToolbar() {
+		// 根据用户角色决定显示哪些按钮
+		const canEdit = this.state.userRole === 'owner' || this.state.userRole === 'admin' || this.state.userRole === 'collaborator';
+
 		return `
             <div class="editor-toolbar">
                 <div class="editor-toolbar-left">
-                    <button class="btn btn-sm" id="createFileBtn">📄 ${this.t('projectDetail.createFile', '创建文件')}</button>
-                    <button class="btn btn-sm" id="createDirBtn">📁 ${this.t('projectDetail.createDirectory', '创建目录')}</button>
-                    <button class="btn btn-sm" id="uploadFileBtn">📤 ${this.t('projectDetail.uploadFile', '上传文件')}</button>
+                    ${canEdit ? `
+                        <button class="btn btn-sm" id="createFileBtn">📄 ${this.t('projectDetail.createFile', '创建文件')}</button>
+                        <button class="btn btn-sm" id="createDirBtn">📁 ${this.t('projectDetail.createDirectory', '创建目录')}</button>
+                        <button class="btn btn-sm" id="uploadFileBtn">📤 ${this.t('projectDetail.uploadFile', '上传文件')}</button>
+                    ` : ''}
                     <button class="btn btn-sm" id="checkUpdateBtn">🔄 ${this.t('projectDetail.checkUpdate', '检查更新')}</button>
                 </div>
                 <div class="editor-toolbar-right">
                     <button class="btn btn-success btn-sm" id="openBtn" style="display: none;">👁 ${this.t('projectDetail.openFile', '打开')}</button>
-                    <button class="btn btn-danger btn-sm" id="deleteBtn" style="display: none;">🗑️ ${this.t('projectDetail.deleteFile', '删除')}</button>
+                    ${canEdit ? `<button class="btn btn-danger btn-sm" id="deleteBtn" style="display: none;">🗑️ ${this.t('projectDetail.deleteFile', '删除')}</button>` : ''}
                 </div>
             </div>
         `;
 	}
 
+	/**
+	 * 渲染项目信息卡片
+	 * @returns {string} 项目信息HTML字符串
+	 */
 	renderProjectInfo() {
 		const isVisible = this.state.moduleStates.projectInfo;
 		return `
@@ -118,6 +153,10 @@ class ProjectDetailPage extends BasePage {
         `;
 	}
 
+	/**
+	 * 渲染主要内容区域
+	 * @returns {string} 主内容HTML字符串
+	 */
 	renderMainContent() {
 		return `
             <div class="main-content" id="mainContent">
@@ -141,7 +180,44 @@ class ProjectDetailPage extends BasePage {
 	}
 
 	/**
+	 * 从本地存储加载项目数据
+	 * @returns {Object|null} 项目数据对象或null
+	 */
+	loadProjectDataFromStorage() {
+		try {
+			const cached = localStorage.getItem('spcp-project-data');
+			if (cached) {
+				const projectData = JSON.parse(cached);
+				console.log('从本地存储加载项目数据:', projectData);
+				return projectData;
+			}
+		} catch (error) {
+			console.error('加载项目数据失败:', error);
+		}
+		return null;
+	}
+
+	/**
+	 * 从本地存储加载文件数据
+	 * @returns {Array} 文件数据数组
+	 */
+	loadFilesDataFromStorage() {
+		try {
+			const cached = localStorage.getItem('spcp-files-data');
+			if (cached) {
+				const filesData = JSON.parse(cached);
+				console.log('从本地存储加载文件数据:', filesData.length, '个文件');
+				return filesData;
+			}
+		} catch (error) {
+			console.error('加载文件数据失败:', error);
+		}
+		return [];
+	}
+
+	/**
 	 * 加载模块状态缓存
+	 * @returns {Object} 模块状态对象
 	 */
 	loadModuleStates() {
 		try {
@@ -166,7 +242,36 @@ class ProjectDetailPage extends BasePage {
 	}
 
 	/**
+	 * 保存项目数据到本地存储
+	 * @param {Object} project - 项目数据对象
+	 * @returns {void}
+	 */
+	saveProjectDataToStorage(project) {
+		try {
+			localStorage.setItem('spcp-project-data', JSON.stringify(project));
+			console.log('项目数据已保存到本地存储:', project);
+		} catch (error) {
+			console.error('保存项目数据失败:', error);
+		}
+	}
+
+	/**
+	 * 保存文件数据到本地存储
+	 * @param {Array} files - 文件数据数组
+	 * @returns {void}
+	 */
+	saveFilesDataToStorage(files) {
+		try {
+			localStorage.setItem('spcp-files-data', JSON.stringify(files));
+			console.log('文件数据已保存到本地存储:', files.length, '个文件');
+		} catch (error) {
+			console.error('保存文件数据失败:', error);
+		}
+	}
+
+	/**
 	 * 保存模块状态缓存
+	 * @returns {void}
 	 */
 	saveModuleStates() {
 		try {
@@ -178,6 +283,7 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 加载成员数据缓存
+	 * @returns {Promise<Array|null>} 成员数据数组或null
 	 */
 	async loadMembersCache() {
 		try {
@@ -202,6 +308,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 保存成员数据缓存
+	 * @param {Array} membersData - 成员数据数组
+	 * @returns {Promise<void>}
 	 */
 	async saveMembersCache(membersData) {
 		try {
@@ -224,6 +332,9 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 更新模块状态
+	 * @param {string} moduleName - 模块名称
+	 * @param {boolean} isOpen - 是否打开
+	 * @returns {void}
 	 */
 	updateModuleState(moduleName, isOpen) {
 		const newModuleStates = {
@@ -237,40 +348,36 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 恢复模块状态
+	 * @returns {void}
 	 */
 	restoreModuleStates() {
 		// 防止重复调用
 		if (this._restoreModuleStatesCalled) {
-			console.log('restoreModuleStates 已被调用，跳过');
 			return;
 		}
 		this._restoreModuleStatesCalled = true;
 
 		// 延迟执行，确保DOM已经渲染完成
 		setTimeout(() => {
-			console.log('恢复模块状态:', this.state.moduleStates);
 
 			if (this.state.moduleStates.projectInfo) {
-				console.log('显示项目信息模块');
 				this.showProjectInfo();
 			}
 			if (this.state.moduleStates.members) {
-				console.log('显示成员模块');
 				this.showMembers();
 			}
 			if (this.state.moduleStates.activity) {
-				console.log('显示活动模块');
 				this.showActivity();
 			}
 			if (this.state.moduleStates.pending) {
-				console.log('显示待审核模块');
 				this.showPendingReviews();
 			}
-		}, 200);
+		}, 100);
 	}
 
 	/**
 	 * 初始化模态框
+	 * @returns {void}
 	 */
 	initModal() {
 		if (!this.state.modal) {
@@ -282,22 +389,47 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
-	// 模态框辅助方法
+	/**
+	 * 显示输入模态框
+	 * @param {string} title - 标题
+	 * @param {string} message - 消息
+	 * @param {string} [placeholder=''] - 占位符
+	 * @param {string} [defaultValue=''] - 默认值
+	 * @param {Function} [callback=null] - 回调函数
+	 * @returns {void}
+	 */
 	showInputModal(title, message, placeholder = '', defaultValue = '', callback = null) {
 		this.initModal();
 		this.state.modal.showInput(title, message, placeholder, defaultValue, callback);
 	}
 
+	/**
+	 * 显示确认模态框
+	 * @param {string} title - 标题
+	 * @param {string} message - 消息
+	 * @param {Function} [callback=null] - 回调函数
+	 * @returns {void}
+	 */
 	showConfirmModal(title, message, callback = null) {
 		this.initModal();
 		this.state.modal.showConfirm(title, message, callback);
 	}
 
+	/**
+	 * 显示信息模态框
+	 * @param {string} title - 标题
+	 * @param {string} message - 消息
+	 * @returns {void}
+	 */
 	showInfoModal(title, message) {
 		this.initModal();
 		this.state.modal.showInfo(title, message);
 	}
 
+	/**
+	 * 渲染文件列表
+	 * @returns {string} 文件列表HTML字符串
+	 */
 	renderFileList() {
 		if (this.state.loading) {
 			return `<div class="loading">${this.t('common.loading', '载入中...')}</div>`;
@@ -312,6 +444,11 @@ class ProjectDetailPage extends BasePage {
 		return this.renderFileTree(tree);
 	}
 
+	/**
+	 * 构建文件树结构
+	 * @param {Array} files - 文件数组
+	 * @returns {Object} 文件树对象
+	 */
 	buildFileTree(files) {
 		const tree = {};
 
@@ -359,6 +496,12 @@ class ProjectDetailPage extends BasePage {
 		return tree;
 	}
 
+	/**
+	 * 渲染文件树
+	 * @param {Object} tree - 文件树对象
+	 * @param {number} [level=0] - 层级深度
+	 * @returns {string} 文件树HTML字符串
+	 */
 	renderFileTree(tree, level = 0) {
 		let html = '';
 		const indent = '  '.repeat(level);
@@ -404,26 +547,57 @@ class ProjectDetailPage extends BasePage {
 		return html;
 	}
 
+	/**
+	 * 挂载组件到容器
+	 * @param {HTMLElement} container - 容器元素
+	 * @returns {void}
+	 */
 	mount(container) {
 		super.mount(container);
+
+		// 检查并更新用户信息（从 localStorage 读取最新状态）
+		this.checkAndUpdateUserInfo();
 
 		// 加载项目数据，loadProjectData方法内部会调用bindEvents
 		this.loadProjectData();
 	}
 
+	/**
+	 * 检查并更新用户信息
+	 */
+	checkAndUpdateUserInfo() {
+		const userInfo = window.app.getUserFromStorage();
+		const user = userInfo.user;
+		const currentRole = userInfo.userRole;
+
+		// 如果用户信息或角色发生变化，更新状态
+		if (this.state.user !== user || this.state.userRole !== currentRole) {
+			this.setState({
+				user: user,
+				userRole: currentRole
+			});
+		}
+	}
+
+	/**
+	 * 加载项目数据
+	 * @returns {Promise<void>}
+	 */
 	async loadProjectData() {
 		try {
 			// 检查是否有用户数据
-			const userData = localStorage.getItem('spcp-user');
-			if (!userData) {
+			if (!this.state.user) {
 				this.setState({
 					loading: false,
 					files: [],
-					project: null
+					project: null,
+					userRole: 'visitor' // 确保访客角色
 				});
 				this.rerender();
 				return Promise.resolve();
 			}
+
+			console.log('ProjectDetailPage: 当前用户角色为:', this.state.userRole);
 
 			// 使用StorageService加载项目数据
 			if (window.StorageService) {
@@ -470,46 +644,78 @@ class ProjectDetailPage extends BasePage {
 						!file.path.startsWith('_deletions/')
 					);
 
+					// 从用户数据中获取仓库信息
+					const user = this.state.user;
+					const repoInfo = user?.repositoryInfo;
+					const projectName = repoInfo?.repo || 'Unknown Project';
+					const projectOwner = repoInfo?.owner || 'Unknown Owner';
+					const projectUrl = `https://github.com/${projectOwner}/${projectName}`;
+
+					const projectData = {
+						name: projectName,
+						url: projectUrl,
+						description: this.t('projectDetail.defaultDescription', '项目描述')
+					};
+
 					this.setState({
 						loading: false,
-						project: {
-							name: 'DPCC',
-							url: 'https://github.com/ZelaCreator/DPCC',
-							description: this.t('projectDetail.defaultDescription', '项目描述')
-						},
+						project: projectData,
 						files: files
 					});
+
+					// 保存到本地存储
+					this.saveProjectDataToStorage(projectData);
+					this.saveFilesDataToStorage(files);
 				} catch (dbError) {
 					console.log('Error loading from IndexedDB:', dbError);
 					// 如果加载失败，设置空文件列表
+					// 从用户数据中获取仓库信息
+					const user = this.state.user;
+					const repoInfo = user?.repositoryInfo;
+					const projectName = repoInfo?.repo || 'Unknown Project';
+					const projectOwner = repoInfo?.owner || 'Unknown Owner';
+					const projectUrl = `https://github.com/${projectOwner}/${projectName}`;
+
+					const projectData = {
+						name: projectName,
+						url: projectUrl,
+						description: this.t('projectDetail.defaultDescription', '项目描述')
+					};
+
 					this.setState({
 						loading: false,
-						project: {
-							name: 'DPCC',
-							url: 'https://github.com/ZelaCreator/DPCC',
-							description: this.t('projectDetail.defaultDescription', '项目描述')
-						},
+						project: projectData,
 						files: []
 					});
+
+					// 保存到本地存储
+					this.saveProjectDataToStorage(projectData);
+					this.saveFilesDataToStorage([]);
 				}
 			}
 
-			this.rerender();
-			// 重新绑定事件，因为文件项是动态生成的
+			// 更新文件列表显示
 			if (this.element) {
-				this.bindEvents();
+				this.updateFileListDOM(this.state.files);
 				// 更新操作按钮状态
 				this.updateActionButtons();
 			}
 
 			// 根据缓存状态自动显示相应的模块
 			this.restoreModuleStates();
+
+			// 绑定事件
+			this.bindEvents();
 		} catch (error) {
 			console.error('Error loading project data:', error);
 
 		}
 	}
 
+	/**
+	 * 绑定事件监听器
+	 * @returns {void}
+	 */
 	bindEvents() {
 		if (!this.element) {
 			console.warn('Cannot bind events: element not mounted');
@@ -518,23 +724,8 @@ class ProjectDetailPage extends BasePage {
 
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
-		// 文件点击
-		const fileItems = this.element.querySelectorAll('.file-item');
-		fileItems.forEach(item => {
-			item.addEventListener('click', (e) => {
-				const path = e.currentTarget.dataset.path;
-				const type = e.currentTarget.dataset.type;
-
-				// 更新选中状态
-				fileItems.forEach(f => f.classList.remove('selected'));
-				e.currentTarget.classList.add('selected');
-
-				// 从文件列表中查找完整的文件信息
-				const fullFileInfo = this.state.files.find(f => f.path === path);
-				this.setState({ selectedFile: fullFileInfo || { path, type, name: path.split('/').pop() } });
-				this.updateActionButtons();
-			});
-		});
+		// 绑定文件项事件
+		this.bindFileItemEvents();
 
 		// 工具栏按钮
 		const createFileBtn = this.element.querySelector('#createFileBtn');
@@ -631,8 +822,7 @@ class ProjectDetailPage extends BasePage {
 				} else {
 					// 默认关闭信息面板
 					this.setState({ showInfoPanel: false });
-					this.rerender();
-					this.bindEvents();
+					this.updateInfoPanelDOM(false);
 				}
 			});
 		}
@@ -645,14 +835,141 @@ class ProjectDetailPage extends BasePage {
 			});
 		}
 
-		// 模态框事件由Modal组件自己处理
 	}
 
+	/**
+	 * 更新项目信息DOM
+	 * @param {Object} project - 项目信息对象
+	 * @returns {void}
+	 */
+	updateProjectInfoDOM(project) {
+		if (!this.element) return;
+
+		// 更新项目标题
+		const projectTitle = this.element.querySelector('#projectTitle');
+		if (projectTitle && project?.name) {
+			projectTitle.textContent = project.name;
+		}
+
+		// 更新项目信息卡片中的各个字段
+		const creator = this.element.querySelector('#creator');
+		if (creator && project?.creator) {
+			creator.textContent = project.creator;
+		}
+
+		const description = this.element.querySelector('#description');
+		if (description && project?.description) {
+			description.textContent = project.description;
+		}
+
+		const contributors = this.element.querySelector('#contributors');
+		if (contributors && project?.contributors) {
+			contributors.textContent = project.contributors;
+		}
+
+		const lastUpdated = this.element.querySelector('#lastUpdated');
+		if (lastUpdated && project?.lastUpdated) {
+			lastUpdated.textContent = project.lastUpdated;
+		}
+
+		const status = this.element.querySelector('#status');
+		if (status && project?.status) {
+			status.textContent = project.status;
+		}
+	}
+
+	/**
+	 * 更新文件列表DOM
+	 * @param {Array} files - 文件数组
+	 * @returns {void}
+	 */
+	updateFileListDOM(files) {
+		if (!this.element) return;
+
+		const fileList = this.element.querySelector('#fileList');
+		if (fileList) {
+			if (files.length === 0) {
+				fileList.innerHTML = `<div class="empty">${this.t('projectDetail.noFiles', '暂无文件')}</div>`;
+			} else {
+				// 构建树状结构
+				const tree = this.buildFileTree(files);
+				fileList.innerHTML = this.renderFileTree(tree);
+			}
+
+			// 重新绑定文件项的事件
+			this.bindFileItemEvents();
+		}
+	}
+
+	/**
+	 * 更新信息面板DOM
+	 * @param {boolean} show - 是否显示
+	 * @param {string} [content=''] - 面板内容
+	 * @param {string} [title=''] - 面板标题
+	 * @returns {void}
+	 */
+	updateInfoPanelDOM(show, content = '', title = '') {
+		if (!this.element) return;
+
+		const infoPanel = this.element.querySelector('#infoPanel');
+		const infoPanelContent = this.element.querySelector('#infoPanelContent');
+		const infoPanelTitle = this.element.querySelector('#infoPanelTitle');
+
+		if (infoPanel) {
+			infoPanel.style.display = show ? 'block' : 'none';
+		}
+
+		if (show && content && infoPanelContent) {
+			infoPanelContent.innerHTML = content;
+		}
+
+		if (show && title && infoPanelTitle) {
+			infoPanelTitle.textContent = title;
+		}
+	}
+
+	/**
+	 * 绑定文件项事件
+	 * @returns {void}
+	 */
+	bindFileItemEvents() {
+		if (!this.element) return;
+
+		const fileItems = this.element.querySelectorAll('.file-item');
+		fileItems.forEach(item => {
+			// 移除旧的事件监听器
+			item.replaceWith(item.cloneNode(true));
+		});
+
+		// 重新获取文件项并绑定事件
+		const newFileItems = this.element.querySelectorAll('.file-item');
+		newFileItems.forEach(item => {
+			item.addEventListener('click', (e) => {
+				const path = e.currentTarget.dataset.path;
+				const type = e.currentTarget.dataset.type;
+
+				// 更新选中状态
+				newFileItems.forEach(f => f.classList.remove('selected'));
+				e.currentTarget.classList.add('selected');
+
+				// 从文件列表中查找完整的文件信息
+				const fullFileInfo = this.state.files.find(f => f.path === path);
+				const selectedFile = fullFileInfo || { path, type, name: path.split('/').pop() };
+				this.setState({ selectedFile });
+				this.updateActionButtons();
+			});
+		});
+	}
+
+	/**
+	 * 更新操作按钮状态
+	 * @returns {void}
+	 */
 	updateActionButtons() {
 		const openBtn = this.element.querySelector('#openBtn');
 		const deleteBtn = this.element.querySelector('#deleteBtn');
 
-		if (openBtn && deleteBtn) {
+		if (openBtn) {
 			if (this.state.selectedFile) {
 				if (this.state.selectedFile.type === 'file') {
 					// 获取文件名（优先使用name，如果没有则从path中提取）
@@ -662,42 +979,72 @@ class ProjectDetailPage extends BasePage {
 					if (this.isEditableFile(fileName)) {
 						openBtn.style.display = 'block';
 						openBtn.textContent = '👁 ' + this.t('projectDetail.openFile', '打开');
+						openBtn.disabled = false;
+						openBtn.title = this.t('projectDetail.openFile', '打开文件');
 					} else if (this.isViewableFile(fileName)) {
 						openBtn.style.display = 'block';
 						openBtn.textContent = '👁 ' + this.t('projectDetail.viewFile', '查看');
+						openBtn.disabled = false;
+						openBtn.title = this.t('projectDetail.viewFile', '查看文件');
 					} else {
-						openBtn.style.display = 'none';
+						// 不可查看的文件，显示提示但禁用按钮
+						openBtn.style.display = 'block';
+						openBtn.textContent = '🚫 ' + this.t('projectDetail.cannotView', '不可查看');
+						openBtn.disabled = true;
+						openBtn.title = this.t('projectDetail.cannotViewFile', '此文件类型不可查看');
 					}
-					deleteBtn.style.display = 'block';
 				} else {
-					openBtn.style.display = 'none';
-					deleteBtn.style.display = 'block';
+					// 目录，显示不可查看提示
+					openBtn.style.display = 'block';
+					openBtn.textContent = '🚫 ' + this.t('projectDetail.cannotView', '不可查看');
+					openBtn.disabled = true;
+					openBtn.title = this.t('projectDetail.cannotViewDirectory', '目录不可查看');
 				}
 			} else {
 				openBtn.style.display = 'none';
+			}
+		}
+
+		// 只有有编辑权限的用户才显示删除按钮
+		if (deleteBtn) {
+			if (this.state.selectedFile) {
+				deleteBtn.style.display = 'block';
+			} else {
 				deleteBtn.style.display = 'none';
 			}
 		}
 	}
 
+	/**
+	 * 更新项目信息
+	 * @param {Object} project - 项目信息对象
+	 * @returns {void}
+	 */
 	updateProject(project) {
 		this.setState({ project });
-		this.rerender();
-		this.bindEvents();
+		this.updateProjectInfoDOM(project);
+		// 保存到本地存储
+		this.saveProjectDataToStorage(project);
 	}
 
+	/**
+	 * 更新文件列表
+	 * @param {Array} files - 文件数组
+	 * @returns {void}
+	 */
 	updateFiles(files) {
 		this.setState({ files });
-		this.rerender();
-		this.bindEvents();
+		this.updateFileListDOM(files);
+		// 保存到本地存储
+		this.saveFilesDataToStorage(files);
 	}
 
-	setLoading(loading) {
-		this.setState({ loading });
-		this.rerender();
-		this.bindEvents();
-	}
-
+	/**
+	 * 显示信息面板
+	 * @param {string} content - 面板内容
+	 * @param {string} [title=null] - 面板标题
+	 * @returns {void}
+	 */
 	showInfoPanel(content, title = null) {
 		if (!title) {
 			title = this.t('projectDetail.details', '详细信息');
@@ -706,17 +1053,22 @@ class ProjectDetailPage extends BasePage {
 			showInfoPanel: true,
 			infoPanelContent: content
 		});
-		this.rerender();
-		this.bindEvents();
+		this.updateInfoPanelDOM(true, content, title);
 	}
 
+	/**
+	 * 隐藏信息面板
+	 * @returns {void}
+	 */
 	hideInfoPanel() {
 		this.setState({ showInfoPanel: false });
-		this.rerender();
-		this.bindEvents();
+		this.updateInfoPanelDOM(false);
 	}
 
-	// 下拉菜单相关方法
+	/**
+	 * 切换项目信息显示状态
+	 * @returns {void}
+	 */
 	toggleProjectInfo() {
 		const isCurrentlyVisible = this.state.moduleStates.projectInfo;
 
@@ -728,6 +1080,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示项目信息
+	 * @returns {void}
+	 */
 	showProjectInfo() {
 		// 直接显示项目信息卡片
 		const projectInfoSection = this.element.querySelector('#project-info-section');
@@ -736,6 +1092,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 隐藏项目信息
+	 * @returns {void}
+	 */
 	hideProjectInfo() {
 		const projectInfoSection = this.element.querySelector('#project-info-section');
 		if (projectInfoSection) {
@@ -745,6 +1105,10 @@ class ProjectDetailPage extends BasePage {
 		this.updateModuleState('projectInfo', false);
 	}
 
+	/**
+	 * 切换成员信息显示状态
+	 * @returns {void}
+	 */
 	toggleMembers() {
 		const isCurrentlyVisible = this.state.moduleStates.members;
 
@@ -756,13 +1120,16 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示成员信息
+	 * @param {boolean} [forceRefresh=false] - 是否强制刷新
+	 * @returns {Promise<void>}
+	 */
 	async showMembers(forceRefresh = false) {
 		// 如果有缓存且不是强制刷新，直接显示缓存数据
 		if (this.state.membersCache && !forceRefresh) {
 			const content = this.renderContributorsList(this.state.membersCache);
 			this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
-			// 重新绑定事件，确保刷新按钮能正常工作
-			this.bindEvents();
 			return;
 		}
 
@@ -773,7 +1140,6 @@ class ProjectDetailPage extends BasePage {
 				this.setState({ membersCache: cachedMembers });
 				const content = this.renderContributorsList(cachedMembers);
 				this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
-				this.bindEvents();
 				return;
 			}
 		}
@@ -792,12 +1158,11 @@ class ProjectDetailPage extends BasePage {
 			this.showInfoPanel(loadingContent, this.t('projectDetail.projectMembers', '项目成员'));
 
 			// 获取用户信息和仓库信息
-			const userData = localStorage.getItem('spcp-user');
-			if (!userData) {
+			if (!this.state.user) {
 				throw new Error('用户未登录');
 			}
 
-			const user = JSON.parse(userData);
+			const user = this.state.user;
 			const repoInfo = user.repositoryInfo;
 
 			if (!repoInfo || !user.token) {
@@ -805,7 +1170,23 @@ class ProjectDetailPage extends BasePage {
 			}
 
 			// 获取贡献者列表
-			const contributors = await window.GitHubService.getCollaborators(repoInfo.owner, repoInfo.repo, user.token);
+			const octokit = new window.Octokit({ auth: user.token });
+
+			// 访客用户使用listContributors，其他用户使用listCollaborators
+			let contributors;
+			if (user.permissionInfo?.role === 'visitor') {
+				// 访客用户使用listContributors API（不需要特殊权限）
+				const { data: contributorsData } = await octokit.rest.repos.listContributors({
+					owner: repoInfo.owner, repo: repoInfo.repo
+				});
+				contributors = contributorsData;
+			} else {
+				// 协作者和管理员使用listCollaborators API
+				const { data: collaboratorsData } = await octokit.rest.repos.listCollaborators({
+					owner: repoInfo.owner, repo: repoInfo.repo
+				});
+				contributors = collaboratorsData;
+			}
 
 			// 缓存数据到IndexedDB
 			await this.saveMembersCache(contributors);
@@ -836,6 +1217,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 隐藏成员信息
+	 * @returns {void}
+	 */
 	hideMembers() {
 		// 如果成员信息在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {
@@ -847,6 +1232,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 渲染贡献者列表
+	 * @param {Array} contributors - 贡献者数组
+	 * @returns {string} 贡献者列表HTML字符串
 	 */
 	renderContributorsList(contributors) {
 		if (!contributors || contributors.length === 0) {
@@ -863,12 +1250,14 @@ class ProjectDetailPage extends BasePage {
 		const contributorsHtml = contributors.map(contributor => {
 			const avatar = contributor.avatar_url || '👤';
 			const name = contributor.login || 'Unknown';
+			// listContributors 没有 permissions 字段，所以需要根据数据结构判断
 			const role = contributor.permissions?.admin ? 'admin' :
-				contributor.permissions?.push ? 'collaborator' : 'read';
+				contributor.permissions?.push ? 'collaborator' :
+					contributor.type === 'User' ? 'contributor' : 'read';
 			const roleInfo = this.getRoleInfo(role);
 
 			return `
-				<div class="stat-card contributor-card" onclick="window.app.router.navigateTo('/user-profile?username=${name}')" style="cursor: pointer;">
+				<div class="stat-card contributor-card" onclick="window.app.navigateTo('/user-profile?username=${name}')" style="cursor: pointer;">
 					<div class="stat-icon contributor-avatar" style="background-image: url('${avatar}'); background-size: cover; background-position: center;">
 						${avatar.startsWith('http') ? '' : avatar}
 					</div>
@@ -897,11 +1286,14 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 获取角色显示名称
+	 * @param {string} role - 角色名称
+	 * @returns {string} 角色显示名称
 	 */
 	getRoleDisplayName(role) {
 		const roleMap = {
 			'admin': this.t('projectDetail.roleAdmin', '管理员'),
-			'collaborator': this.t('projectDetail.roleCollaborator', '贡献者'),
+			'collaborator': this.t('projectDetail.roleCollaborator', '协作者'),
+			'contributor': this.t('projectDetail.roleContributor', '贡献者'),
 			'read': this.t('projectDetail.roleRead', '只读')
 		};
 		return roleMap[role] || this.t('projectDetail.roleUnknown', '未知');
@@ -909,6 +1301,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 获取角色信息（包含样式类名）
+	 * @param {string} role - 角色名称
+	 * @returns {Object} 角色信息对象
 	 */
 	getRoleInfo(role) {
 		const roleInfo = {
@@ -917,8 +1311,12 @@ class ProjectDetailPage extends BasePage {
 				className: 'role-admin'
 			},
 			'collaborator': {
-				displayName: this.t('projectDetail.roleCollaborator', '贡献者'),
+				displayName: this.t('projectDetail.roleCollaborator', '协作者'),
 				className: 'role-collaborator'
+			},
+			'contributor': {
+				displayName: this.t('projectDetail.roleContributor', '贡献者'),
+				className: 'role-contributor'
 			},
 			'read': {
 				displayName: this.t('projectDetail.roleRead', '只读'),
@@ -931,6 +1329,10 @@ class ProjectDetailPage extends BasePage {
 		};
 	}
 
+	/**
+	 * 切换活动信息显示状态
+	 * @returns {void}
+	 */
 	toggleActivity() {
 		const isCurrentlyVisible = this.state.moduleStates.activity;
 
@@ -942,6 +1344,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示活动信息
+	 * @returns {void}
+	 */
 	showActivity() {
 		const content = `
 			<div class="info-section">
@@ -952,6 +1358,10 @@ class ProjectDetailPage extends BasePage {
 		this.showInfoPanel(content, this.t('projectDetail.recentActivity', '最近活动'));
 	}
 
+	/**
+	 * 隐藏活动信息
+	 * @returns {void}
+	 */
 	hideActivity() {
 		// 如果活动信息在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {
@@ -961,6 +1371,10 @@ class ProjectDetailPage extends BasePage {
 		this.updateModuleState('activity', false);
 	}
 
+	/**
+	 * 切换待审核内容显示状态
+	 * @returns {void}
+	 */
 	togglePendingReviews() {
 		const isCurrentlyVisible = this.state.moduleStates.pending;
 
@@ -972,6 +1386,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 显示待审核内容
+	 * @returns {void}
+	 */
 	showPendingReviews() {
 		const content = `
 			<div class="info-section">
@@ -982,6 +1400,10 @@ class ProjectDetailPage extends BasePage {
 		this.showInfoPanel(content, this.t('projectDetail.pendingReviews', '待审核内容'));
 	}
 
+	/**
+	 * 隐藏待审核内容
+	 * @returns {void}
+	 */
 	hidePendingReviews() {
 		// 如果待审核信息在信息面板中显示，关闭信息面板
 		if (this.state.showInfoPanel) {
@@ -991,7 +1413,10 @@ class ProjectDetailPage extends BasePage {
 		this.updateModuleState('pending', false);
 	}
 
-	// 页面内处理方法
+	/**
+	 * 处理创建文件
+	 * @returns {Promise<void>}
+	 */
 	async handleCreateFile() {
 		// 显示输入模态框让用户输入文件名
 		this.showInputModal(
@@ -1064,8 +1489,7 @@ class ProjectDetailPage extends BasePage {
 					// 更新文件列表
 					const updatedFiles = [...this.state.files, newFile];
 					this.setState({ files: updatedFiles });
-					this.rerender();
-					this.bindEvents();
+					this.updateFileListDOM(updatedFiles);
 
 					// 自动选中新创建的文件
 					this.setState({ selectedFile: newFile });
@@ -1082,6 +1506,11 @@ class ProjectDetailPage extends BasePage {
 		);
 	}
 
+	/**
+	 * 验证文件名是否有效
+	 * @param {string} fileName - 文件名
+	 * @returns {boolean} 是否有效
+	 */
 	isValidFileName(fileName) {
 		// 检查文件名是否有效
 		if (!fileName || fileName.trim() === '') {
@@ -1104,6 +1533,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 检查文件是否可编辑（文本类型文件）
+	 * @param {string} fileName - 文件名
+	 * @returns {boolean} 是否可编辑
 	 */
 	isEditableFile(fileName) {
 		const editableExtensions = [
@@ -1128,7 +1559,8 @@ class ProjectDetailPage extends BasePage {
 		// 常见的无扩展名文本文件
 		const commonTextFiles = [
 			'LICENSE', 'README', 'CHANGELOG', 'CONTRIBUTING', 'AUTHORS',
-			'COPYING', 'INSTALL', 'NEWS', 'TODO', 'HISTORY', 'VERSION'
+			'COPYING', 'INSTALL', 'NEWS', 'TODO', 'HISTORY', 'VERSION',
+			'GITIGNORE', 'GITATTRIBUTES', 'DOCKERFILE', 'MAKEFILE'
 		];
 
 		// 检查是否是常见的无扩展名文本文件
@@ -1143,6 +1575,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 检查文件是否可查看（图像文件）
+	 * @param {string} fileName - 文件名
+	 * @returns {boolean} 是否可查看
 	 */
 	isViewableFile(fileName) {
 		const viewableExtensions = [
@@ -1154,6 +1588,10 @@ class ProjectDetailPage extends BasePage {
 		return viewableExtensions.includes(extension);
 	}
 
+	/**
+	 * 处理创建目录
+	 * @returns {Promise<void>}
+	 */
 	async handleCreateDir() {
 		// 显示输入模态框让用户输入目录名
 		this.showInputModal(
@@ -1218,8 +1656,7 @@ class ProjectDetailPage extends BasePage {
 					// 更新文件列表
 					const updatedFiles = [...this.state.files, newDir];
 					this.setState({ files: updatedFiles });
-					this.rerender();
-					this.bindEvents();
+					this.updateFileListDOM(updatedFiles);
 
 					// 自动选中新创建的目录
 					this.setState({ selectedFile: newDir });
@@ -1236,6 +1673,10 @@ class ProjectDetailPage extends BasePage {
 		);
 	}
 
+	/**
+	 * 处理文件上传
+	 * @returns {void}
+	 */
 	handleUploadFile() {
 		console.log('开始上传文件...');
 		// 创建文件输入元素
@@ -1357,9 +1798,8 @@ class ProjectDetailPage extends BasePage {
 					}
 				}
 
-				// 重新渲染和绑定事件
-				this.rerender();
-				this.bindEvents();
+				// 更新文件列表显示
+				this.updateFileListDOM(this.state.files);
 
 				// 显示结果 - 只有失败时才显示对话框
 				if (successCount === 0) {
@@ -1381,7 +1821,11 @@ class ProjectDetailPage extends BasePage {
 		fileInput.click();
 	}
 
-	// 读取文件为文本
+	/**
+	 * 读取文件为文本
+	 * @param {File} file - 文件对象
+	 * @returns {Promise<string>} 文件内容
+	 */
 	readFileAsText(file) {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
@@ -1391,6 +1835,10 @@ class ProjectDetailPage extends BasePage {
 		});
 	}
 
+	/**
+	 * 处理检查更新
+	 * @returns {Promise<void>}
+	 */
 	async handleCheckUpdate() {
 		try {
 			// 显示检查中的状态
@@ -1401,15 +1849,32 @@ class ProjectDetailPage extends BasePage {
 			}
 
 			// 检查GitHub上的最新提交
-			const projectUrl = this.state.project?.url || 'https://github.com/ZelaCreator/DPCC';
-			const repoInfo = window.GitHubService.extractRepoInfo(projectUrl);
+			const projectUrl = this.state.project?.url || (() => {
+				// 从用户数据中获取仓库信息作为默认值
+				const user = this.state.user;
+				const repoInfo = user?.repositoryInfo;
+				if (repoInfo?.owner && repoInfo?.repo) {
+					return `https://github.com/${repoInfo.owner}/${repoInfo.repo}`;
+				}
+				return 'https://github.com/ZelaCreator/test';
+			})();
+			const repoInfo = this.extractRepoInfo(projectUrl);
 
 			if (!repoInfo) {
 				throw new Error('无法解析项目URL');
 			}
 
 			// 获取GitHub API的最新提交信息
-			const latestCommit = await window.GitHubService.getLatestCommit(repoInfo.owner, repoInfo.repo);
+			const user = this.state.user;
+			if (!user || !user.token) {
+				throw new Error('用户未登录或访问令牌不可用');
+			}
+
+			const octokit = new window.Octokit({ auth: user.token });
+			const { data: commits } = await octokit.rest.repos.listCommits({
+				owner: repoInfo.owner, repo: repoInfo.repo, per_page: 1
+			});
+			const latestCommit = commits[0];
 
 			if (!latestCommit) {
 				throw new Error('无法获取最新提交信息');
@@ -1457,7 +1922,13 @@ class ProjectDetailPage extends BasePage {
 	}
 
 
-	// 同步项目
+	/**
+	 * 同步项目
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @param {string} commitSha - 提交SHA
+	 * @returns {Promise<void>}
+	 */
 	async syncProject(owner, repo, commitSha) {
 		try {
 			// 显示同步中的状态
@@ -1469,13 +1940,16 @@ class ProjectDetailPage extends BasePage {
 			// 构建仓库URL
 			const repositoryUrl = `https://github.com/${owner}/${repo}`;
 
-			// 使用GitHub服务同步仓库数据
-			await window.GitHubService.syncRepositoryData(owner, repo);
+			// 使用StorageService同步仓库数据
+			const user = this.state.user;
+			if (!user || !user.token) {
+				throw new Error('用户未登录或访问令牌不可用');
+			}
+
+			await window.StorageService.syncRepositoryData(owner, repo, user.token);
 
 			// 重新加载项目数据
 			await this.loadProjectData();
-			this.rerender();
-			this.bindEvents();
 
 			// 保存同步信息
 			const syncInfo = {
@@ -1496,6 +1970,27 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 解析GitHub URL
+	 * @param {string} url - GitHub URL
+	 * @returns {Object|null} 仓库信息对象或null
+	 */
+	extractRepoInfo(url) {
+		const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+		if (match) {
+			return {
+				owner: match[1],
+				repo: match[2].replace('.git', '')
+			};
+		}
+		return null;
+	}
+
+	/**
+	 * 处理文件打开
+	 * @param {Object} file - 文件对象
+	 * @returns {void}
+	 */
 	handleFileOpen(file) {
 		// 获取文件名（优先使用name，如果没有则从path中提取）
 		const fileName = file.name || file.path.split('/').pop();
@@ -1503,15 +1998,15 @@ class ProjectDetailPage extends BasePage {
 		// 检查文件类型
 		if (this.isEditableFile(fileName)) {
 			// 可编辑文件，跳转到编辑器页面
-			if (window.app && window.app.router) {
-				const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=edit`;
-				window.app.router.navigateTo(editorUrl);
+			const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=edit`;
+			if (window.app && window.app.navigateTo) {
+				window.app.navigateTo(editorUrl);
 			}
 		} else if (this.isViewableFile(fileName)) {
 			// 图像文件，跳转到查看模式
-			if (window.app && window.app.router) {
-				const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=view`;
-				window.app.router.navigateTo(editorUrl);
+			const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=view`;
+			if (window.app && window.app.navigateTo) {
+				window.app.navigateTo(editorUrl);
 			}
 		} else {
 			// 不支持的文件类型
@@ -1522,6 +2017,11 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 处理文件删除
+	 * @param {Object} file - 文件对象
+	 * @returns {Promise<void>}
+	 */
 	async handleFileDelete(file) {
 		if (!file) {
 			this.showInfoModal(
@@ -1566,8 +2066,6 @@ class ProjectDetailPage extends BasePage {
 
 							// 重新加载项目数据以更新文件列表
 							await this.loadProjectData();
-							this.rerender();
-							this.bindEvents();
 
 							// 清除选中状态
 							this.setState({ selectedFile: null });
@@ -1589,8 +2087,7 @@ class ProjectDetailPage extends BasePage {
 							}
 
 							this.setState({ files: updatedFiles });
-							this.rerender();
-							this.bindEvents();
+							this.updateFileListDOM(updatedFiles);
 
 							// 清除选中状态
 							this.setState({ selectedFile: null });
@@ -1613,8 +2110,7 @@ class ProjectDetailPage extends BasePage {
 							}
 
 							this.setState({ files: updatedFiles });
-							this.rerender();
-							this.bindEvents();
+							this.updateFileListDOM(updatedFiles);
 
 							// 清除选中状态
 							this.setState({ selectedFile: null });
@@ -1637,6 +2133,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 检查文件是否存在于文件缓存中
+	 * @param {string} filePath - 文件路径
+	 * @returns {Promise<boolean>} 是否存在
 	 */
 	async checkFileInCache(filePath) {
 		try {
@@ -1653,6 +2151,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 从本地工作空间删除文件
+	 * @param {Object} file - 文件对象
+	 * @returns {Promise<void>}
 	 */
 	async deleteFromLocalWorkspace(file) {
 		try {
@@ -1666,6 +2166,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 从文件缓存删除文件
+	 * @param {Object} file - 文件对象
+	 * @returns {Promise<void>}
 	 */
 	async deleteFromFileCache(file) {
 		try {
@@ -1679,6 +2181,9 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 记录删除操作到本地工作空间
+	 * @param {string} filePath - 文件路径
+	 * @param {string} source - 删除来源
+	 * @returns {Promise<void>}
 	 */
 	async recordDeletion(filePath, source) {
 		try {
@@ -1709,6 +2214,8 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 完全删除文件（包括本地工作空间和文件缓存）
+	 * @param {Object} file - 文件对象
+	 * @returns {Promise<void>}
 	 */
 	async deleteFileCompletely(file) {
 		try {
@@ -1732,7 +2239,13 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
-	// 处理文件上传的辅助方法
+	/**
+	 * 处理文件上传的辅助方法
+	 * @param {File} file - 文件对象
+	 * @param {string} content - 文件内容
+	 * @param {string} filePath - 文件路径
+	 * @returns {Promise<void>}
+	 */
 	async processFileUpload(file, content, filePath) {
 		try {
 			// 保存到IndexedDB - 只保存到localWorkspace
@@ -1774,8 +2287,7 @@ class ProjectDetailPage extends BasePage {
 			}
 
 			this.setState({ files: updatedFiles });
-			this.rerender();
-			this.bindEvents();
+			this.updateFileListDOM(updatedFiles);
 
 			// 自动选中新上传的文件
 			this.setState({ selectedFile: newFile });
@@ -1790,6 +2302,10 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 销毁组件
+	 * @returns {void}
+	 */
 	destroy() {
 		// 清理模态框
 		if (this.state.modal) {
@@ -1804,5 +2320,8 @@ class ProjectDetailPage extends BasePage {
 	}
 }
 
-// 注册组件
+/**
+ * 注册组件到全局
+ * @global
+ */
 window.ProjectDetailPage = ProjectDetailPage;

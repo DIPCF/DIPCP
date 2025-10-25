@@ -7,12 +7,12 @@ on:
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.title, '申请成为贡献者')
+    if: contains(github.event.issue.title, 'Become a collaborator')
     steps:
       - name: Extract username from issue title
         id: extract_username
         run: |
-          USERNAME=$(echo "${{ github.event.issue.title }}" | sed 's/申请成为贡献者 - //')
+          USERNAME=$(echo "${{ github.event.issue.title }}" | sed 's/Become a collaborator - //')
           echo "username=$USERNAME" >> $GITHUB_OUTPUT
           echo "Extracted username: $USERNAME"
       
@@ -60,7 +60,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: `🎉 恭喜！您的贡献者申请已自动批准！\n\n您现在是 **${context.repo.repo}** 仓库的协作者，可以开始贡献代码了。\n\n欢迎加入我们的项目！`
+                body: `🎉 Congratulations! Your contributor application has been automatically approved!\n\nYou are now a collaborator of the **${context.repo.repo}** repository, and can start contributing code.\n\nWelcome to our project!`
               });
               
             } catch (error) {

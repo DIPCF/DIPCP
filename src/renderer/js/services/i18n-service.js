@@ -3,8 +3,22 @@ window.I18nService = {
 	currentLanguage: 'en-US',
 	fallbackLanguage: 'en-US',
 	translations: {},
-	supportedLanguages: ['zh-CN', 'en-US'],
+	supportedLanguages: ['zh-CN', 'en-US', 'ja-JP'],
 	defaultLanguage: 'en-US',
+
+	/**
+	 * 获取语言显示名称
+	 * @param {string} languageCode - 语言代码
+	 * @returns {string} 语言显示名称
+	 */
+	getLanguageDisplayName(languageCode) {
+		const displayNames = {
+			'zh-CN': '中文',
+			'en-US': 'English',
+			'ja-JP': '日本語'
+		};
+		return displayNames[languageCode] || languageCode;
+	},
 
 	/**
 	 * 初始化多语言服务
@@ -182,19 +196,6 @@ window.I18nService = {
 	 */
 	getSupportedLanguages() {
 		return [...this.supportedLanguages];
-	},
-
-	/**
-	 * 获取语言显示名称
-	 * @param {string} languageCode - 语言代码
-	 * @returns {string} 语言显示名称
-	 */
-	getLanguageDisplayName(languageCode) {
-		const displayNames = {
-			'zh-CN': '中文',
-			'en-US': 'English'
-		};
-		return displayNames[languageCode] || languageCode;
 	},
 
 	/**

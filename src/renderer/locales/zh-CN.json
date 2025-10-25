@@ -123,6 +123,9 @@
 		"deleteFile": "删除",
 		"uploadFile": "上传文件",
 		"checkUpdate": "检查更新",
+		"cannotView": "不可查看",
+		"cannotViewFile": "此文件类型不可查看",
+		"cannotViewDirectory": "目录不可查看",
 		"projectInfo": "项目信息",
 		"details": "详细信息",
 		"defaultDescription": "项目描述",
@@ -458,6 +461,23 @@
 			"title": "成为贡献者",
 			"description": "申请成为项目贡献者，参与代码开发和项目维护。",
 			"applyButton": "申请成为贡献者",
+			"waiting": {
+				"title": "申请已提交",
+				"message": "您的申请已成功提交，等待仓库管理员审核...",
+				"details": "Issue #{issueNumber} 已创建<br>请耐心等待管理员审核您的申请",
+				"note": "审核结果将通过GitHub通知您"
+			},
+			"success": {
+				"title": "申请成功！",
+				"message": "恭喜！您已成为项目协作者，现在可以参与项目开发了。",
+				"details": "Issue #{issueNumber} 已处理完成<br>您已获得协作者权限"
+			},
+			"manual": {
+				"title": "等待人工审核",
+				"message": "申请已提交，等待仓库管理员审核并发送协作者邀请...",
+				"details": "Issue #{issueNumber} 已创建<br>请耐心等待管理员处理您的申请",
+				"note": "审核结果将通过GitHub通知您"
+			},
 			"pendingTitle": "申请已提交",
 			"pendingMessage": "您的贡献者申请正在审核中，请耐心等待。",
 			"checkStatusButton": "确认审核状态",
@@ -466,11 +486,11 @@
 			"reasonPlaceholder": "请简要说明您希望参与项目的原因和计划...",
 			"submitButton": "提交申请",
 			"submitting": "提交中...",
-			"success": "申请已提交成功！请等待审核。",
+			"submitSuccess": "申请已提交成功！请等待审核。",
 			"error": "提交申请失败：",
 			"reviewing": {
 				"title": "正在审核中",
-				"message": "您的申请正在处理中，大约需要15秒...",
+				"message": "您的申请正在处理中，大约需要1分钟...",
 				"details": "Issue #{issueNumber} 已创建<br>GitHub Actions 正在自动处理您的申请",
 				"processing": "正在处理您的申请，请稍候...",
 				"workflowRunning": "GitHub Actions 工作流正在执行...",

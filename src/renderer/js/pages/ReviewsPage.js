@@ -205,8 +205,8 @@ class ReviewsPage extends BasePage {
 				}
 
 				// 使用路由器导航
-				if (window.app && window.app.router) {
-					window.app.router.navigateTo(route);
+				if (window.app && window.app.navigateTo) {
+					window.app.navigateTo(route);
 				}
 			});
 		});

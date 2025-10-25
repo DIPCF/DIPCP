@@ -4,8 +4,8 @@
 
 - **项目名称**: SPCP - Serverless Project Contribution Platform
 - **版本**: v1.0
-- **创建日期**: 2025年1月21日
-- **最后更新**: 2025年10月22日
+- **创建日期**: 2025年10月21日
+- **最后更新**: 2025年10月24日
 - **文档类型**: 技术设计文档
 
 ## 🏗️ 系统架构设计
@@ -128,8 +128,15 @@
 - **原因**: 利用GitHub的分布式版本控制能力
 
 #### 2.3.3 GitHub API
-- **库**: 原生fetch API
-- **原因**: 无第三方依赖，直接调用GitHub REST API
+- **库**: @octokit/rest.js (官方GitHub REST API客户端)
+- **原因**: 使用官方库，避免重复造轮子，获得最新API支持和更好的错误处理
+
+**重大技术变更 (2025年10月24日)**:
+- **API集成策略**: 完全采用官方@octokit/rest.js库，移除所有自定义GitHub API封装
+- **代码简化**: 直接使用Octokit方法调用GitHub API，避免重复造轮子
+- **维护性提升**: 自动获得最新API支持，减少维护成本
+- **类型安全**: 更好的TypeScript支持和错误处理
+- **社区支持**: 官方维护，社区活跃，文档完善
 
 #### 2.3.4 运行时环境
 - **桌面**: Electron (Node.js)
@@ -139,9 +146,9 @@
 ### 2.4 开发工具
 
 #### 2.4.1 开发服务器
-- **工具**: Python HTTP Server
-- **命令**: `python -m http.server 8000`
-- **原因**: 简单静态文件服务器，无Node.js依赖
+- **工具**: Python 编写的极简的HTTP Server
+- **命令**: start-dev.bat
+- **原因**: 完全无缓存处理，避免调试时缓存造成的麻烦
 
 #### 2.4.2 代码编辑
 - **编辑器**: 任意代码编辑器
@@ -160,7 +167,6 @@ spcp/
 │       ├── index.html          # 单页应用入口，加载所有JS资源
 │       ├── js/                 # JavaScript文件
 │       │   ├── app.js          # 应用主入口，路由和状态管理
-│       │   ├── router.js       # 路由系统
 │       │   ├── pages/          # 页面组件
 │       │   │   ├── LoginPage.js        # 登录页面组件
 │       │   │   ├── DashboardPage.js    # 仪表盘页面组件
@@ -174,15 +180,15 @@ spcp/
 │       │   │   ├── Modal.js            # 通用模态框组件
 │       │   │   └── ...                 # 其他组件
 │       │   └── services/       # 服务层
-│       │       ├── github-service.js   # GitHub API服务
 │       │       ├── storage-service.js  # 数据存储服务
 │       │       ├── i18n-service.js     # 国际化服务
-│       │       └── theme-manager.js   # 主题管理服务
+│       │       └── theme-service.js   # 主题管理服务
 │       ├── templates/          # 模板文件目录
 │       │   ├── auto-approve-collaborators.yml  # GitHub Actions工作流模板
 │       │   └── README.md       # 模板文件说明文档
 │       ├── locales/            # 国际化文件
 │       │   ├── zh-CN.json      # 中文翻译
+│       │   ├── ja-JP.json      # 日语翻译
 │       │   └── en-US.json      # 英文翻译
 │       └── styles/             # 样式文件
 │           ├── main.css        # 主样式文件
@@ -200,554 +206,18 @@ spcp/
 ### 3.1 应用初始化流程
 
 #### 3.1.1 资源加载策略
-```javascript
-// index.html 中一次性加载所有资源
-<!DOCTYPE html>
-<html>
-<head>
-    <title>SPCP</title>
-    <link rel="stylesheet" href="styles/main.css">
-    <link rel="stylesheet" href="styles/modal.css">
-</head>
-<body>
-    <div id="app"></div>
-    
-    <!-- 一次性加载所有JS资源 -->
-    <script src="js/services/global-services.js"></script>
-    <script src="js/services/i18n-service.js"></script>
-    <script src="js/services/storage-service.js"></script>
-    <script src="js/services/github-service.js"></script>
-    <script src="js/services/theme-manager.js"></script>
-    
-    <script src="js/components/Component.js"></script>
-    <script src="js/components/ComponentLoader.js"></script>
-    <script src="js/components/Modal.js"></script>
-    <!-- ... 其他组件 ... -->
-    
-    <script src="js/pages/LoginPage.js"></script>
-    <script src="js/pages/DashboardPage.js"></script>
-    <script src="js/pages/ProjectDetailPage.js"></script>
-    <script src="js/pages/EditorPage.js"></script>
-    <script src="js/pages/ReviewsPage.js"></script>
-    <script src="js/pages/SettingsPage.js"></script>
-    
-    <script src="js/router.js"></script>
-    <script src="js/app.js"></script>
-</body>
-</html>
-```
 
 #### 3.1.2 应用启动流程
-```javascript
-// app.js - 应用主入口
-class SPCPApp {
-    constructor() {
-        this.router = new Router();
-        this.currentPage = null;
-        this.state = {
-            user: null,
-            theme: 'light',
-            language: 'zh-CN',
-            currentProject: null
-        };
-    }
-
-    async init() {
-        // 1. 等待所有服务加载完成
-        await this.waitForServices();
-        
-        // 2. 初始化主题和国际化
-        await this.initThemeAndI18n();
-        
-        // 3. 检查用户认证状态
-        await this.checkAuthStatus();
-        
-        // 4. 初始化路由
-        this.router.init();
-        
-        // 5. 渲染初始页面
-        await this.renderInitialPage();
-    }
-
-    async waitForServices() {
-        // 确保所有服务都已加载
-        while (!window.I18nService || !window.StorageService || !window.GitHubService) {
-            await new Promise(resolve => setTimeout(resolve, 10));
-        }
-    }
-
-    async initThemeAndI18n() {
-        // 初始化主题管理器
-        window.themeManager = new ThemeManager();
-        
-        // 初始化国际化服务
-        await window.I18nService.init();
-        
-        // 应用主题和语言设置
-        document.documentElement.setAttribute('data-theme', this.state.theme);
-        document.documentElement.setAttribute('lang', this.state.language);
-    }
-}
-```
 
 ### 3.2 路由系统设计
 
 #### 3.2.1 路由管理器
-```javascript
-// router.js - 路由系统
-class Router {
-    constructor() {
-        this.routes = {
-            '/': 'DashboardPage',
-            '/login': 'LoginPage',
-            '/project/:id': 'ProjectDetailPage',
-            '/editor': 'EditorPage',
-            '/reviews': 'ReviewsPage',
-            '/settings': 'SettingsPage'
-        };
-        this.currentRoute = null;
-    }
-
-    init() {
-        // 监听浏览器前进后退
-        window.addEventListener('popstate', () => {
-            this.handleRouteChange();
-        });
-        
-        // 监听链接点击
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-route]')) {
-                e.preventDefault();
-                this.navigateTo(e.target.dataset.route);
-            }
-        });
-        
-        // 处理初始路由
-        this.handleRouteChange();
-    }
-
-    navigateTo(path) {
-        history.pushState(null, '', path);
-        this.handleRouteChange();
-    }
-
-    async handleRouteChange() {
-        const path = window.location.pathname;
-        const route = this.matchRoute(path);
-        
-        if (route && route !== this.currentRoute) {
-            await this.renderPage(route, path);
-            this.currentRoute = route;
-        }
-    }
-
-    matchRoute(path) {
-        for (const [pattern, pageClass] of Object.entries(this.routes)) {
-            if (this.isMatch(pattern, path)) {
-                return pageClass;
-            }
-        }
-        return 'DashboardPage'; // 默认页面
-    }
-
-    async renderPage(pageClass, path) {
-        // 销毁当前页面
-        if (window.app.currentPage) {
-            window.app.currentPage.destroy();
-        }
-        
-        // 创建新页面
-        const PageClass = window[pageClass];
-        window.app.currentPage = new PageClass();
-        
-        // 渲染页面
-        await window.app.currentPage.render(path);
-    }
-}
-```
 
 ### 3.3 页面组件设计
 
 #### 3.3.1 页面基类
-```javascript
-// pages/BasePage.js - 页面基类
-class BasePage {
-    constructor() {
-        this.container = document.getElementById('app');
-        this.state = {};
-    }
-
-    async render(path) {
-        // 清空容器
-        this.container.innerHTML = '';
-        
-        // 生成页面HTML
-        const html = this.generateHTML();
-        
-        // 渲染到DOM
-        this.container.innerHTML = html;
-        
-        // 绑定事件
-        this.bindEvents();
-        
-        // 初始化页面
-        await this.init();
-        
-        // 应用主题和国际化
-        this.applyThemeAndI18n();
-    }
-
-    generateHTML() {
-        // 子类实现具体的HTML生成逻辑
-        throw new Error('generateHTML method must be implemented');
-    }
-
-    bindEvents() {
-        // 子类实现具体的事件绑定逻辑
-    }
-
-    async init() {
-        // 子类实现具体的初始化逻辑
-    }
-
-    applyThemeAndI18n() {
-        // 应用主题
-        if (window.themeManager) {
-            window.themeManager.applyTheme();
-        }
-        
-        // 应用国际化
-        if (window.I18nService) {
-            window.I18nService.translatePage();
-        }
-    }
-
-    destroy() {
-        // 清理事件监听器和定时器
-        this.container.innerHTML = '';
-    }
-}
-```
 
 #### 3.3.2 通用模态框组件设计
-```javascript
-// components/Modal.js - 通用模态框组件
-class Modal extends Component {
-    constructor(props = {}) {
-        super(props);
-        this.state = {
-            show: false,
-            type: 'info', // 'info', 'input', 'confirm'
-            title: '',
-            message: '',
-            inputValue: '',
-            inputPlaceholder: '',
-            callback: null
-        };
-    }
-
-    showInfo(title, message) {
-        this.setState({
-            show: true,
-            type: 'info',
-            title: title,
-            message: message,
-            inputValue: '',
-            inputPlaceholder: '',
-            callback: null
-        });
-        this.rerender();
-    }
-
-    showInput(title, message, placeholder = '', defaultValue = '', callback = null) {
-        this.setState({
-            show: true,
-            type: 'input',
-            title: title,
-            message: message,
-            inputValue: defaultValue,
-            inputPlaceholder: placeholder,
-            callback: callback
-        });
-        this.rerender();
-        // 自动聚焦到输入框
-        setTimeout(() => {
-            const input = this.element.querySelector('#modal-input');
-            if (input) {
-                input.focus();
-            }
-        }, 0);
-    }
-
-    showConfirm(title, message, callback = null) {
-        this.setState({
-            show: true,
-            type: 'confirm',
-            title: title,
-            message: message,
-            inputValue: '',
-            inputPlaceholder: '',
-            callback: callback
-        });
-        this.rerender();
-    }
-
-    hide() {
-        this.setState({
-            show: false,
-            type: 'info',
-            title: '',
-            message: '',
-            inputValue: '',
-            inputPlaceholder: '',
-            callback: null
-        });
-        this.rerender();
-    }
-
-    handleConfirm() {
-        if (this.state.callback) {
-            if (this.state.type === 'input') {
-                this.state.callback(this.state.inputValue);
-            } else if (this.state.type === 'confirm') {
-                this.state.callback(true);
-            }
-        }
-        this.hide();
-    }
-
-    handleCancel() {
-        if (this.state.callback && this.state.type === 'confirm') {
-            this.state.callback(false);
-        }
-        this.hide();
-    }
-
-    handleInputChange(event) {
-        this.setState({ inputValue: event.target.value });
-    }
-
-    render() {
-        if (!this.state.show) {
-            return document.createElement('div');
-        }
-
-        const container = document.createElement('div');
-        container.innerHTML = `
-            <div class="modal-overlay" id="modal-overlay">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>${this.state.title}</h3>
-                        <button class="btn-close" id="modal-close">×</button>
-                    </div>
-                    <div class="modal-body">
-                        ${this.renderBody()}
-                    </div>
-                    <div class="modal-footer">
-                        ${this.renderFooter()}
-                    </div>
-                </div>
-            </div>
-        `;
-        return container.firstElementChild;
-    }
-
-    bindEvents() {
-        if (!this.element) return;
-
-        // 关闭按钮
-        const closeBtn = this.element.querySelector('#modal-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', this.handleCancel.bind(this));
-        }
-
-        // 取消按钮 (input/confirm)
-        const cancelBtn = this.element.querySelector('#modal-cancel');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', this.handleCancel.bind(this));
-        }
-
-        // 确认按钮 (input/confirm)
-        const confirmBtn = this.element.querySelector('#modal-confirm');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', this.handleConfirm.bind(this));
-        }
-
-        // 遮罩层点击关闭
-        const overlay = this.element.querySelector('#modal-overlay');
-        if (overlay) {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    this.handleCancel();
-                }
-            });
-        }
-
-        // 输入框事件 (input)
-        const input = this.element.querySelector('#modal-input');
-        if (input) {
-            input.addEventListener('input', this.handleInputChange.bind(this));
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.handleConfirm();
-                }
-            });
-        }
-    }
-
-    destroy() {
-        if (this.element && this.element.parentNode) {
-            this.element.parentNode.removeChild(this.element);
-        }
-        this.element = null;
-    }
-}
-```
-
-#### 3.3.3 具体页面实现示例
-```javascript
-// pages/LoginPage.js - 登录页面
-class LoginPage extends BasePage {
-    generateHTML() {
-        return `
-            <div class="login-container">
-                <header class="login-header">
-                    <h1 data-i18n="login.title">登录</h1>
-                    <p data-i18n="login.subtitle">Serverless Project Contribution Platform</p>
-                </header>
-                
-                <form class="login-form" id="loginForm">
-                    <div class="form-group">
-                        <label data-i18n="login.language">语言</label>
-                        <select id="language-selector" data-i18n="login.selectLanguage">
-                            <option value="zh-CN">中文</option>
-                            <option value="en-US">English</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label data-i18n="login.username">GitHub用户名</label>
-                        <input type="text" id="username" data-i18n-placeholder="login.usernamePlaceholder">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label data-i18n="login.email">邮箱地址</label>
-                        <input type="email" id="email" data-i18n-placeholder="login.emailPlaceholder">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label data-i18n="login.repository">仓库地址</label>
-                        <input type="url" id="repository" data-i18n-placeholder="login.repositoryPlaceholder">
-                    </div>
-                    
-                    <button type="submit" id="login-btn" data-i18n="login.submit">登录并克隆仓库</button>
-                </form>
-                
-                <div class="login-footer">
-                    <p data-i18n="login.legalText">登录即表示您同意我们的服务条款和隐私政策</p>
-                </div>
-            </div>
-        `;
-    }
-
-    bindEvents() {
-        const form = document.getElementById('loginForm');
-        const languageSelector = document.getElementById('language-selector');
-        
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleLogin();
-        });
-        
-        languageSelector.addEventListener('change', (e) => {
-            this.changeLanguage(e.target.value);
-        });
-    }
-
-    async init() {
-        // 初始化表单数据
-        this.loadFormData();
-        
-        // 设置语言选择器
-        const languageSelector = document.getElementById('language-selector');
-        languageSelector.value = window.app.state.language;
-    }
-
-    async handleLogin() {
-        // 登录逻辑
-        const formData = this.getFormData();
-        
-        try {
-            // 显示加载状态
-            this.showLoading();
-            
-            // 验证用户
-            await window.GitHubService.verifyUser(formData.username);
-            
-            // 克隆仓库
-            await this.cloneRepository(formData.repository);
-            
-            // 保存配置
-            window.StorageService.saveUserConfig(formData);
-            
-            // 跳转到仪表盘
-            window.app.router.navigateTo('/');
-            
-        } catch (error) {
-            this.showError(error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    // 使用通用模态框的示例
-    initModal() {
-        if (!this.state.modal) {
-            this.state.modal = new Modal();
-            const modalElement = this.state.modal.render();
-            document.body.appendChild(modalElement);
-            this.state.modal.element = modalElement;
-            this.state.modal.bindEvents();
-        }
-    }
-
-    showConfirmDialog() {
-        this.initModal();
-        this.state.modal.showConfirm(
-            '确认操作',
-            '您确定要执行此操作吗？',
-            (confirmed) => {
-                if (confirmed) {
-                    console.log('用户确认了操作');
-                } else {
-                    console.log('用户取消了操作');
-                }
-            }
-        );
-    }
-
-    showInputDialog() {
-        this.initModal();
-        this.state.modal.showInput(
-            '输入信息',
-            '请输入您的姓名：',
-            '请输入姓名',
-            '默认值',
-            (value) => {
-                console.log('用户输入了：', value);
-            }
-        );
-    }
-
-    showInfoDialog() {
-        this.initModal();
-        this.state.modal.showInfo(
-            '信息提示',
-            '操作已成功完成！'
-        );
-    }
-}
-```
 
 ### 3.4 状态管理
 
@@ -829,7 +299,6 @@ class SPCPApp {
 
 **推荐权限设置（全选）**：
 - 建议用户勾选所有权限选项
-- 包括：repo, admin:org, user:email, read:user, write:org, admin:public_key 等
 - 简化用户操作，避免技术门槛
 
 **设计理念**：

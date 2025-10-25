@@ -1,14 +1,29 @@
 /**
  * 用户资料页面组件
  * 显示用户的基本信息、贡献度、活跃度等公开信息
+ * @class UserProfilePage
+ * @extends {BasePage}
  */
 class UserProfilePage extends BasePage {
+	/**
+	 * 构造函数
+	 * @param {Object} props - 组件属性
+	 * @param {string} [props.username] - 用户名
+	 */
 	constructor(props = {}) {
 		super(props);
+
+		// 从 localStorage 获取用户信息
+		const userInfo = window.app.getUserFromStorage();
+
 		this.state = {
 			username: props.username || null,
-			userInfo: props.userInfo || null,
-			userStats: props.userStats || null,
+			user: userInfo.user,
+			userRole: userInfo.userRole,
+			permissionInfo: userInfo.permissionInfo,
+			userInfo: null, // 目标用户信息
+			userStats: null, // 用户统计信息
+			userActivity: null, // 用户活动信息
 			loading: true,
 			error: null,
 			// 模态框实例
@@ -16,6 +31,10 @@ class UserProfilePage extends BasePage {
 		};
 	}
 
+	/**
+	 * 渲染页面内容
+	 * @returns {HTMLElement} 页面容器元素
+	 */
 	render() {
 		const container = document.createElement('div');
 		container.className = 'user-profile';
@@ -30,11 +49,19 @@ class UserProfilePage extends BasePage {
 		return container;
 	}
 
+	/**
+	 * 渲染页面头部
+	 * @returns {string} 头部HTML字符串
+	 */
 	renderHeader() {
 		// 使用BasePage的renderHeader方法
 		return super.renderHeader('user-profile', false, null);
 	}
 
+	/**
+	 * 渲染用户基本信息卡片
+	 * @returns {string} 用户信息HTML字符串
+	 */
 	renderUserInfo() {
 		if (this.state.loading) {
 			return `
@@ -93,6 +120,10 @@ class UserProfilePage extends BasePage {
 		`;
 	}
 
+	/**
+	 * 渲染用户统计信息卡片
+	 * @returns {string} 统计信息HTML字符串
+	 */
 	renderUserStats() {
 		if (this.state.loading || this.state.error) {
 			return '';
@@ -136,6 +167,10 @@ class UserProfilePage extends BasePage {
 		`;
 	}
 
+	/**
+	 * 渲染用户活动列表
+	 * @returns {string} 活动列表HTML字符串
+	 */
 	renderUserActivity() {
 		if (this.state.loading || this.state.error) {
 			return '';
@@ -164,6 +199,10 @@ class UserProfilePage extends BasePage {
 		`;
 	}
 
+	/**
+	 * 挂载组件到容器
+	 * @param {HTMLElement} container - 容器元素
+	 */
 	mount(container) {
 		super.mount(container);
 
@@ -177,40 +216,42 @@ class UserProfilePage extends BasePage {
 		this.loadUserData();
 	}
 
+	/**
+	 * 绑定事件监听器
+	 */
 	bindEvents() {
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
 	}
 
+	/**
+	 * 加载用户数据
+	 * 从GitHub API获取目标用户的基本信息、统计数据和活动记录
+	 * @async
+	 */
 	async loadUserData() {
 		try {
 			this.setState({ loading: true, error: null });
 
-			// 获取用户信息和仓库信息
-			const userData = localStorage.getItem('spcp-user');
-			if (!userData) {
-				throw new Error('用户未登录');
-			}
-
-			const user = JSON.parse(userData);
-			const repoInfo = user.repositoryInfo;
-
-			if (!repoInfo || !user.token) {
-				throw new Error('仓库信息或访问令牌不可用');
+			// 获取当前用户信息
+			const userInfo = window.app.getUserFromStorage();
+			if (!userInfo.user || !userInfo.user.token) {
+				throw new Error('用户未登录或访问令牌不可用');
 			}
 
 			// 获取目标用户的基本信息
-			const userInfo = await window.GitHubService.getUserInfo(this.state.username, user.token);
+			const octokit = new window.Octokit({ auth: userInfo.user.token });
+			const { data: targetUserInfo } = await octokit.rest.users.getByUsername({ username: this.state.username });
 
 			// 获取用户的贡献统计
-			const userStats = await this.getUserStats(this.state.username, user.token);
+			const userStats = await this.getUserStats(this.state.username, userInfo.user.token);
 
 			// 获取用户最近活动
-			const userActivity = await this.getUserActivity(this.state.username, user.token);
+			const userActivity = await this.getUserActivity(this.state.username, userInfo.user.token);
 
 			this.setState({
 				loading: false,
-				userInfo: userInfo,
+				userInfo: targetUserInfo,
 				userStats: userStats,
 				userActivity: userActivity
 			});
@@ -231,11 +272,15 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 获取用户统计信息
+	 * @param {string} username - 用户名
+	 * @param {string} token - GitHub访问令牌
+	 * @returns {Promise<Object>} 用户统计信息
 	 */
 	async getUserStats(username, token) {
 		try {
 			// 获取用户的仓库列表
-			const repos = await window.GitHubService.getUserRepos(username, token);
+			const octokit = new window.Octokit({ auth: token });
+			const { data: repos } = await octokit.rest.repos.listForUser({ username });
 
 			// 计算统计信息
 			const totalStars = repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
@@ -260,11 +305,15 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 获取用户最近活动
+	 * @param {string} username - 用户名
+	 * @param {string} token - GitHub访问令牌
+	 * @returns {Promise<Array>} 用户活动列表
 	 */
 	async getUserActivity(username, token) {
 		try {
 			// 获取用户的事件
-			const events = await window.GitHubService.getUserEvents(username, token);
+			const octokit = new window.Octokit({ auth: token });
+			const { data: events } = await octokit.rest.activity.listPublicEventsForUser({ username });
 
 			// 处理事件并转换为活动列表
 			const activities = events.slice(0, 10).map(event => {
@@ -288,6 +337,8 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 获取活动图标
+	 * @param {string} type - 活动类型
+	 * @returns {string} 对应的图标
 	 */
 	getActivityIcon(type) {
 		const iconMap = {
@@ -303,6 +354,8 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 获取活动描述
+	 * @param {Object} event - GitHub事件对象
+	 * @returns {string} 活动描述文本
 	 */
 	getActivityDescription(event) {
 		const type = event.type;
@@ -328,6 +381,8 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 格式化时间
+	 * @param {string} dateString - 日期字符串
+	 * @returns {string} 格式化后的时间文本
 	 */
 	formatTime(dateString) {
 		const date = new Date(dateString);
@@ -349,6 +404,10 @@ class UserProfilePage extends BasePage {
 		}
 	}
 
+	/**
+	 * 销毁组件
+	 * 清理全局引用、模态框和事件监听器
+	 */
 	destroy() {
 		// 清理全局引用
 		if (window.currentPage === this) {

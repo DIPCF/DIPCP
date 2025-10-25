@@ -8,7 +8,7 @@
 GitHub Actions工作流模板，用于自动批准协作申请。
 
 **功能：**
-- 当有新的带有 `contribution-application` 标签的Issue被创建时触发
+- 当标题为 `Become a collaborator` 的Issue被创建时触发
 - 自动提取申请人的用户名
 - 将用户添加为仓库协作者
 - 添加批准标签并关闭Issue
@@ -19,7 +19,3 @@ GitHub Actions工作流模板，用于自动批准协作申请。
 2. 如果不存在，会自动创建并提交到仓库的 `.github/workflows/` 目录
 3. 无需手动配置
 
-**注意事项：**
-- 需要仓库管理员权限才能添加协作者
-- 如果自动添加失败，会添加错误标签并发送通知
-- 建议在仓库设置中创建相应的标签：`contribution-application`, `approved`, `contribution-approved`, `error`, `needs-manual-review`
