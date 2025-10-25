@@ -1,0 +1,38 @@
+[
+	{
+		"name": "提交新代码",
+		"points": 10,
+		"method": "by row count",
+		"reviewers": 1
+	},
+	{
+		"name": "审核新代码",
+		"points": 5,
+		"method": "by row count",
+		"reviewers": 1
+	},
+	{
+		"name": "提交新文档",
+		"points": 2,
+		"method": "by word count",
+		"reviewers": 1
+	},
+	{
+		"name": "审核新文档",
+		"points": 1,
+		"method": "by word count",
+		"reviewers": 1
+	},
+	{
+		"name": "提交图片",
+		"points": 100,
+		"method": "by commit",
+		"reviewers": 1
+	},
+	{
+		"name": "审核图片",
+		"points": 10,
+		"method": "by commit",
+		"reviewers": 1
+	}
+]

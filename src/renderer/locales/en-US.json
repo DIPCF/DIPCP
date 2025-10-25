@@ -38,7 +38,11 @@
 		"success": "Operation successful",
 		"info": "Information",
 		"warning": "Warning",
-		"action": "Action"
+		"action": "Action",
+		"add": "Add",
+		"remove": "Remove",
+		"actions": "Actions",
+		"preview": "Preview"
 	},
 	"navigation": {
 		"dashboard": "Dashboard",
@@ -111,6 +115,49 @@
 			"settingUpWorkspace": "Setting up workspace...",
 			"downloadComplete": "File download completed",
 			"invalidRepositoryUrl": "Invalid repository URL"
+		},
+		"settingUp": {
+			"branchProtection": "Setting up branch protection...",
+			"codeOwners": "Setting up CODEOWNERS...",
+			"actionsPermissions": "Setting up Actions permissions...",
+			"workflowPermissions": "Setting up Workflow permissions...",
+			"secrets": "Creating secrets...",
+			"checkingRepository": "Checking repository type...",
+			"creatingOrganization": "Creating organization...",
+			"transferringRepository": "Transferring repository to organization...",
+			"teamPermissions": "Setting up team permissions...",
+			"creatingTeams": "Creating teams...",
+			"settingTeamPermissions": "Setting up team permissions..."
+		},
+		"teams": {
+			"administrators": {
+				"description": "Administrators team - Has full management permissions for the repository"
+			},
+			"reviewers": {
+				"description": "Reviewers team - Responsible for code review and branch merging"
+			}
+		},
+		"errors": {
+			"personalRepo": {
+				"title": "Personal Repository Not Supported",
+				"message": "This application only supports organization repositories. Please use an organization repository or contact the repository administrator."
+			},
+			"repoCheck": {
+				"title": "Repository Check Failed",
+				"message": "Unable to check repository type. Please verify that the repository URL is correct."
+			},
+			"repoNotFound": {
+				"title": "Repository Not Found",
+				"message": "Repository {owner}/{repo} does not exist or is not public. Please check if the repository URL is correct."
+			},
+			"repoPrivate": {
+				"title": "Private Repository",
+				"message": "Cannot access private repository. Please ensure the repository is public or you have access permissions."
+			},
+			"unauthorized": {
+				"title": "Authentication Failed",
+				"message": "Authentication failed. Please check if your GitHub Access Token is correct."
+			}
 		}
 	},
 	"projectDetail": {
@@ -118,6 +165,7 @@
 		"projectFiles": "Project Files",
 		"localWorkspace": "Local Workspace",
 		"noFiles": "No files",
+		"files": "files",
 		"createFile": "Create File",
 		"createDirectory": "Create Directory",
 		"openFile": "Open",
@@ -849,5 +897,103 @@
 		"forksReceived": "Forks Received",
 		"recentActivity": "Recent Activity",
 		"noRecentActivity": "No Recent Activity"
+	},
+	"roleManagement": {
+		"title": "Project Permission Settings",
+		"status": {
+			"saved": "Saved",
+			"unsaved": "Unsaved",
+			"error": "Error",
+			"loading": "Loading"
+		},
+		"branchProtection": {
+			"title": "Branch Protection Rules",
+			"branchName": "Branch Name",
+			"addBranch": "Add Branch",
+			"protectionRules": "Protection Rules",
+			"requirePR": "Require pull request reviews before merging",
+			"requireCodeOwners": "Require review from code owners",
+			"dismissStaleReviews": "Dismiss stale reviews when new commits are pushed",
+			"requireStatusChecks": "Require status checks to pass before merging",
+			"requireUpToDate": "Require branches to be up to date before merging",
+			"restrictPushes": "Restrict pushes that create files",
+			"advancedSettings": "Advanced Settings",
+			"requiredReviewers": "Required number of reviewers",
+			"requiredCodeOwners": "Required code owners",
+			"requiredStatusChecks": "Required status checks",
+			"addStatusCheck": "Add Status Check"
+		},
+		"codeOwners": {
+			"title": "Code Owners Configuration (CODEOWNERS)",
+			"globalOwners": "Global Owners",
+			"specificRules": "Specific File/Directory Rules",
+			"pathPattern": "Path Pattern",
+			"owners": "Owners",
+			"addRule": "Add Rule",
+			"previewFile": "Preview CODEOWNERS File"
+		},
+		"teamPermissions": {
+			"title": "Team Permission Assignment",
+			"teamName": "Team Name",
+			"permissionLevel": "Permission Level",
+			"addTeam": "Add Team",
+			"noTeams": "No teams available",
+			"read": "Read",
+			"triage": "Triage",
+			"write": "Write",
+			"maintain": "Maintain",
+			"admin": "Admin"
+		},
+		"modals": {
+			"addTeam": {
+				"title": "Add Team Permission",
+				"selectTeam": "Select Team",
+				"permissionLevel": "Permission Level",
+				"devTeam": "Developer Team",
+				"techLeadTeam": "Tech Lead Team",
+				"maintainerTeam": "Maintainer Team",
+				"read": "Read",
+				"triage": "Triage",
+				"write": "Write",
+				"maintain": "Maintain",
+				"admin": "Admin",
+				"permissionDescription": "Permission Description",
+				"writeDesc": "Can push code, create branches, manage Issues and PRs",
+				"maintainDesc": "Can manage repository, but cannot modify sensitive settings",
+				"adminDesc": "Has full administrative permissions, can modify repository settings",
+				"readDesc": "Can only view code, cannot modify",
+				"triageDesc": "Can manage Issues and PRs, but cannot push code",
+				"addTeam": "Add Team"
+			},
+			"preview": {
+				"title": "Permission Settings Preview",
+				"branchProtection": "Branch Protection Rules",
+				"branchProtected": "branch protection enabled",
+				"requirePR": "Require PR review before merging",
+				"requireCodeOwners": "Require code owner review",
+				"codeOwners": "Code Owners",
+				"globalOwners": "Global Owners",
+				"specificRules": "Specific File Rules",
+				"rules": "rules",
+				"teamPermissions": "Team Permissions",
+				"permission": "permission",
+				"backToEdit": "Back to Edit"
+			}
+		},
+		"errors": {
+			"teamExists": "This team already exists",
+			"selectTeam": "Please select a team",
+			"addTeamFailed": "Failed to add team: {error}",
+			"removeTeamFailed": "Failed to remove team: {error}",
+			"updatePermissionFailed": "Failed to update permission: {error}"
+		},
+		"confirm": {
+			"removeTeam": "Are you sure you want to remove this team?",
+			"reset": "Are you sure you want to reset all settings? This will lose all unsaved changes."
+		},
+		"messages": {
+			"saveSuccess": "Settings saved successfully",
+			"saveError": "Save failed: {error}"
+		}
 	}
 }

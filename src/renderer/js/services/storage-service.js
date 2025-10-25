@@ -266,47 +266,99 @@ window.StorageService = {
 		}
 	},
 
+	// 递归获取所有文件（包括子目录）
+	async getAllFiles(octokit, owner, repo, path = '', allFiles = []) {
+		try {
+			const { data: items } = await octokit.rest.repos.getContent({ owner, repo, path });
+
+			for (const item of items) {
+				if (item.type === 'file') {
+					// 跳过.github目录的文件
+					if (!item.path.startsWith('.github/')) {
+						allFiles.push(item);
+					}
+				} else if (item.type === 'dir') {
+					// 递归处理子目录
+					await this.getAllFiles(octokit, owner, repo, item.path, allFiles);
+				}
+			}
+
+			return allFiles;
+		} catch (error) {
+			console.error(`获取目录 ${path} 失败:`, error);
+			return allFiles;
+		}
+	},
+
 	// 同步仓库数据 - 使用Octokit
 	async syncRepositoryData(owner, repo, token, progressCallback = null) {
 		try {
 			console.log(`开始同步仓库数据: ${owner}/${repo}`);
 
 			// 初始化数据库
-			await this.initDB();
+			if (window.StorageService) {
+				await window.StorageService.initDB();
+			}
 
-			// 使用Octokit获取仓库文件列表
+			// 使用Octokit获取所有文件（包括子目录）
 			const octokit = new window.Octokit({ auth: token });
-			const { data: files } = await octokit.rest.repos.getContent({ owner, repo, path: '' });
+			const allFiles = await this.getAllFiles(octokit, owner, repo);
 
-			// 过滤掉.github目录的文件
-			const validFiles = files.filter(file =>
-				!(file.path.startsWith('.github/') || file.path === '.github') &&
-				file.type === 'file'
-			);
-
-			console.log(`需要下载 ${validFiles.length} 个文件`);
+			console.log(`需要下载 ${allFiles.length} 个文件`);
 
 			// 下载所有文件到fileCache
 			let downloadedCount = 0;
-			for (const file of validFiles) {
+			for (const file of allFiles) {
 				try {
+					// 使用Octokit获取文件内容
 					const { data: fileData } = await octokit.rest.repos.getContent({
 						owner, repo, path: file.path
 					});
 
+					// 获取文件提交历史以获取创建和修改时间
+					let createdTime = new Date().toISOString();
+					let modifiedTime = new Date().toISOString();
+
+					try {
+						const { data: commits } = await octokit.rest.repos.listCommits({
+							owner, repo, path: file.path, per_page: 1
+						});
+
+						if (commits && commits.length > 0) {
+							modifiedTime = commits[0].commit.committer.date;
+							createdTime = modifiedTime; // 默认使用最后提交时间
+						}
+
+						// 获取首次提交时间
+						const { data: allCommits } = await octokit.rest.repos.listCommits({
+							owner, repo, path: file.path
+						});
+
+						if (allCommits && allCommits.length > 0) {
+							createdTime = allCommits[allCommits.length - 1].commit.committer.date;
+						}
+					} catch (commitError) {
+						console.warn(`获取文件 ${file.path} 的提交历史失败:`, commitError);
+					}
+
 					// 检查是否有内容
 					if (fileData.content) {
 						try {
-							// 尝试解码base64内容
-							const content = atob(fileData.content);
+							// 尝试解码base64内容，使用UTF-8编码
+							const binaryString = atob(fileData.content);
+							const bytes = new Uint8Array(binaryString.length);
+							for (let i = 0; i < binaryString.length; i++) {
+								bytes[i] = binaryString.charCodeAt(i);
+							}
+							const content = new TextDecoder('utf-8').decode(bytes);
 
 							// 保存到fileCache
-							await this._execute('fileCache', 'put', {
+							await window.StorageService._execute('fileCache', 'put', {
 								path: file.path,
 								content: content,
 								sha: fileData.sha,
-								created: fileData.created_at,
-								modified: fileData.updated_at,
+								created: createdTime,
+								modified: modifiedTime,
 								isLocal: false,
 								size: content.length,
 								type: file.type
@@ -316,12 +368,12 @@ window.StorageService = {
 
 							// 调用进度回调
 							if (progressCallback) {
-								const progress = Math.round((downloadedCount / validFiles.length) * 100);
-								progressCallback(progress, downloadedCount, validFiles.length, file.path);
+								const progress = Math.round((downloadedCount / allFiles.length) * 100);
+								progressCallback(progress, downloadedCount, allFiles.length, file.path);
 							}
 						} catch (decodeError) {
 							// 如果base64解码失败，跳过该文件
-							console.log(`跳过无法解码的文件: ${file.path}`);
+							console.log(`跳过无法解码的文件: ${file.path}`, decodeError);
 						}
 					} else {
 						// 没有内容，可能是空文件

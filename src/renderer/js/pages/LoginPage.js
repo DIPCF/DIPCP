@@ -6,14 +6,13 @@ class LoginPage extends BasePage {
 	constructor(props = {}) {
 		super(props);
 		this.state = {
-			language: props.language || (window.I18nService ? window.I18nService.currentLanguage : 'zh-CN'),
+			language: window.I18nService ? window.I18nService.currentLanguage : 'zh-CN',
 			formData: {
-				username: props.username || 'minne100',
-				repositoryUrl: props.repositoryUrl || 'https://github.com/ZelaCreator/SPCP',
-				accessToken: props.accessToken || ''
+				username: '',
+				accessToken: '',
+				repositoryUrl: 'https://github.com/Zela-Foundation/SPCP'
 			},
 			loading: false,
-			onLogin: props.onLogin || null
 		};
 
 		// 确保主题在LoginPage渲染时被应用
@@ -283,11 +282,6 @@ class LoginPage extends BasePage {
 		modal.bindEvents();
 	}
 
-	updateFormData(data) {
-		this.setState({ formData: { ...this.state.formData, ...data } });
-		this.update();
-	}
-
 	async setLanguage(language) {
 		// 更新本地状态
 		this.setState({ language });
@@ -301,7 +295,7 @@ class LoginPage extends BasePage {
 		}
 
 		// 重新渲染页面
-		this.update();
+		this.rerender();
 	}
 
 
@@ -311,7 +305,22 @@ class LoginPage extends BasePage {
 			throw new Error('请填写所有必填字段');
 		}
 
-		// 1. 验证GitHub Access Token
+		// 1. 解析仓库信息
+		const repoInfo = this.parseGitHubUrl(formData.repositoryUrl);
+		if (!repoInfo) {
+			throw new Error('无效的GitHub仓库URL，请检查仓库地址格式');
+		}
+
+		// 2. 检查仓库类型（必须是组织仓库）- 不需要认证
+		console.log('检查仓库类型...');
+		const isOrgRepo = await this.checkRepositoryType(null, repoInfo.owner, repoInfo.repo);
+		if (!isOrgRepo) {
+			// 错误提示已经在 checkRepositoryType 中显示，恢复按钮状态并返回
+			this.updateLoginButtonState('default', this.t('login.loginButton', '登录并克隆仓库'));
+			return;
+		}
+
+		// 3. 验证GitHub Access Token
 		console.log('验证GitHub Access Token...');
 		let userInfo;
 
@@ -330,17 +339,11 @@ class LoginPage extends BasePage {
 			throw new Error(`用户名不匹配：Token对应的用户是"${userInfo.username}"，但您输入的是"${formData.username}"`);
 		}
 
-		// 2. 解析仓库信息
-		const repoInfo = this.parseGitHubUrl(formData.repositoryUrl);
-		if (!repoInfo) {
-			throw new Error('无效的GitHub仓库URL，请检查仓库地址格式');
-		}
-
-		// 3. 检查用户对仓库的权限
+		// 4. 检查用户对仓库的权限
 		console.log('检查用户权限...');
 		const permissionInfo = await this.checkUserPermissions(userInfo.username, repoInfo.owner, repoInfo.repo, formData.accessToken);
 
-		// 4. 保存用户信息（包含token和权限信息）
+		// 5. 保存用户信息（包含token和权限信息）
 		const fullUserInfo = {
 			...userInfo,
 			repositoryUrl: formData.repositoryUrl,
@@ -352,13 +355,23 @@ class LoginPage extends BasePage {
 		localStorage.setItem('spcp-user', JSON.stringify(fullUserInfo));
 		console.log('用户信息已保存');
 
-		// 5. 根据用户权限执行不同操作
-		if (permissionInfo.role === 'owner') {
-			// 所有者：检查并创建GitHub Actions工作流
-			await this.setupGitHubActions(repoInfo.owner, repoInfo.repo, formData.accessToken);
+		// 6. 检查组织权限并执行相应设置
+		const hasOrgPermission = await this.checkOrganizationPermission(octokit, repoInfo.owner, userInfo.username);
+		if (hasOrgPermission) {
+			// 获取用户在组织中的角色
+			const membership = await octokit.rest.orgs.getMembershipForUser({
+				org: repoInfo.owner,
+				username: userInfo.username
+			});
 
-			// 所有者：自动设置仓库权限
-			await this.setupRepositoryPermissions(repoInfo.owner, repoInfo.repo, formData.accessToken);
+			if (membership.data.role === 'admin') {
+				// 组织admin：执行完整设置
+				await this.setupGitHubActions(repoInfo.owner, repoInfo.repo, formData.accessToken);
+				await this.setupRepositoryPermissions(repoInfo.owner, repoInfo.repo, formData.accessToken);
+			} else {
+				// 普通组织成员：只设置团队权限
+				await this.setupTeamPermissions(octokit, repoInfo.owner, repoInfo.repo);
+			}
 		}
 
 		// 7. 更新app.js的状态
@@ -473,30 +486,11 @@ class LoginPage extends BasePage {
 	}
 
 	/**
-	 * 删除工作流文件
-	 */
-	async deleteWorkflowFile(owner, repo, token) {
-		const octokit = new window.Octokit({ auth: token });
-
-		// 先获取文件SHA
-		const { data: fileData } = await octokit.rest.repos.getContent({
-			owner, repo, path: '.github/workflows/auto-approve-collaborators.yml'
-		});
-
-		// 删除文件
-		await octokit.rest.repos.deleteFile({
-			owner, repo, path: '.github/workflows/auto-approve-collaborators.yml',
-			message: 'Update auto-approve collaborators workflow',
-			sha: fileData.sha
-		});
-	}
-
-	/**
 	 * 创建工作流文件
 	 */
 	async createWorkflowFile(owner, repo, token) {
 		// 读取工作流文件内容
-		const workflowContent = await this.loadWorkflowTemplate();
+		const workflowContent = await this.loadFileTemplate('auto-approve-collaborators.yml');
 
 		const octokit = new window.Octokit({ auth: token });
 
@@ -527,11 +521,11 @@ class LoginPage extends BasePage {
 	}
 
 	/**
-	 * 加载工作流模板
+	 * 加载文件
 	 */
-	async loadWorkflowTemplate() {
-		// 从服务器加载工作流模板文件
-		const response = await fetch('/templates/auto-approve-collaborators.yml');
+	async loadFileTemplate(path) {
+		// 从服务器加载文件
+		const response = await fetch(`/templates/${path}`);
 		if (response.ok) {
 			return await response.text();
 		} else {
@@ -609,57 +603,253 @@ class LoginPage extends BasePage {
 		if (window.StorageService) {
 			await window.StorageService.clearUserData();
 		}
-		console.log('本地数据已清除');
-	}
-
-
-	update() {
-		if (this.element) {
-			const newElement = this.render();
-			this.element.innerHTML = '';
-			this.element.appendChild(newElement);
-			this.bindEvents();
-		}
 	}
 
 	/**
 	 * 设置仓库权限（分支保护、CODEOWNERS、Actions权限、团队权限）
 	 */
 	async setupRepositoryPermissions(owner, repo, token) {
-		console.log('🔧 开始设置仓库权限...');
-
 		const octokit = new window.Octokit({ auth: token });
 
 		try {
+			// 0. 检查仓库类型
+			this.updateLoginButtonState('loading', this.t('login.settingUp.checkingRepository', '正在检查仓库类型...'));
+			const isOrgRepo = await this.checkRepositoryType(octokit, owner, repo);
+
+			// 如果不是组织仓库，直接返回
+			if (!isOrgRepo) {
+				return;
+			}
+
 			// 1. 设置分支保护
-			console.log('📋 设置分支保护...');
+			this.updateLoginButtonState('loading', this.t('login.settingUp.branchProtection', '正在设置分支保护...'));
 			await this.setupBranchProtection(octokit, owner, repo);
-			console.log('✅ 分支保护设置成功！');
 
 			// 2. 设置CODEOWNERS
-			console.log('👥 设置CODEOWNERS...');
+			this.updateLoginButtonState('loading', this.t('login.settingUp.codeOwners', '正在设置CODEOWNERS...'));
 			await this.setupCodeOwners(octokit, owner, repo);
-			console.log('✅ CODEOWNERS设置成功！');
 
 			// 3. 设置Actions权限
-			console.log('⚙️ 设置Actions权限...');
+			this.updateLoginButtonState('loading', this.t('login.settingUp.actionsPermissions', '正在设置Actions权限...'));
 			await this.setupActionsPermissions(octokit, owner, repo);
-			console.log('✅ Actions权限设置成功！');
 
 			// 4. 设置Workflow权限
-			console.log('🔄 设置Workflow权限...');
+			this.updateLoginButtonState('loading', this.t('login.settingUp.workflowPermissions', '正在设置Workflow权限...'));
 			await this.setupWorkflowPermissions(octokit, owner, repo);
-			console.log('✅ Workflow权限设置成功！');
 
 			// 5. 创建Secrets
-			console.log('🔐 创建Secrets...');
+			this.updateLoginButtonState('loading', this.t('login.settingUp.secrets', '正在创建Secrets...'));
 			await this.setupSecrets(octokit, owner, repo, token);
-			console.log('✅ Secrets创建成功！');
 
-			console.log('🎉 所有仓库权限设置完成！');
+			// 6. 设置团队权限
+			this.updateLoginButtonState('loading', this.t('login.settingUp.teamPermissions', '正在设置团队权限...'));
+			await this.setupTeamPermissions(octokit, owner, repo);
+
 		} catch (error) {
 			console.error('❌ 设置仓库权限失败:', error);
 			throw error;
+		}
+	}
+
+	/**
+	 * 检查仓库类型
+	 * @param {Object} octokit - Octokit实例（可以为null，使用公开API）
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @returns {Promise<boolean>} 是否为组织仓库
+	 */
+	async checkRepositoryType(octokit, owner, repo) {
+		try {
+			// 如果没有提供octokit，创建一个不需要认证的实例
+			if (!octokit) {
+				octokit = new window.Octokit();
+			}
+
+			// 检查仓库信息（公开API，不需要认证）
+			const { data: repoInfo } = await octokit.rest.repos.get({
+				owner,
+				repo
+			});
+
+			console.log('仓库类型检查:', {
+				owner: repoInfo.owner.login,
+				type: repoInfo.owner.type,
+				isOrg: repoInfo.owner.type === 'Organization'
+			});
+
+			// 如果是组织仓库，返回true
+			if (repoInfo.owner.type === 'Organization') {
+				return true;
+			}
+
+			// 如果是个人仓库，显示错误提示
+			this.showError(this.t('login.errors.personalRepo.message', '此应用仅支持组织仓库。请使用组织仓库或联系仓库管理员。'));
+			return false;
+
+		} catch (error) {
+			// 根据不同的错误类型显示不同的提示
+			if (error.status === 404) {
+				console.log('显示仓库不存在错误');
+				const message = this.t('login.errors.repoNotFound.message', '仓库 {owner}/{repo} 不存在或不是公开仓库，请检查仓库地址是否正确。')
+					.replace('{owner}', owner)
+					.replace('{repo}', repo);
+				this.showError(message);
+			} else if (error.status === 401) {
+				console.log('显示认证错误');
+				this.showError(this.t('login.errors.unauthorized.message', '认证失败，请检查您的GitHub Access Token是否正确。'));
+			} else {
+				console.log('显示通用错误');
+				this.showError(this.t('login.errors.repoCheck.message', '无法检查仓库类型，请检查仓库地址是否正确。'));
+			}
+			return false;
+		}
+	}
+
+	/**
+	 * 检查用户是否有组织权限
+	 * @param {Object} octokit - Octokit实例
+	 * @param {string} orgName - 组织名称
+	 * @param {string} username - 用户名
+	 * @returns {Promise<boolean>} 是否有组织权限
+	 */
+	async checkOrganizationPermission(octokit, orgName, username) {
+		try {
+			// 检查用户是否是组织成员
+			const { data: membership } = await octokit.rest.orgs.getMembershipForUser({
+				org: orgName,
+				username: username
+			});
+
+			console.log('组织成员信息:', {
+				org: orgName,
+				user: username,
+				role: membership.role,
+				state: membership.state
+			});
+
+			// 检查用户是否有admin或member权限且状态为active
+			return membership.role === 'admin' || (membership.role === 'member' && membership.state === 'active');
+
+		} catch (error) {
+			console.error('检查组织权限失败:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * 设置团队权限
+	 * @param {Object} octokit - Octokit实例
+	 * @param {string} owner - 组织名称
+	 * @param {string} repo - 仓库名称
+	 */
+	async setupTeamPermissions(octokit, owner, repo) {
+		try {
+			// 定义需要创建的团队
+			const teams = [
+				{
+					name: 'administrators',
+					description: this.t('login.teams.administrators.description', '管理员团队 - 拥有仓库的完全管理权限'),
+					permission: 'admin'
+				},
+				{
+					name: 'reviewers',
+					description: this.t('login.teams.reviewers.description', '审核委员团队 - 负责代码审查和分支合并'),
+					permission: 'maintain'
+				}
+			];
+
+			for (const team of teams) {
+				try {
+					// 检查团队是否已存在
+					let teamExists = false;
+					try {
+						await octokit.rest.teams.getByName({
+							org: owner,
+							team_slug: team.name
+						});
+						teamExists = true;
+						console.log(`✅ 团队 ${team.name} 已存在`);
+					} catch (error) {
+						if (error.status !== 404) {
+							throw error;
+						}
+						// 团队不存在，继续创建
+					}
+
+					// 如果团队不存在，创建团队
+					if (!teamExists) {
+						const { data: createdTeam } = await octokit.rest.teams.create({
+							org: owner,
+							name: team.name,
+							description: team.description,
+							privacy: 'closed'
+						});
+						console.log(`✅ 创建团队 ${team.name} 成功`);
+					}
+
+					// 设置团队仓库权限
+					await octokit.rest.teams.addOrUpdateRepoPermissionsInOrg({
+						org: owner,
+						team_slug: team.name,
+						owner: owner,
+						repo: repo,
+						permission: team.permission
+					});
+
+					console.log(`✅ 设置团队 ${team.name} 权限为 ${team.permission}`);
+
+				} catch (error) {
+					console.warn(`⚠️ 设置团队 ${team.name} 失败:`, error);
+					// 继续处理其他团队，不中断整个流程
+				}
+			}
+
+			// 设置分支保护规则，只允许审核委员合并到main分支
+			await this.setupBranchProtectionForTeams(octokit, owner, repo);
+
+		} catch (error) {
+			console.error('❌ 设置团队权限失败:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * 为团队设置分支保护规则
+	 * @param {Object} octokit - Octokit实例
+	 * @param {string} owner - 组织名称
+	 * @param {string} repo - 仓库名称
+	 */
+	async setupBranchProtectionForTeams(octokit, owner, repo) {
+		try {
+			// 设置main分支保护规则
+			await octokit.rest.repos.updateBranchProtection({
+				owner: owner,
+				repo: repo,
+				branch: 'main',
+				required_status_checks: {
+					strict: true,
+					contexts: []
+				},
+				enforce_admins: false,
+				required_pull_request_reviews: {
+					required_approving_review_count: 1,
+					dismiss_stale_reviews: true,
+					require_code_owner_reviews: true
+				},
+				restrictions: {
+					users: [],
+					teams: ['reviewers'], // 只有审核委员可以合并
+					apps: []
+				},
+				allow_force_pushes: false,
+				allow_deletions: false
+			});
+
+			console.log('✅ 设置main分支保护规则成功 - 只有审核委员可以合并');
+
+		} catch (error) {
+			console.warn('⚠️ 设置分支保护规则失败:', error);
+			// 不抛出错误，因为这不是关键功能
 		}
 	}
 
@@ -691,45 +881,60 @@ class LoginPage extends BasePage {
 	 * 设置CODEOWNERS
 	 */
 	async setupCodeOwners(octokit, owner, repo) {
-		const codeOwnersContent = `# 全局代码所有者
-* @${owner}
-
-# 特定文件/目录
-/src/ @${owner}
-/docs/ @${owner}
-*.js @${owner}
-
-# 重要配置文件
-package.json @${owner}
+		const time = new Date().toISOString();
+		const codeOwners = `# 全局代码所有者
+/CODEOWNERS @${owner}
+# 保存贡献积分的目录
+/POINTS/ @${owner}
+# 积分规则
+/RULES.json @${owner}
 `;
 
+		const points = `time,points,total,reviewers,reason
+${time},1000,1000,${this.state.formData.username},创建仓库\n`;
+
+		const rules = await this.loadFileTemplate('RULES.json');
+
 		// 先尝试获取现有文件
-		let sha = null;
 		try {
-			const { data } = await octokit.rest.repos.getContent({
+			await octokit.rest.repos.getContent({
 				owner, repo, path: 'CODEOWNERS'
 			});
-			sha = data.sha;
 		} catch (error) {
-			// 文件不存在，sha为null
+			// 文件不存在,创建文件
+			const codeOwnersBody = {
+				message: 'Add CODEOWNERS',
+				content: btoa(unescape(encodeURIComponent(codeOwners))),
+				branch: 'main'
+			};
+
+			await octokit.rest.repos.createOrUpdateFileContents({
+				owner, repo, path: 'CODEOWNERS',
+				...codeOwnersBody
+			});
+
+			const pointsBody = {
+				message: 'Add POINTS',
+				content: btoa(unescape(encodeURIComponent(points))),
+				branch: 'main'
+			};
+
+			await octokit.rest.repos.createOrUpdateFileContents({
+				owner, repo, path: `POINTS/${this.state.formData.username}.csv`,
+				...pointsBody
+			});
+
+			const rulesBody = {
+				message: 'Add RULES',
+				content: btoa(unescape(encodeURIComponent(rules))),
+				branch: 'main'
+			};
+
+			await octokit.rest.repos.createOrUpdateFileContents({
+				owner, repo, path: 'RULES.json',
+				...rulesBody
+			});
 		}
-
-		// 创建或更新文件
-		const content = btoa(unescape(encodeURIComponent(codeOwnersContent)));
-		const requestBody = {
-			message: sha ? 'Update CODEOWNERS file' : 'Add CODEOWNERS',
-			content: content,
-			branch: 'main'
-		};
-
-		if (sha) {
-			requestBody.sha = sha;
-		}
-
-		await octokit.rest.repos.createOrUpdateFileContents({
-			owner, repo, path: 'CODEOWNERS',
-			...requestBody
-		});
 	}
 
 	/**
@@ -748,38 +953,45 @@ package.json @${owner}
 	 */
 	async setupWorkflowPermissions(octokit, owner, repo) {
 		try {
-			// 设置Actions权限（允许Actions运行）
-			const actionsPermissions = {
-				owner, repo,
-				enabled: true,
-				allowed_actions: 'all'
-			};
-
-			console.log('🔄 设置Actions权限参数:', actionsPermissions);
-			await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions', actionsPermissions);
-			console.log('✅ Actions权限设置成功');
-
-			// 设置Workflow权限（使用正确的API端点）
-			const workflowPermissions = {
-				owner, repo,
-				default_workflow_permissions: 'write',
-				can_approve_pull_request_reviews: true
-			};
-
-			console.log('🔄 设置Workflow权限参数:', workflowPermissions);
-			await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions/workflow', workflowPermissions);
-			console.log('✅ Workflow权限设置成功');
-
-			// 验证设置是否生效
-			const { data: actionsPermissionsResult } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions', {
+			// 先获取当前权限设置
+			const { data: currentActionsPermissions } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions', {
 				owner, repo
 			});
-			console.log('🔍 验证Actions权限设置:', actionsPermissionsResult);
+			console.log('🔍 当前Actions权限设置:', currentActionsPermissions);
 
-			const { data: workflowPermissionsResult } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions/workflow', {
+			const { data: currentWorkflowPermissions } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions/workflow', {
 				owner, repo
 			});
-			console.log('🔍 验证Workflow权限设置:', workflowPermissionsResult);
+			console.log('🔍 当前Workflow权限设置:', currentWorkflowPermissions);
+
+			// 检查第一个权限（Actions）是否已正确设置
+			const isActionsCorrectlySet = currentActionsPermissions.enabled && currentActionsPermissions.allowed_actions === 'all';
+
+			if (!isActionsCorrectlySet) {
+				// 需要更新，统一设置所有权限
+
+				// 设置Actions权限
+				const actionsPermissions = {
+					owner, repo,
+					enabled: true,
+					allowed_actions: 'all'
+				};
+				console.log('🔄 设置Actions权限参数:', actionsPermissions);
+				await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions', actionsPermissions);
+				console.log('✅ Actions权限设置成功');
+
+				// 设置Workflow权限
+				const workflowPermissions = {
+					owner, repo,
+					default_workflow_permissions: 'write',
+					can_approve_pull_request_reviews: true
+				};
+				console.log('🔄 设置Workflow权限参数:', workflowPermissions);
+				await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions/workflow', workflowPermissions);
+				console.log('✅ Workflow权限设置成功');
+			} else {
+				console.log('ℹ️ 所有权限已正确设置，跳过更新');
+			}
 
 		} catch (error) {
 			console.error('❌ Workflow权限设置失败:', error);

@@ -35,7 +35,9 @@ class ProjectDetailPage extends BasePage {
 			moduleStates: this.loadModuleStates(),
 			// 成员数据缓存
 			membersCache: null,
-			membersLoading: false
+			membersLoading: false,
+			// 目录折叠状态
+			collapsedDirs: new Set()
 		};
 	}
 
@@ -86,6 +88,7 @@ class ProjectDetailPage extends BasePage {
                         <a href="#" class="dropdown-item" data-section="members">${this.t('projectDetail.projectMembers', '项目成员')}</a>
                         <a href="#" class="dropdown-item" data-section="activity">${this.t('projectDetail.recentActivity', '最近活动')}</a>
                         <a href="#" class="dropdown-item" data-section="pending">${this.t('projectDetail.pendingReviews', '待审核内容')}</a>
+                        <a href="#" class="dropdown-item" data-section="role-management">${this.t('projectDetail.roleManagement', '权限设置')}</a>
                     </div>
                 </div>
             </div>
@@ -475,13 +478,18 @@ class ProjectDetailPage extends BasePage {
 						const dirPath = pathParts.slice(0, i + 1).join('/') + '/';
 						const dirFile = files.find(f => f.path === dirPath);
 
+						// 检查该目录下是否有任何本地文件
+						const hasLocalFile = files.some(f => f.path.startsWith(dirPath) && f.isLocal);
+
 						current[part] = {
 							type: 'dir',
 							children: {},
 							path: dirPath,
 							name: part,
 							selected: dirFile ? dirFile.selected : false,
-							isLocal: dirFile ? dirFile.isLocal : true
+							isLocal: dirFile ? dirFile.isLocal : hasLocalFile,
+							created: dirFile ? dirFile.created : new Date().toISOString(),
+							modified: dirFile ? dirFile.modified : new Date().toISOString()
 						};
 					}
 					// 确保children存在
@@ -513,38 +521,79 @@ class ProjectDetailPage extends BasePage {
 				// 目录 - 只显示最后一部分路径
 				const displayName = key.split('/').pop() + '/';
 				const localIcon = item.isLocal ? '🏠' : '';
-				html += `
-					<div class="file-item dir-item ${item.selected ? 'selected' : ''}" 
-						 data-path="${item.path || key + '/'}" 
-						 data-type="dir" 
-						 data-local="${item.isLocal || true}"
-						 style="padding-left: ${level * 20}px;">
-						<span class="file-icon">${localIcon}📁</span>
-						<span class="file-name">${displayName}</span>
-					</div>
-				`;
+				const dirPath = item.path || key + '/';
+				const isCollapsed = this.state.collapsedDirs.has(dirPath);
+				const hasChildren = item.children && Object.keys(item.children).length > 0;
+				const toggleIcon = hasChildren ? (isCollapsed ? '▶' : '▼') : '📁';
 
-				// 如果有子项，递归渲染
-				if (item.children) {
+				// 计算目录内的文件数量
+				const fileCount = item.children ? Object.keys(item.children).filter(k => {
+					const child = item.children[k];
+					return !child || !child.type || child.type !== 'dir';
+				}).length : 0;
+
+				html += `
+			<div class="file-item dir-item ${item.selected ? 'selected' : ''} ${isCollapsed ? 'collapsed' : 'expanded'}" 
+				 data-path="${dirPath}" 
+				 data-type="dir" 
+				 data-local="${item.isLocal || true}"
+				 style="padding-left: ${level * 20}px;">
+				<span class="file-icon dir-toggle" data-path="${dirPath}" data-has-children="${hasChildren}">${localIcon}${toggleIcon}</span>
+				<span class="file-name">${displayName}</span>
+				<span class="file-info">${fileCount} ${this.t('projectDetail.files', '个文件')}</span>
+			</div>
+		`;
+
+				// 如果有子项且未折叠，递归渲染
+				if (item.children && !isCollapsed) {
 					html += this.renderFileTree(item.children, level + 1);
 				}
 			} else if (item.path) {
 				// 文件
 				const localIcon = item.isLocal ? '🏠' : '';
+
+				// 格式化文件大小
+				const fileSize = item.size ? this.formatFileSize(item.size) : '-';
+
+				// 格式化创建时间（包含日期和时间）
+				const createdTime = item.created ? new Date(item.created).toLocaleString('zh-CN', {
+					year: 'numeric',
+					month: '2-digit',
+					day: '2-digit',
+					hour: '2-digit',
+					minute: '2-digit'
+				}) : '-';
+
 				html += `
-					<div class="file-item file-item ${item.selected ? 'selected' : ''}" 
-						 data-path="${item.path}" 
-						 data-type="${item.type}" 
-						 data-local="${item.isLocal}"
-						 style="padding-left: ${level * 20}px;">
-						<span class="file-icon">${localIcon}${item.type === 'dir' ? '📁' : '📄'}</span>
-						<span class="file-name">${item.name}</span>
-					</div>
-				`;
+				<div class="file-item file-item ${item.selected ? 'selected' : ''}" 
+					 data-path="${item.path}" 
+					 data-type="${item.type}" 
+					 data-local="${item.isLocal}"
+					 style="padding-left: ${level * 20}px;">
+					<span class="file-icon">${localIcon}${item.type === 'dir' ? '📁' : '📄'}</span>
+					<span class="file-name">${item.name}</span>
+					<span class="file-info">${fileSize} • ${createdTime}</span>
+				</div>
+			`;
 			}
 		});
 
 		return html;
+	}
+
+	/**
+	 * 格式化文件大小
+	 * @param {number} bytes - 文件大小（字节）
+	 * @returns {string} 格式化后的文件大小
+	 */
+	formatFileSize(bytes) {
+		if (!bytes || bytes === 0) return '0 B';
+
+		const k = 1024;
+		const sizes = ['B', 'KB', 'MB', 'GB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 	}
 
 	/**
@@ -616,24 +665,38 @@ class ProjectDetailPage extends BasePage {
 
 					// 先添加文件缓存的文件（GitHub原版）
 					cacheFiles.forEach(file => {
+						// 如果没有创建时间，使用当前时间作为默认值（旧数据）
+						const createdTime = file.created || new Date().toISOString();
+						const modifiedTime = file.modified || createdTime;
+
 						const fileInfo = {
 							name: file.path.split('/').pop() || file.path,
 							path: file.path,
 							type: file.path.endsWith('/') ? 'dir' : 'file',
 							selected: false,
-							isLocal: false
+							isLocal: false,
+							created: createdTime,
+							modified: modifiedTime,
+							size: file.size || 0
 						};
 						fileMap.set(file.path, fileInfo);
 					});
 
 					// 再添加本地工作空间的文件（用户编辑的版本，会覆盖缓存版本）
 					workspaceFiles.forEach(file => {
+						// 如果没有创建时间，使用当前时间作为默认值（旧数据）
+						const createdTime = file.created || new Date().toISOString();
+						const modifiedTime = file.modified || createdTime;
+
 						const fileInfo = {
 							name: file.path.split('/').pop() || file.path,
 							path: file.path,
 							type: file.path.endsWith('/') ? 'dir' : 'file',
 							selected: false,
-							isLocal: true
+							isLocal: true,
+							created: createdTime,
+							modified: modifiedTime,
+							size: file.size || 0
 						};
 						fileMap.set(file.path, fileInfo);
 					});
@@ -804,6 +867,8 @@ class ProjectDetailPage extends BasePage {
 					this.toggleActivity();
 				} else if (section === 'pending') {
 					this.togglePendingReviews();
+				} else if (section === 'role-management') {
+					this.handleRoleManagement();
 				}
 			});
 		});
@@ -896,8 +961,9 @@ class ProjectDetailPage extends BasePage {
 				fileList.innerHTML = this.renderFileTree(tree);
 			}
 
-			// 重新绑定文件项的事件
-			this.bindFileItemEvents();
+			// 重新绑定文件项的事件（不重新绑定所有事件，避免重复绑定）
+			// 只绑定文件项相关的事件
+			this.bindFileItemEventsOnly();
 		}
 	}
 
@@ -933,12 +999,43 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {void}
 	 */
 	bindFileItemEvents() {
+		this.bindFileItemEventsOnly();
+	}
+
+	/**
+	 * 仅绑定文件项事件（避免重复绑定工具栏按钮等其他事件）
+	 * @returns {void}
+	 */
+	bindFileItemEventsOnly() {
 		if (!this.element) return;
 
 		const fileItems = this.element.querySelectorAll('.file-item');
 		fileItems.forEach(item => {
 			// 移除旧的事件监听器
 			item.replaceWith(item.cloneNode(true));
+		});
+
+		// 绑定目录展开/折叠事件
+		const dirToggles = this.element.querySelectorAll('.dir-toggle');
+		dirToggles.forEach(toggle => {
+			toggle.addEventListener('click', (e) => {
+				e.stopPropagation();
+				const path = e.currentTarget.dataset.path;
+				const hasChildren = e.currentTarget.dataset.hasChildren === 'true';
+
+				if (hasChildren) {
+					// 切换折叠状态
+					const newCollapsedDirs = new Set(this.state.collapsedDirs);
+					if (newCollapsedDirs.has(path)) {
+						newCollapsedDirs.delete(path);
+					} else {
+						newCollapsedDirs.add(path);
+					}
+
+					this.setState({ collapsedDirs: newCollapsedDirs });
+					this.updateFileListDOM(this.state.files);
+				}
+			});
 		});
 
 		// 重新获取文件项并绑定事件
@@ -1414,6 +1511,26 @@ class ProjectDetailPage extends BasePage {
 	}
 
 	/**
+	 * 处理权限设置
+	 * @returns {void}
+	 */
+	handleRoleManagement() {
+		// 检查用户权限，只有owner和admin可以访问权限设置
+		if (this.state.userRole !== 'owner' && this.state.userRole !== 'admin') {
+			this.showInfoModal(
+				this.t('projectDetail.fileOperations.modalTitles.error', '错误'),
+				this.t('projectDetail.roleManagement.noPermission', '您没有权限访问此功能。只有项目所有者和管理员可以管理权限设置。')
+			);
+			return;
+		}
+
+		// 导航到权限设置页面
+		if (window.app && window.app.navigateTo) {
+			window.app.navigateTo('/role-management');
+		}
+	}
+
+	/**
 	 * 处理创建文件
 	 * @returns {Promise<void>}
 	 */
@@ -1880,6 +1997,11 @@ class ProjectDetailPage extends BasePage {
 				throw new Error('无法获取最新提交信息');
 			}
 
+			// 解析提交信息
+			const commitMessage = latestCommit.commit?.message || '无提交信息';
+			const commitAuthor = latestCommit.commit?.author?.name || '未知作者';
+			const commitDate = latestCommit.commit?.author?.date || latestCommit.commit?.committer?.date || new Date().toISOString();
+
 			// 获取本地同步信息
 			const syncInfo = localStorage.getItem(`spcp-sync-${repoInfo.repo}`);
 			const lastSyncCommit = syncInfo ? JSON.parse(syncInfo).lastCommit : null;
@@ -1895,9 +2017,9 @@ class ProjectDetailPage extends BasePage {
 				this.showConfirmModal(
 					this.t('projectDetail.fileOperations.modalTitles.updateAvailable', '发现新版本！'),
 					this.t('projectDetail.fileOperations.newVersionFound', '发现新版本！') + '\n\n' +
-					this.t('projectDetail.fileOperations.latestCommit', '最新提交：{message}').replace('{message}', latestCommit.message) + '\n' +
-					this.t('projectDetail.fileOperations.committer', '提交者：{author}').replace('{author}', latestCommit.author) + '\n' +
-					this.t('projectDetail.fileOperations.commitTime', '时间：{time}').replace('{time}', new Date(latestCommit.date).toLocaleString()) + '\n\n' +
+					this.t('projectDetail.fileOperations.latestCommit', '最新提交：{message}').replace('{message}', commitMessage) + '\n' +
+					this.t('projectDetail.fileOperations.committer', '提交者：{author}').replace('{author}', commitAuthor) + '\n' +
+					this.t('projectDetail.fileOperations.commitTime', '时间：{time}').replace('{time}', new Date(commitDate).toLocaleString('zh-CN')) + '\n\n' +
 					this.t('projectDetail.fileOperations.syncConfirm', '是否立即同步？'),
 					async (confirmed) => {
 						if (confirmed) {

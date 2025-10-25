@@ -137,6 +137,7 @@ class SPCPApp {
 		this.routes.set('/terms', 'TermsPage');
 		this.routes.set('/privacy', 'PrivacyPage');
 		this.routes.set('/user-profile', 'UserProfilePage');
+		this.routes.set('/role-management', 'RoleManagementPage');
 
 		// 监听浏览器前进后退
 		window.addEventListener('popstate', () => {
