@@ -302,20 +302,19 @@ class LoginPage extends BasePage {
 	async performLogin(formData) {
 		// 验证必填字段
 		if (!formData || !formData.username || !formData.repositoryUrl || !formData.accessToken) {
-			throw new Error('请填写所有必填字段');
+			throw new Error(this.t('login.validation.formInvalid', '请填写所有必填字段'));
 		}
 
 		// 1. 解析仓库信息
 		const repoInfo = this.parseGitHubUrl(formData.repositoryUrl);
 		if (!repoInfo) {
-			throw new Error('无效的GitHub仓库URL，请检查仓库地址格式');
+			throw new Error(this.t('login.validation.repositoryInvalid', '无效的GitHub仓库URL，请检查仓库地址格式'));
 		}
 
 		// 2. 检查仓库类型（必须是组织仓库）- 不需要认证
 		console.log('检查仓库类型...');
 		const isOrgRepo = await this.checkRepositoryType(null, repoInfo.owner, repoInfo.repo);
 		if (!isOrgRepo) {
-			// 错误提示已经在 checkRepositoryType 中显示，恢复按钮状态并返回
 			this.updateLoginButtonState('default', this.t('login.loginButton', '登录并克隆仓库'));
 			return;
 		}
@@ -326,7 +325,16 @@ class LoginPage extends BasePage {
 
 		// 使用Octokit验证用户
 		const octokit = new window.Octokit({ auth: formData.accessToken });
-		const { data } = await octokit.rest.users.getAuthenticated();
+		let data;
+		try {
+			const response = await octokit.rest.users.getAuthenticated();
+			data = response.data;
+		} catch (error) {
+			if (error.status === 401) {
+				throw new Error(this.t('login.validation.invalidToken', 'GitHub Access Token无效或已过期，请检查您的Token是否正确'));
+			}
+			throw error;
+		}
 		userInfo = {
 			username: data.login,
 			email: data.email,
@@ -336,7 +344,9 @@ class LoginPage extends BasePage {
 
 		// 验证用户名是否匹配
 		if (userInfo.username !== formData.username) {
-			throw new Error(`用户名不匹配：Token对应的用户是"${userInfo.username}"，但您输入的是"${formData.username}"`);
+			throw new Error(this.t('login.validation.usernameMismatch', `用户名不匹配：Token对应的用户是"${userInfo.username}"，但您输入的是"${formData.username}"`)
+				.replace('{tokenUser}', userInfo.username)
+				.replace('{inputUser}', formData.username));
 		}
 
 		// 4. 检查用户对仓库的权限
@@ -365,25 +375,20 @@ class LoginPage extends BasePage {
 			});
 
 			if (membership.data.role === 'admin') {
-				// 组织admin：执行完整设置
-				await this.setupGitHubActions(repoInfo.owner, repoInfo.repo, formData.accessToken);
-				await this.setupRepositoryPermissions(repoInfo.owner, repoInfo.repo, formData.accessToken);
-			} else {
-				// 普通组织成员：只设置团队权限
-				await this.setupTeamPermissions(octokit, repoInfo.owner, repoInfo.repo);
+				// 检查设置是否已经完成（通过检查Discussions是否启用来判断）
+				const { data: currentRepoInfo } = await octokit.rest.repos.get({
+					owner: repoInfo.owner,
+					repo: repoInfo.repo
+				});
+
+				if (!currentRepoInfo.has_discussions) {
+					// 设置未完成，执行完整设置
+					await this.setupRepository(repoInfo.owner, repoInfo.repo, formData.accessToken);
+				}
 			}
 		}
 
-		// 7. 更新app.js的状态
-		if (window.app) {
-			window.app.state.user = fullUserInfo;
-			window.app.state.isAuthenticated = true;
-			window.app.state.userRole = permissionInfo.role;
-			window.app.state.permissionInfo = permissionInfo;
-			console.log('App状态已更新:', permissionInfo.role);
-		}
-
-		// 8. 所有用户都自动同步GitHub数据（包括访客）
+		// 7. 所有用户都自动同步GitHub数据（包括访客）
 		console.log('开始自动同步GitHub数据...');
 
 		// 更新按钮状态为加载中
@@ -392,21 +397,42 @@ class LoginPage extends BasePage {
 		try {
 			// 定义进度回调函数
 			const progressCallback = (progress, downloaded, total, currentFile) => {
-				this.updateLoginButtonState('loading', `正在下载文件... ${progress}% (${downloaded}/${total}) - ${currentFile}`);
+				this.updateLoginButtonState('loading', `正在下载文件... ${progress}% (${downloaded}/${total})`);
 			};
 
 			await window.StorageService.syncRepositoryData(repoInfo.owner, repoInfo.repo, formData.accessToken, progressCallback);
 			console.log('GitHub数据同步完成');
 
+			// 根据角色文件更新用户角色
+			const updatedPermissionInfo = await this.determineUserRoleFromFiles(userInfo.username, repoInfo.owner, repoInfo.repo);
+			if (updatedPermissionInfo && updatedPermissionInfo.role !== permissionInfo.role) {
+				console.log(`角色已更新: ${permissionInfo.role} -> ${updatedPermissionInfo.role}`);
+
+				// 更新localStorage中的用户信息
+				const updatedUserInfo = {
+					...fullUserInfo,
+					permissionInfo: updatedPermissionInfo
+				};
+				localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
+
+				// 更新app.js的状态
+				if (window.app) {
+					window.app.state.user = updatedUserInfo;
+					window.app.state.isAuthenticated = true;
+					window.app.state.userRole = updatedPermissionInfo.role;
+					window.app.state.permissionInfo = updatedPermissionInfo;
+				}
+			}
+
 			// 更新按钮状态为完成
-			this.updateLoginButtonState('success', '数据同步完成！');
+			this.updateLoginButtonState('success', this.t('login.messages.dataSyncComplete', '数据同步完成！'));
 
 			// 等待1秒让用户看到完成状态
 			await new Promise(resolve => setTimeout(resolve, 1000));
 		} catch (syncError) {
 			console.error('GitHub数据同步失败:', syncError);
 			// 更新按钮状态为错误
-			this.updateLoginButtonState('error', '数据同步失败，但登录成功');
+			this.updateLoginButtonState('error', this.t('login.messages.dataSyncFailedButLoginSuccess', '数据同步失败，但登录成功'));
 			// 等待1秒让用户看到错误状态
 			await new Promise(resolve => setTimeout(resolve, 1000));
 		}
@@ -430,14 +456,15 @@ class LoginPage extends BasePage {
 			// 检查用户是否是仓库所有者
 			const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
 			console.log('仓库信息:', repoInfo.owner.login, 'vs', username);
-			if (repoInfo.owner.login === username) {
+			// 不区分大小写比较用户名
+			if (repoInfo.owner.login.toLowerCase() === username.toLowerCase()) {
 				console.log('用户是仓库所有者');
 				return { role: 'owner', hasPermission: true };
 			}
 
 			// 对于非所有者，先尝试检查是否是协作者
 			const { data: collaborators } = await octokit.rest.repos.listCollaborators({ owner, repo });
-			const isCollaborator = collaborators.some(collab => collab.login === username);
+			const isCollaborator = collaborators.some(collab => collab.login.toLowerCase() === username.toLowerCase());
 
 			if (isCollaborator) {
 				return { role: 'collaborator', hasPermission: true };
@@ -448,6 +475,56 @@ class LoginPage extends BasePage {
 		} catch (error) {
 			console.log('权限检查失败，默认为访客:', error.message);
 			return { role: 'visitor', hasPermission: false };
+		}
+	}
+
+	/**
+	 * 根据角色文件确定用户角色
+	 * @param {string} username - 用户名
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @returns {Promise<Object|null>} 权限信息对象或null
+	 */
+	async determineUserRoleFromFiles(username, owner, repo) {
+		try {
+			// 从IndexedDB读取角色文件
+			const roleFiles = [
+				{ path: '.github/directors.txt', role: 'owner' },
+				{ path: '.github/reviewers.txt', role: 'reviewer' },
+				{ path: '.github/maintainers.txt', role: 'maintainer' }
+			];
+
+			for (const { path, role } of roleFiles) {
+				try {
+					const fileContent = await window.StorageService._execute('fileCache', 'get', path);
+					if (fileContent && fileContent.content) {
+						const lines = fileContent.content.split('\n');
+						const usernameLower = username.toLowerCase();
+
+						// 检查用户名是否在文件中（不区分大小写）
+						for (const line of lines) {
+							const trimmedLine = line.trim();
+							// 跳过注释和空行
+							if (trimmedLine && !trimmedLine.startsWith('#')) {
+								if (trimmedLine.toLowerCase() === usernameLower) {
+									console.log(`用户 ${username} 在 ${path} 中找到，角色为: ${role}`);
+									return { role, hasPermission: true };
+								}
+							}
+						}
+					}
+				} catch (error) {
+					// 文件不存在，继续检查下一个文件
+					console.log(`文件 ${path} 不存在或读取失败:`, error.message);
+				}
+			}
+
+			// 如果在任何角色文件中都没找到，返回null（保持原有角色）
+			console.log(`用户 ${username} 不在任何角色文件中，保持原有角色`);
+			return null;
+		} catch (error) {
+			console.error('根据角色文件确定用户角色失败:', error);
+			return null;
 		}
 	}
 
@@ -465,32 +542,52 @@ class LoginPage extends BasePage {
 		return null;
 	}
 
-
 	/**
 	 * 设置GitHub Actions工作流
+	 * 创建必要的多个工作流文件
 	 */
 	async setupGitHubActions(owner, repo, token) {
 		console.log('检查GitHub Actions工作流...');
 
-		// 检查工作流文件是否存在
-		const workflowPath = '.github/workflows/auto-approve-collaborators.yml';
-		const workflowExists = await this.fileExists(owner, repo, workflowPath, token);
+		// 定义需要创建的工作流列表
+		const workflows = [
+			{
+				path: '.github/workflows/auto-approve-collaborators.yml',
+				template: 'auto-approve-collaborators.yml',
+				message: 'Add auto-approve collaborators workflow'
+			},
+			{
+				path: '.github/workflows/grant-points.yml',
+				template: 'grant-points.yml',
+				message: 'Add grant points workflow'
+			}
+		];
 
-		if (workflowExists) {
-			console.log('工作流文件已存在，跳过创建...');
-			return;
+		// 检查并创建每个工作流
+		for (const workflow of workflows) {
+			const exists = await this.fileExists(owner, repo, workflow.path, token);
+
+			if (exists) {
+				console.log(`✅ 工作流 ${workflow.path} 已存在，跳过创建...`);
+			} else {
+				console.log(`创建新的工作流: ${workflow.path}...`);
+				await this.createWorkflowFile(owner, repo, token, workflow.template, workflow.path, workflow.message);
+			}
 		}
-
-		console.log('创建新的工作流文件...');
-		await this.createWorkflowFile(owner, repo, token);
 	}
 
 	/**
 	 * 创建工作流文件
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @param {string} token - GitHub token
+	 * @param {string} templateName - 模板文件名
+	 * @param {string} targetPath - 目标路径
+	 * @param {string} commitMessage - 提交消息
 	 */
-	async createWorkflowFile(owner, repo, token) {
+	async createWorkflowFile(owner, repo, token, templateName, targetPath, commitMessage) {
 		// 读取工作流文件内容
-		const workflowContent = await this.loadFileTemplate('auto-approve-collaborators.yml');
+		const workflowContent = await this.loadFileTemplate(templateName);
 
 		const octokit = new window.Octokit({ auth: token });
 
@@ -498,10 +595,12 @@ class LoginPage extends BasePage {
 		const content = btoa(unescape(encodeURIComponent(workflowContent)));
 
 		await octokit.rest.repos.createOrUpdateFileContents({
-			owner, repo, path: '.github/workflows/auto-approve-collaborators.yml',
-			message: 'Add auto-approve collaborators workflow',
+			owner, repo, path: targetPath,
+			message: commitMessage,
 			content: content
 		});
+
+		console.log(`✅ 工作流 ${targetPath} 创建成功`);
 	}
 
 	/**
@@ -518,6 +617,53 @@ class LoginPage extends BasePage {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * 获取文件的sha（如果文件存在）
+	 */
+	async getFileSha(octokit, owner, repo, path) {
+		try {
+			const { data } = await octokit.rest.repos.getContent({ owner, repo, path });
+			if (Array.isArray(data)) {
+				return null; // 如果是目录，返回null
+			}
+			return data.sha;
+		} catch (error) {
+			if (error.status === 404) {
+				return null; // 文件不存在，返回null
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 创建或更新文件（自动处理sha）
+	 */
+	async createOrUpdateFileSafe(octokit, owner, repo, path, content, message) {
+		// 获取文件的sha（如果存在）
+		const sha = await this.getFileSha(octokit, owner, repo, path);
+
+		// 准备文件内容
+		const fileContent = {
+			message: message,
+			content: btoa(unescape(encodeURIComponent(content))),
+			branch: 'main'
+		};
+
+		// 如果文件已存在，添加sha
+		if (sha) {
+			fileContent.sha = sha;
+		}
+
+		await octokit.rest.repos.createOrUpdateFileContents({
+			owner,
+			repo,
+			path,
+			...fileContent
+		});
+
+		return sha ? 'updated' : 'created';
 	}
 
 	/**
@@ -608,42 +754,41 @@ class LoginPage extends BasePage {
 	/**
 	 * 设置仓库权限（分支保护、CODEOWNERS、Actions权限、团队权限）
 	 */
-	async setupRepositoryPermissions(owner, repo, token) {
+	async setupRepository(owner, repo, token) {
 		const octokit = new window.Octokit({ auth: token });
 
 		try {
-			// 0. 检查仓库类型
-			this.updateLoginButtonState('loading', this.t('login.settingUp.checkingRepository', '正在检查仓库类型...'));
-			const isOrgRepo = await this.checkRepositoryType(octokit, owner, repo);
+			// 1. 创建GitHub Actions工作流
+			this.updateLoginButtonState('loading', this.t('login.settingUp.workflows', '正在创建GitHub Actions工作流...'));
+			await this.setupGitHubActions(owner, repo, token);
 
-			// 如果不是组织仓库，直接返回
-			if (!isOrgRepo) {
-				return;
-			}
-
-			// 1. 设置分支保护
+			// 2. 设置分支保护
 			this.updateLoginButtonState('loading', this.t('login.settingUp.branchProtection', '正在设置分支保护...'));
 			await this.setupBranchProtection(octokit, owner, repo);
 
-			// 2. 设置CODEOWNERS
+			// 3. 设置CODEOWNERS
 			this.updateLoginButtonState('loading', this.t('login.settingUp.codeOwners', '正在设置CODEOWNERS...'));
 			await this.setupCodeOwners(octokit, owner, repo);
 
-			// 3. 设置Actions权限
+			// 4. 设置Actions权限
 			this.updateLoginButtonState('loading', this.t('login.settingUp.actionsPermissions', '正在设置Actions权限...'));
 			await this.setupActionsPermissions(octokit, owner, repo);
 
-			// 4. 设置Workflow权限
+			// 5. 设置Workflow权限
 			this.updateLoginButtonState('loading', this.t('login.settingUp.workflowPermissions', '正在设置Workflow权限...'));
 			await this.setupWorkflowPermissions(octokit, owner, repo);
 
-			// 5. 创建Secrets
+			// 6. 创建Secrets
 			this.updateLoginButtonState('loading', this.t('login.settingUp.secrets', '正在创建Secrets...'));
 			await this.setupSecrets(octokit, owner, repo, token);
 
-			// 6. 设置团队权限
+			// 7. 设置团队权限
 			this.updateLoginButtonState('loading', this.t('login.settingUp.teamPermissions', '正在设置团队权限...'));
 			await this.setupTeamPermissions(octokit, owner, repo);
+
+			// 8. 启用Discussions功能
+			this.updateLoginButtonState('loading', this.t('login.settingUp.discussions', '正在启用Discussions...'));
+			await this.setupDiscussions(octokit, owner, repo);
 
 		} catch (error) {
 			console.error('❌ 设置仓库权限失败:', error);
@@ -744,7 +889,7 @@ class LoginPage extends BasePage {
 	 */
 	async setupTeamPermissions(octokit, owner, repo) {
 		try {
-			// 定义需要创建的团队
+			// 定义需要创建的团队（根据4个角色：所有者、审核委员、维护者、贡献者）
 			const teams = [
 				{
 					name: 'administrators',
@@ -753,8 +898,13 @@ class LoginPage extends BasePage {
 				},
 				{
 					name: 'reviewers',
-					description: this.t('login.teams.reviewers.description', '审核委员团队 - 负责代码审查和分支合并'),
-					permission: 'maintain'
+					description: this.t('login.teams.reviewers.description', '审核委员团队 - 负责审核贡献质量并通过评论授予积分'),
+					permission: 'push'
+				},
+				{
+					name: 'maintainers',
+					description: this.t('login.teams.maintainers.description', '维护者团队 - 负责合并PR和管理贡献，但受CODEOWNERS限制'),
+					permission: 'push'
 				}
 			];
 
@@ -855,6 +1005,7 @@ class LoginPage extends BasePage {
 
 	/**
 	 * 设置分支保护
+	 * 启用CODEOWNERS审查要求，保护受保护的文件
 	 */
 	async setupBranchProtection(octokit, owner, repo) {
 		const protectionRules = {
@@ -866,7 +1017,7 @@ class LoginPage extends BasePage {
 			required_pull_request_reviews: {
 				required_approving_review_count: 1,  // 需要1个审查
 				dismiss_stale_reviews: true,         // 新提交时取消过时审查
-				require_code_owner_reviews: false    // 不强制代码所有者审查
+				require_code_owner_reviews: true     // 要求CODEOWNERS审查（关键！）
 			},
 			restrictions: null        // 不限制推送用户，让协作者可以推送
 		};
@@ -879,61 +1030,124 @@ class LoginPage extends BasePage {
 
 	/**
 	 * 设置CODEOWNERS
+	 * 根据讨论的需求，CODEOWNERS保护以下路径：
+	 * - POINT/ 目录（审核委员拥有权限）
+	 * - .github/reviewers.txt 等角色定义文件（所有者拥有权限）
 	 */
 	async setupCodeOwners(octokit, owner, repo) {
-		const time = new Date().toISOString();
-		const codeOwners = `# 全局代码所有者
-/CODEOWNERS @${owner}
-# 保存贡献积分的目录
-/POINTS/ @${owner}
-# 积分规则
-/RULES.json @${owner}
+		const codeOwners = `# ${this.t('login.files.codeowners.title')}
+# ${this.t('login.files.codeowners.description')}
+
+# ${this.t('login.files.codeowners.protectPoint')}
+.github/POINT/ @${owner}/reviewers
+
+# ${this.t('login.files.codeowners.protectRoles')}
+.github/reviewers.txt @${owner}/administrators
+.github/maintainers.txt @${owner}/administrators
+.github/directors.txt @${owner}/administrators
+
+# ${this.t('login.files.codeowners.protectCodeowners')}
+.github/CODEOWNERS @${owner}/administrators
+
+# ${this.t('login.files.codeowners.protectWorkflows')}
+.github/workflows/ @${owner}/administrators
 `;
 
-		const points = `time,points,total,reviewers,reason
-${time},1000,1000,${this.state.formData.username},创建仓库\n`;
+		// 创建或更新CODEOWNERS文件
+		const result = await this.createOrUpdateFileSafe(
+			octokit, owner, repo, '.github/CODEOWNERS',
+			codeOwners,
+			'Add CODEOWNERS file for permission protection'
+		);
+		console.log(`✅ CODEOWNERS文件${result === 'created' ? '创建' : '更新'}成功`);
 
-		const rules = await this.loadFileTemplate('RULES.json');
+		// 创建POINT目录的初始结构（如果不存在）
+		const time = new Date().toISOString();
 
-		// 先尝试获取现有文件
-		try {
-			await octokit.rest.repos.getContent({
-				owner, repo, path: 'CODEOWNERS'
-			});
-		} catch (error) {
-			// 文件不存在,创建文件
-			const codeOwnersBody = {
-				message: 'Add CODEOWNERS',
-				content: btoa(unescape(encodeURIComponent(codeOwners))),
-				branch: 'main'
-			};
+		// 用户积分一览
+		const points = `user,HP,RP
+${this.state.formData.username},1000,1000\n`;
 
-			await octokit.rest.repos.createOrUpdateFileContents({
-				owner, repo, path: 'CODEOWNERS',
-				...codeOwnersBody
-			});
+		// 个人积分明细
+		const user_points = `[{"time":"${time}","HP":1000,"RP":1000,"points":1000,"reviewers":"${this.state.formData.username}","reason":"创建仓库"}]`;
 
-			const pointsBody = {
-				message: 'Add POINTS',
-				content: btoa(unescape(encodeURIComponent(points))),
-				branch: 'main'
-			};
+		// 创建POINT目录的README
+		const pointReadme = `# ${this.t('login.files.pointReadme.title')}
 
-			await octokit.rest.repos.createOrUpdateFileContents({
-				owner, repo, path: `POINTS/${this.state.formData.username}.csv`,
-				...pointsBody
-			});
+${this.t('login.files.pointReadme.description')}
 
-			const rulesBody = {
-				message: 'Add RULES',
-				content: btoa(unescape(encodeURIComponent(rules))),
-				branch: 'main'
-			};
+## ${this.t('login.files.pointReadme.protected')}
 
-			await octokit.rest.repos.createOrUpdateFileContents({
-				owner, repo, path: 'RULES.json',
-				...rulesBody
-			});
+${this.t('login.files.pointReadme.protectedDesc')}
+
+## ${this.t('login.files.pointReadme.structure')}
+
+- ${this.t('login.files.pointReadme.userFile')}
+- ${this.t('login.files.pointReadme.overviewFile')}
+
+## ${this.t('login.files.pointReadme.permissions')}
+
+- **${this.t('login.files.pointReadme.reviewer')}**
+- **${this.t('login.files.pointReadme.maintainer')}**
+- **${this.t('login.files.pointReadme.contributor')}**
+`;
+
+		// 创建或更新POINT目录文件
+		await this.createOrUpdateFileSafe(
+			octokit, owner, repo, '.github/POINT/README.md',
+			pointReadme,
+			'Create POINT directory with README'
+		);
+
+		await this.createOrUpdateFileSafe(
+			octokit, owner, repo, `.github/POINT/${this.state.formData.username}.json`,
+			user_points,
+			'Initialize user points'
+		);
+
+		await this.createOrUpdateFileSafe(
+			octokit, owner, repo, '.github/POINT/points.csv',
+			points,
+			'Initialize points overview'
+		);
+
+		const roleFiles = [
+			{
+				path: '.github/reviewers.txt',
+				content: `# ${this.t('login.files.roles.reviewers.title')}
+# ${this.t('login.files.roles.reviewers.format')}
+
+`,
+				description: this.t('login.files.roles.reviewers.description', '审核委员角色定义文件')
+			},
+			{
+				path: '.github/maintainers.txt',
+				content: `# ${this.t('login.files.roles.maintainers.title')}
+# ${this.t('login.files.roles.maintainers.format')}
+
+`,
+				description: this.t('login.files.roles.maintainers.description', '维护者角色定义文件')
+			},
+			{
+				path: '.github/directors.txt',
+				content: `# ${this.t('login.files.roles.directors.title')}
+# ${this.t('login.files.roles.directors.format')}
+
+${this.state.formData.username}
+
+`,
+				description: this.t('login.files.roles.directors.description', '理事角色定义文件')
+			}
+		];
+
+		for (const roleFile of roleFiles) {
+			// 创建或更新文件
+			const result = await this.createOrUpdateFileSafe(
+				octokit, owner, repo, roleFile.path,
+				roleFile.content,
+				`Add ${roleFile.description}`
+			);
+			console.log(`✅ ${roleFile.description} ${result === 'created' ? '创建' : '更新'}成功`);
 		}
 	}
 
@@ -1063,7 +1277,7 @@ ${time},1000,1000,${this.state.formData.username},创建仓库\n`;
 				console.log('✅ libsodium加密成功');
 				return encryptedBase64;
 			} else {
-				throw new Error('libsodium库未加载');
+				throw new Error(this.t('login.errors.libsodiumNotLoaded', 'libsodium库未加载'));
 			}
 		} catch (error) {
 			console.error('❌ libsodium加密失败:', error);
@@ -1158,6 +1372,57 @@ ${time},1000,1000,${this.state.formData.username},创建仓库\n`;
 		} catch (error) {
 			console.error('❌ Web Crypto API加密失败:', error);
 			throw error;
+		}
+	}
+
+	/**
+	 * 启用Discussions功能
+	 * 使用GraphQL API检测和启用Discussions功能
+	 * @param {Object} octokit - Octokit实例
+	 * @param {string} owner - 组织名称
+	 * @param {string} repo - 仓库名称
+	 */
+	async setupDiscussions(octokit, owner, repo) {
+		try {
+			console.log('🔧 正在启用Discussions...');
+
+			// 获取仓库信息以获取repository ID
+			const { data: repoInfo } = await octokit.rest.repos.get({
+				owner,
+				repo
+			});
+
+			const repositoryId = repoInfo.node_id; // node_id就是GitHub的ID格式
+
+			if (!repositoryId) {
+				console.warn('⚠️ 无法获取仓库ID，跳过Discussions启用');
+				return;
+			}
+
+			// 使用GraphQL API启用Discussions
+			await octokit.graphql(`
+				mutation EnableDiscussions($repoId: ID!) {
+					updateRepository(input: {
+						repositoryId: $repoId,
+						hasDiscussionsEnabled: true
+					}) {
+						repository {
+							id
+							name
+							hasDiscussionsEnabled
+						}
+					}
+				}
+			`, {
+				repoId: repositoryId
+			});
+
+			console.log('✅ Discussions功能启用成功');
+
+		} catch (error) {
+			console.error('❌ 启用Discussions失败:', error);
+			// 不抛出错误，因为Discussions不是关键功能，不应该阻止其他设置
+			console.log('⚠️ 继续执行后续设置...');
 		}
 	}
 

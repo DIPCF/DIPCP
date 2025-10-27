@@ -725,7 +725,7 @@ class DashboardPage extends BasePage {
 			}
 
 			if (!repoInfo) {
-				throw new Error('无效的仓库地址');
+				throw new Error(this.t('dashboard.errors.invalidRepositoryUrl', '无效的仓库地址'));
 			}
 
 			// 调用createContributionApplication方法

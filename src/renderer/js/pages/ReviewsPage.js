@@ -289,19 +289,19 @@ class ReviewsPage extends BasePage {
 	handleApprove(review) {
 		console.log('审核通过', review);
 		// TODO: 实现审核通过逻辑
-		alert('审核通过功能暂未实现');
+		alert(this.t('reviews.notImplemented.approve', '审核通过功能暂未实现'));
 	}
 
 	handleReject(review) {
 		console.log('审核拒绝', review);
 		// TODO: 实现审核拒绝逻辑
-		alert('审核拒绝功能暂未实现');
+		alert(this.t('reviews.notImplemented.reject', '审核拒绝功能暂未实现'));
 	}
 
 	handleComment(review, comment) {
 		console.log('添加评论', review, comment);
 		// TODO: 实现添加评论逻辑
-		alert('添加评论功能暂未实现');
+		alert(this.t('reviews.notImplemented.comment', '添加评论功能暂未实现'));
 	}
 
 	setLoading(loading) {

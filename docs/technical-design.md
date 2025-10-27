@@ -3,9 +3,9 @@
 ## 📋 文档信息
 
 - **项目名称**: SPCP - Serverless Project Contribution Platform
-- **版本**: v1.0
+- **版本**: v1.1
 - **创建日期**: 2025年10月21日
-- **最后更新**: 2025年10月24日
+- **最后更新**: 2025年10月26日
 - **文档类型**: 技术设计文档
 
 ## 🏗️ 系统架构设计
@@ -26,12 +26,19 @@
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
 │  │  Git操作    │ │  审核流程   │ │  积分系统   │ │  权限控制   │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                │
+│  │ Discussions│ │  搜索功能   │ │  用户管理   │                │
+│  └─────────────┘ └─────────────┘ └─────────────┘                │
 ├─────────────────────────────────────────────────────────────────┤
 │  数据存储层 (GitHub仓库)                                        │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │ GitHub API  │ │  Git仓库    │ │  用户数据   │ │  项目文件   │ │
-│  │ (认证+数据) │ │ (版本控制)  │ │ (明文存储)  │ │ (内容管理)  │ │
+│  │ GitHub API  │ │  Git仓库    │ │ Discussions│ │  项目文件   │ │
+│  │ (认证+数据) │ │ (版本控制)  │ │  讨论数据   │ │ (内容管理)  │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+│  ┌─────────────┐ ┌─────────────┐                                │
+│  │  用户数据   │ │ GitHub Pages│                                │
+│  │ (明文存储)  │ │ (静态部署)  │                                │
+│  └─────────────┘ └─────────────┘                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -138,7 +145,143 @@
 - **类型安全**: 更好的TypeScript支持和错误处理
 - **社区支持**: 官方维护，社区活跃，文档完善
 
-#### 2.3.4 运行时环境
+#### 2.3.4 GitHub API类型说明
+
+**GitHub API的两种类型**：
+
+1. **REST API** (@octokit/rest.js)
+   - **使用场景**: 仓库操作、文件管理、Issues、PR、用户信息等
+   - **特点**: 基于HTTP方法，请求简单直接
+   - **示例**: `octokit.rest.repos.get()`, `octokit.rest.issues.create()`
+
+2. **GraphQL API** (@octokit/graphql)
+   - **使用场景**: Discussions、复杂查询、自定义数据结构
+   - **特点**: 灵活查询，一次请求获取所需数据
+   - **示例**: `octokit.graphql()` - 使用GraphQL查询语言
+
+**为什么Discussions必须使用GraphQL？**
+- GitHub的Discussions功能是仓库级别的特性
+- REST API不提供Discussions的直接操作端点
+- 只能通过GraphQL API的`createDiscussion` mutation和讨论查询实现
+
+#### 2.3.5 GitHub Discussions集成
+
+**技术方案**：
+- **主要API**: GraphQL API（使用@octokit/graphql）
+- **辅助API**: REST API（用于获取仓库信息、权限检测）
+- **自动启用机制**: 所有者首次登录时自动检测并启用Discussions功能
+
+**实现细节**：
+```javascript
+// 混合使用REST和GraphQL API
+const octokit = new Octokit({
+    auth: token
+});
+
+// 1. 使用REST API检查Discussions状态
+async checkDiscussionsStatus(owner, repo) {
+    const response = await octokit.rest.repos.get({
+        owner,
+        repo
+    });
+    return response.data.hasDiscussionsEnabled;
+}
+
+// 2. 使用GraphQL API启用Discussions
+async enableDiscussions(repositoryId) {
+    const response = await octokit.graphql(`
+        mutation EnableDiscussions($repoId: ID!) {
+            updateRepository(input: {
+                repositoryId: $repoId,
+                hasDiscussionsEnabled: true
+            }) {
+                repository {
+                    id
+                    hasDiscussionsEnabled
+                    name
+                }
+            }
+        }
+    `, {
+        repoId: repositoryId
+    });
+    return response;
+}
+
+// 3. 使用GraphQL API创建讨论
+async createDiscussion(repositoryId, categoryId, title, body) {
+    const response = await octokit.graphql(`
+        mutation CreateDiscussion(
+            $repoId: ID!,
+            $categoryId: ID!,
+            $title: String!,
+            $body: String!
+        ) {
+            createDiscussion(input: {
+                repositoryId: $repoId,
+                categoryId: $categoryId,
+                title: $title,
+                body: $body
+            }) {
+                discussion {
+                    id
+                    number
+                    title
+                    url
+                    viewerSubscription
+                }
+            }
+        }
+    `, {
+        repoId: repositoryId,
+        categoryId: categoryId,
+        title: title,
+        body: body
+    });
+    return response;
+}
+
+// 4. 使用GraphQL API查询讨论列表
+async getDiscussions(owner, repo, first = 10) {
+    const response = await octokit.graphql(`
+        query GetDiscussions($owner: String!, $repo: String!, $first: Int!) {
+            repository(owner: $owner, name: $repo) {
+                discussions(first: $first, orderBy: {field: CREATED_AT, direction: DESC}) {
+                    nodes {
+                        id
+                        number
+                        title
+                        url
+                        body
+                        createdAt
+                        author {
+                            login
+                            avatarUrl
+                        }
+                        category {
+                            id
+                            name
+                            emoji
+                        }
+                    }
+                }
+            }
+        }
+    `, {
+        owner: owner,
+        repo: repo,
+        first: first
+    });
+    return response;
+}
+```
+
+**API选择原则**：
+- **REST API**: 用于基础的仓库操作、文件管理、Issues、PR管理
+- **GraphQL API**: 用于Discussions、复杂查询、需要自定义数据结构的场景
+- **混合使用**: 根据功能特点选择最合适的API类型
+
+#### 2.3.6 运行时环境
 - **桌面**: Electron (Node.js)
 - **Web**: 现代浏览器
 - **原因**: 跨平台兼容，支持最新JavaScript特性
@@ -207,84 +350,308 @@ spcp/
 
 #### 3.1.1 资源加载策略
 
+SPCP采用动态加载策略，在index.html中按需加载资源，避免阻塞页面渲染。
+
+**核心原则**：
+- **渐进式加载**: 先加载i18n服务，再加载其他依赖
+- **分组并行**: 按依赖关系分组，组内并行加载
+- **避免时序问题**: 通过动态加载器确保加载顺序
+- **错误容错**: 加载失败时有友好的错误处理
+
+**加载顺序**：
+```javascript
+// 1. index.html中只加载基础脚本
+<script src="js/services/i18n-service.js"></script>
+<script src="js/loader.js"></script>
+
+// 2. loader.js完成以下加载流程：
+// 2.1 加载外部库（Octokit、libsodium）
+// 2.2 等待i18n服务初始化
+// 2.3 按依赖关系分组加载应用脚本
+// 2.4 初始化应用主入口
+
+// 依赖关系分组：
+// 第一组：基础服务（storage-service、theme-service）
+// 第二组：基础组件类（Component、ComponentLoader）
+// 第三组：基础UI组件（StatusIndicator、InfoItem等）
+// 第四组：复合组件（Breadcrumb、MembersList等）
+// 第五组：布局和表单组件
+// 第六组：页面基类（BasePage）
+// 第七组：页面组件（LoginPage、DashboardPage等）
+// 第八组：应用主入口（app.js）
+```
+
+**技术实现**：
+- 使用`<script>`标签动态创建脚本元素
+- 使用`Promise.all()`实现组内并行加载
+- 使用`waitForServices()`确保依赖就绪
+- 使用localStorage缓存加载状态
+
 #### 3.1.2 应用启动流程
+
+应用启动遵循严格的初始化顺序，确保所有依赖正确加载。
+
+**启动流程**：
+```mermaid
+graph TD
+    A[DOMContentLoaded] --> B[加载loader.js]
+    B --> C[动态加载器初始化]
+    C --> D[加载外部库]
+    D --> E[Octokit库]
+    D --> F[libsodium库]
+    E --> G[等待i18n初始化]
+    F --> G
+    G --> H[分组加载应用脚本]
+    H --> I[初始化app.js]
+    I --> J[检查用户认证状态]
+    J --> K[初始化路由系统]
+    K --> L[渲染初始页面]
+```
+
+**详细步骤**：
+1. **DOM加载完成**: 监听`DOMContentLoaded`事件
+2. **服务初始化**: 加载i18n服务和动态加载器
+3. **外部库加载**: 加载Octokit和libsodium
+4. **应用脚本加载**: 按依赖分组加载所有脚本
+5. **应用初始化**: 
+   - 等待所有服务就绪
+   - 初始化语言设置
+   - 检查用户认证状态
+   - 初始化路由系统
+   - 渲染初始页面
+6. **路由处理**: 根据认证状态决定显示哪个页面
 
 ### 3.2 路由系统设计
 
 #### 3.2.1 路由管理器
 
+SPCP采用原生JavaScript实现客户端路由，支持路径匹配、查询参数解析和自动重定向。
+
+**核心功能**：
+- **路由注册**: 定义路径与页面类的映射关系
+- **路径匹配**: 支持精确匹配和参数匹配
+- **查询参数解析**: 自动解析URL查询参数
+- **认证重定向**: 根据认证状态自动重定向
+- **历史记录**: 支持浏览器前进/后退
+
+**路由定义**：
+```javascript
+// 在app.js中定义路由
+this.routes.set('/', 'DashboardPage');
+this.routes.set('/login', 'LoginPage');
+this.routes.set('/project-detail', 'ProjectDetailPage');
+this.routes.set('/editor', 'EditorPage');
+this.routes.set('/reviews', 'ReviewsPage');
+this.routes.set('/settings', 'SettingsPage');
+```
+
+**认证重定向逻辑**：
+```javascript
+// 根据用户角色和权限自动重定向
+if (userRole === 'owner' && currentRoute === 'LoginPage') {
+    navigateTo('/project-detail'); // 所有者跳转到项目详情
+}
+else if (userRole === 'collaborator' && currentRoute === 'LoginPage') {
+    navigateTo('/project-detail'); // 协作者跳转到项目详情
+}
+else if (userRole === 'visitor' && currentRoute === 'LoginPage') {
+    navigateTo('/'); // 访客跳转到仪表盘
+}
+```
+
+**路径匹配**：
+- 支持精确匹配：`/login` → `LoginPage`
+- 支持查询参数：`/editor?file=test.md` → `EditorPage`
+- 支持动态路由：`/user/:username`（预留）
+
+**页面渲染流程**：
+1. 匹配路由：根据当前URL匹配对应的页面类
+2. 检查认证：根据用户权限决定是否重定向
+3. 销毁旧页面：调用destroy()清理旧页面
+4. 创建新页面：实例化页面类
+5. 解析参数：提取查询参数并传递给页面
+6. 渲染页面：调用render()方法
+7. 挂载DOM：将页面挂载到容器
+
 ### 3.3 页面组件设计
 
 #### 3.3.1 页面基类
 
+所有页面组件继承自Component基类，提供生命周期管理和事件处理。
+
+**Component基类功能**：
+```javascript
+class Component {
+    constructor(props = {}) {
+        this.props = props;              // 组件属性
+        this.state = {};                 // 组件状态
+        this.element = null;             // DOM元素引用
+        this.eventListeners = new Map(); // 事件监听器映射
+    }
+    
+    // 生命周期方法
+    render() { }              // 子类必须实现
+    mount(container) { }      // 挂载到DOM
+    destroy() { }            // 销毁组件
+    setState(newState) { }    // 更新状态
+    
+    // 事件管理
+    addEventListener() { }    // 添加监听器
+    removeEventListener() { } // 移除监听器
+    componentDidMount() { }  // 挂载后调用
+    componentDidUpdate() { } // 更新后调用
+    componentWillUnmount() { } // 销毁前调用
+}
+```
+
+**BasePage基类**：
+所有页面组件继承自BasePage，提供页面级别的功能。
+
+**核心特性**：
+- **生命周期管理**: mount、destroy、rerender
+- **状态管理**: 组件级状态管理
+- **事件绑定**: 自动绑定和解绑事件
+- **国际化支持**: 自动应用i18n翻译
+- **主题支持**: 自动应用当前主题
+
+**页面渲染模式**：
+```javascript
+class MyPage extends BasePage {
+    async render() {
+        // 1. 创建主容器
+        const container = document.createElement('div');
+        
+        // 2. 动态生成内容
+        container.innerHTML = `
+            <h1>${t('myPage.title')}</h1>
+            <button class="btn-primary">${t('button.submit')}</button>
+        `;
+        
+        // 3. 绑定事件
+        container.querySelector('.btn-primary').onclick = () => {
+            this.handleSubmit();
+        };
+        
+        // 4. 返回容器
+        return container;
+    }
+}
+```
+
 #### 3.3.2 通用模态框组件设计
+
+SPCP提供完全可复用的通用模态框组件，支持三种类型：输入、确认、信息。
+
+**组件特性**：
+- **三种类型**: `input`（输入）、`confirm`（确认）、`info`（信息）
+- **键盘支持**: 回车确认、ESC取消
+- **遮罩关闭**: 点击遮罩可关闭
+- **自动聚焦**: 自动聚焦输入框或按钮
+- **主题适配**: 完全支持主题切换
+- **国际化**: 完全支持多语言
+
+**使用方法**：
+```javascript
+// 输入类型
+const result = await Modal.show({
+    type: 'input',
+    title: t('modal.createFolder.title'),
+    message: t('modal.createFolder.message'),
+    placeholder: t('modal.createFolder.placeholder'),
+    value: '',
+    onConfirm: async (inputValue) => {
+        // 处理用户输入
+        return true; // 返回true关闭模态框
+    }
+});
+
+// 确认类型
+const confirmed = await Modal.show({
+    type: 'confirm',
+    title: t('modal.deleteFile.title'),
+    message: t('modal.deleteFile.message'),
+    onConfirm: async () => {
+        // 执行删除操作
+        return true;
+    }
+});
+
+// 信息类型
+await Modal.show({
+    type: 'info',
+    title: t('modal.info.title'),
+    message: t('modal.info.message')
+});
+```
+
+**技术实现要点**：
+- 使用Promise实现异步操作
+- 自动管理事件监听器（keyboard、focus、click）
+- 使用`data-*`属性标识模态框类型
+- 支持国际化字符串注入
+- 响应式设计，支持移动端
 
 ### 3.4 状态管理
 
 #### 3.4.1 全局状态管理
+
+SPCP采用发布-订阅模式实现全局状态管理，支持状态持久化和监听器通知。
+
+**状态结构**：
 ```javascript
-// app.js 中的状态管理
 class SPCPApp {
     constructor() {
         this.state = {
-            user: null,
-            theme: 'light',
-            language: 'zh-CN',
-            currentProject: null,
-            projects: [],
-            isAuthenticated: false
+            // 用户相关
+            user: null,              // 用户信息
+            isAuthenticated: false,  // 认证状态
+            userRole: null,          // 用户角色
+            permissionInfo: null,    // 权限信息
+            
+            // 项目相关
+            currentProject: null,    // 当前项目
+            projects: [],           // 项目列表
+            
+            // UI相关（由服务管理）
+            // theme: 'light',      // 由ThemeService管理
+            // language: 'zh-CN'    // 由I18nService管理
         };
         
-        this.listeners = new Map();
-    }
-
-    setState(newState) {
-        const oldState = { ...this.state };
-        this.state = { ...this.state, ...newState };
-        
-        // 通知所有监听器
-        this.notifyListeners(oldState, this.state);
-        
-        // 持久化状态
-        this.persistState();
-    }
-
-    subscribe(key, callback) {
-        if (!this.listeners.has(key)) {
-            this.listeners.set(key, []);
-        }
-        this.listeners.get(key).push(callback);
-    }
-
-    notifyListeners(oldState, newState) {
-        for (const [key, callbacks] of this.listeners) {
-            if (oldState[key] !== newState[key]) {
-                callbacks.forEach(callback => callback(newState[key], oldState[key]));
-            }
-        }
-    }
-
-    persistState() {
-        // 持久化关键状态到localStorage
-        const persistentState = {
-            theme: this.state.theme,
-            language: this.state.language,
-            user: this.state.user
-        };
-        
-        localStorage.setItem('spcp-app-state', JSON.stringify(persistentState));
-    }
-
-    restoreState() {
-        // 从localStorage恢复状态
-        const savedState = localStorage.getItem('spcp-app-state');
-        if (savedState) {
-            const persistentState = JSON.parse(savedState);
-            this.setState(persistentState);
-        }
+        this.listeners = new Map(); // 监听器映射
     }
 }
 ```
+
+**核心方法**：
+1. **setState(newState)**: 更新状态并通知监听器
+2. **subscribe(key, callback)**: 订阅状态变化
+3. **persistState()**: 持久化关键状态到localStorage
+4. **restoreState()**: 从localStorage恢复状态
+
+**持久化策略**：
+- 关键状态自动持久化：`user`
+- 非关键状态在内存中：`currentProject`、`projects`
+- 主题和语言由独立服务管理
+
+**使用示例**：
+```javascript
+// 更新状态
+app.setState({ user: newUser, isAuthenticated: true });
+
+// 订阅状态变化
+app.subscribe('user', (newUser, oldUser) => {
+    console.log('User changed:', oldUser, '->', newUser);
+});
+
+// 获取状态
+const state = app.getState();
+```
+
+**状态管理优势**：
+- **单一数据源**: 所有状态集中在app.js
+- **持久化**: 关键状态自动保存到localStorage
+- **响应式**: 状态变化自动通知相关组件
+- **类型安全**: 通过严格的状态结构避免错误
 
 ## 🔐 安全设计
 
@@ -308,12 +675,57 @@ class SPCPApp {
 - 零门槛：非技术用户也能轻松完成设置
 
 #### 3.1.2 用户权限管理
-- **角色**: owner（所有者）, collaborator（协作者）, visitor（访客）
+- **角色**: owner（所有者）, maintainer（维护者）, reviewer（审核委员）, visitor（访客）
 - **权限检测**: 自动检测用户对目标仓库的权限级别
 - **自动工作流**: 所有者登录时自动检查并创建GitHub Actions工作流
 - **存储**: 明文存储在GitHub仓库中，完全透明
 
-#### 3.1.3 智能协作申请流程
+#### 3.1.3 CODEOWNERS权限保护机制
+
+**设计目的**：
+- 保护敏感文件（POINT目录、角色定义文件）不被维护者随意修改
+- 通过CODEOWNERS强制审查机制确保权限隔离
+
+**实现方案**：
+
+1. **CODEOWNERS文件创建**（所有者登录时自动创建）：
+```plaintext
+# .github/CODEOWNERS
+
+# 保护 POINT 目录，只允许审核委员修改
+POINT/ @organization/reviewers-team
+
+# 保护角色定义文件，只允许所有者修改
+.github/reviewers.txt @organization/directors-team
+.github/maintainers.txt @organization/directors-team
+
+# 保护 CODEOWNERS 本身，防止被恶意修改
+.github/CODEOWNERS @organization/directors-team
+```
+
+2. **分支保护规则启用**：
+- 在GitHub仓库设置中启用 CODEOWNERS 审查要求
+- 配置路径：Repository Settings → Branches → Branch protection rules
+- 规则：`Require review from CODEOWNERS`
+
+3. **权限隔离效果**：
+```javascript
+场景: 维护者试图修改 POINT/user.txt
+├── 创建 PR
+├── GitHub 自动检测 POINT/ 目录被 CODEOWNERS 保护
+├── 自动添加 CODEOWNERS 审查者（审核委员）
+├── 维护者无法自审
+└── 必须等待 CODEOWNERS 批准才能合并
+```
+
+4. **优势**：
+- **原生支持**: GitHub 原生机制，无需额外开发
+- **自动审查**: 自动触发，无需手动配置
+- **权限隔离**: 维护者拥有 Write 权限，但受 CODEOWNERS 限制
+- **可追溯**: 所有审查记录可追溯
+- **零运维**: 配置一次，长期有效
+
+#### 3.1.4 智能协作申请流程
 - **申请提交**: 访客填写申请理由，系统创建GitHub Issue并触发Actions
 - **状态显示**: 显示"正在审核中"UI，包含进度条和实时状态更新
 - **工作流轮询**: 每5秒轮询GitHub Actions工作流执行状态
@@ -437,6 +849,73 @@ sequenceDiagram
         Review->>Git: 拒绝PR
         UI-->>Reviewer: 显示审核拒绝
     end
+```
+
+#### 4.1.5 CODEOWNERS权限保护流程
+```mermaid
+sequenceDiagram
+    participant Maintainer as 维护者
+    participant GitHub as GitHub
+    participant COW as CODEOWNERS
+    participant Reviewer as 审核委员
+    participant POINT as POINT目录
+    
+    Maintainer->>GitHub: 提交修改POINT文件的PR
+    GitHub->>COW: 检测到POINT/路径被保护
+    COW->>GitHub: 自动添加审核委员为审查者
+    GitHub->>Maintainer: PR显示等待审查
+    Maintainer->>GitHub: 尝试自审
+    GitHub-->>Maintainer: ❌ 无法通过CODEOWNERS审查
+    Reviewer->>GitHub: 审查POINT文件修改
+    alt 批准
+        Reviewer->>GitHub: 批准PR
+        GitHub->>POINT: 合并修改
+        GitHub-->>Maintainer: ✅ PR已合并
+    else 拒绝
+        Reviewer->>GitHub: 请求修改
+        GitHub-->>Maintainer: ❌ 需要修改
+    end
+```
+
+#### 4.1.6 GitHub Discussions数据流
+```mermaid
+sequenceDiagram
+    participant Owner as 所有者
+    participant UI as 界面
+    participant GitHub as GitHub API
+    participant GraphQL as GraphQL API
+    participant Discussion as Discussions
+    participant User as 用户
+    
+    Note over Owner: 首次登录
+    Owner->>UI: 登录应用
+    UI->>GitHub: 检查Discussions状态
+    GitHub-->>UI: 返回disabled状态
+    UI->>GraphQL: 启用Discussions
+    GraphQL->>Discussion: 启用讨论功能
+    Discussion-->>GraphQL: 返回success
+    GraphQL-->>UI: 显示成功消息
+    
+    Note over User: 创建讨论
+    User->>UI: 点击创建讨论
+    UI->>GraphQL: mutation createDiscussion
+    GraphQL->>Discussion: 创建讨论
+    Discussion-->>GraphQL: 返回讨论ID和URL
+    GraphQL-->>UI: 显示讨论创建成功
+    
+    Note over User: 查看讨论列表
+    User->>UI: 打开讨论页面
+    UI->>GraphQL: query discussions
+    GraphQL->>Discussion: 查询讨论列表
+    Discussion-->>GraphQL: 返回讨论数组
+    GraphQL-->>UI: 渲染讨论列表
+    
+    Note over User: 回复讨论
+    User->>UI: 输入回复内容
+    UI->>GraphQL: mutation addDiscussionComment
+    GraphQL->>Discussion: 添加评论
+    Discussion-->>GraphQL: 返回评论ID
+    GraphQL-->>UI: 更新讨论显示
 ```
 
 ### 4.2 数据同步机制

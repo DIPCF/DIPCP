@@ -88,7 +88,6 @@ class ProjectDetailPage extends BasePage {
                         <a href="#" class="dropdown-item" data-section="members">${this.t('projectDetail.projectMembers', '项目成员')}</a>
                         <a href="#" class="dropdown-item" data-section="activity">${this.t('projectDetail.recentActivity', '最近活动')}</a>
                         <a href="#" class="dropdown-item" data-section="pending">${this.t('projectDetail.pendingReviews', '待审核内容')}</a>
-                        <a href="#" class="dropdown-item" data-section="role-management">${this.t('projectDetail.roleManagement', '权限设置')}</a>
                     </div>
                 </div>
             </div>
@@ -191,7 +190,6 @@ class ProjectDetailPage extends BasePage {
 			const cached = localStorage.getItem('spcp-project-data');
 			if (cached) {
 				const projectData = JSON.parse(cached);
-				console.log('从本地存储加载项目数据:', projectData);
 				return projectData;
 			}
 		} catch (error) {
@@ -209,8 +207,7 @@ class ProjectDetailPage extends BasePage {
 			const cached = localStorage.getItem('spcp-files-data');
 			if (cached) {
 				const filesData = JSON.parse(cached);
-				console.log('从本地存储加载文件数据:', filesData.length, '个文件');
-				return filesData;
+				return filesData || [];
 			}
 		} catch (error) {
 			console.error('加载文件数据失败:', error);
@@ -231,7 +228,6 @@ class ProjectDetailPage extends BasePage {
 				activity: false,
 				pending: false
 			};
-			console.log('加载模块状态缓存:', states);
 			return states;
 		} catch (error) {
 			console.error('加载模块状态缓存失败:', error);
@@ -252,7 +248,6 @@ class ProjectDetailPage extends BasePage {
 	saveProjectDataToStorage(project) {
 		try {
 			localStorage.setItem('spcp-project-data', JSON.stringify(project));
-			console.log('项目数据已保存到本地存储:', project);
 		} catch (error) {
 			console.error('保存项目数据失败:', error);
 		}
@@ -266,7 +261,6 @@ class ProjectDetailPage extends BasePage {
 	saveFilesDataToStorage(files) {
 		try {
 			localStorage.setItem('spcp-files-data', JSON.stringify(files));
-			console.log('文件数据已保存到本地存储:', files.length, '个文件');
 		} catch (error) {
 			console.error('保存文件数据失败:', error);
 		}
@@ -726,9 +720,7 @@ class ProjectDetailPage extends BasePage {
 						files: files
 					});
 
-					// 保存到本地存储
-					this.saveProjectDataToStorage(projectData);
-					this.saveFilesDataToStorage(files);
+
 				} catch (dbError) {
 					console.log('Error loading from IndexedDB:', dbError);
 					// 如果加载失败，设置空文件列表
@@ -751,14 +743,12 @@ class ProjectDetailPage extends BasePage {
 						files: []
 					});
 
-					// 保存到本地存储
-					this.saveProjectDataToStorage(projectData);
-					this.saveFilesDataToStorage([]);
 				}
 			}
 
-			// 更新文件列表显示
+			// 更新项目信息DOM和文件列表显示
 			if (this.element) {
+				this.updateProjectInfoDOM(this.state.project);
 				this.updateFileListDOM(this.state.files);
 				// 更新操作按钮状态
 				this.updateActionButtons();
@@ -867,8 +857,6 @@ class ProjectDetailPage extends BasePage {
 					this.toggleActivity();
 				} else if (section === 'pending') {
 					this.togglePendingReviews();
-				} else if (section === 'role-management') {
-					this.handleRoleManagement();
 				}
 			});
 		});
@@ -1105,7 +1093,15 @@ class ProjectDetailPage extends BasePage {
 		// 只有有编辑权限的用户才显示删除按钮
 		if (deleteBtn) {
 			if (this.state.selectedFile) {
-				deleteBtn.style.display = 'block';
+				// 检查是否是.github目录或其下的文件
+				const filePath = this.state.selectedFile.path;
+				const isProtectedPath = filePath.startsWith('.github/');
+
+				if (isProtectedPath) {
+					deleteBtn.style.display = 'none';
+				} else {
+					deleteBtn.style.display = 'block';
+				}
 			} else {
 				deleteBtn.style.display = 'none';
 			}
@@ -1256,14 +1252,14 @@ class ProjectDetailPage extends BasePage {
 
 			// 获取用户信息和仓库信息
 			if (!this.state.user) {
-				throw new Error('用户未登录');
+				throw new Error(this.t('projectDetail.errors.userNotLoggedIn', '用户未登录'));
 			}
 
 			const user = this.state.user;
 			const repoInfo = user.repositoryInfo;
 
 			if (!repoInfo || !user.token) {
-				throw new Error('仓库信息或访问令牌不可用');
+				throw new Error(this.t('projectDetail.errors.repositoryInfoUnavailable', '仓库信息或访问令牌不可用'));
 			}
 
 			// 获取贡献者列表
@@ -1508,26 +1504,6 @@ class ProjectDetailPage extends BasePage {
 		}
 		// 更新状态
 		this.updateModuleState('pending', false);
-	}
-
-	/**
-	 * 处理权限设置
-	 * @returns {void}
-	 */
-	handleRoleManagement() {
-		// 检查用户权限，只有owner和admin可以访问权限设置
-		if (this.state.userRole !== 'owner' && this.state.userRole !== 'admin') {
-			this.showInfoModal(
-				this.t('projectDetail.fileOperations.modalTitles.error', '错误'),
-				this.t('projectDetail.roleManagement.noPermission', '您没有权限访问此功能。只有项目所有者和管理员可以管理权限设置。')
-			);
-			return;
-		}
-
-		// 导航到权限设置页面
-		if (window.app && window.app.navigateTo) {
-			window.app.navigateTo('/role-management');
-		}
 	}
 
 	/**
@@ -1978,13 +1954,13 @@ class ProjectDetailPage extends BasePage {
 			const repoInfo = this.extractRepoInfo(projectUrl);
 
 			if (!repoInfo) {
-				throw new Error('无法解析项目URL');
+				throw new Error(this.t('projectDetail.errors.cannotParseProjectUrl', '无法解析项目URL'));
 			}
 
 			// 获取GitHub API的最新提交信息
 			const user = this.state.user;
 			if (!user || !user.token) {
-				throw new Error('用户未登录或访问令牌不可用');
+				throw new Error(this.t('projectDetail.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
 			}
 
 			const octokit = new window.Octokit({ auth: user.token });
@@ -1994,7 +1970,7 @@ class ProjectDetailPage extends BasePage {
 			const latestCommit = commits[0];
 
 			if (!latestCommit) {
-				throw new Error('无法获取最新提交信息');
+				throw new Error(this.t('projectDetail.errors.cannotGetLatestCommit', '无法获取最新提交信息'));
 			}
 
 			// 解析提交信息
@@ -2065,7 +2041,7 @@ class ProjectDetailPage extends BasePage {
 			// 使用StorageService同步仓库数据
 			const user = this.state.user;
 			if (!user || !user.token) {
-				throw new Error('用户未登录或访问令牌不可用');
+				throw new Error(this.t('projectDetail.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
 			}
 
 			await window.StorageService.syncRepositoryData(owner, repo, user.token);

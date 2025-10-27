@@ -1,0 +1,137 @@
+name: Grant Points
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  grant-points:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check if comment contains /grant command
+        id: check_grant
+        run: |
+          if [[ "${{ github.event.comment.body }}" == /grant* ]]; then
+            echo "is_grant=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_grant=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Checkout repository
+        if: steps.check_grant.outputs.is_grant == 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Verify reviewer identity
+        if: steps.check_grant.outputs.is_grant == 'true'
+        id: check
+        run: |
+          COMMENTER="${{ github.event.comment.user.login }}"
+          # TODO: 从 .github/reviewers.txt 读取审核委员列表
+          # REVIEWERS=$(cat .github/reviewers.txt | grep -v '^#' | grep -v '^$')
+          
+          # 临时解决方案：检查是否是团队成员
+          if [[ "$COMMENTER" == *"reviewer"* ]]; then
+            echo "is_reviewer=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_reviewer=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Parse comment content
+        if: steps.check_grant.outputs.is_grant == 'true' && steps.check.outputs.is_reviewer == 'true'
+        id: parse
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          
+          # 解析格式: /grant @username 100 HP 50 RP [reason]
+          USER=$(echo "$COMMENT" | grep -oP '@\K\w+')
+          HP=$(echo "$COMMENT" | grep -oP '\d+(?= HP)')
+          RP=$(echo "$COMMENT" | grep -oP '\d+(?= RP)')
+          
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "hp=$HP" >> $GITHUB_OUTPUT
+          echo "rp=$RP" >> $GITHUB_OUTPUT
+          
+          echo "Parsed: user=$USER, HP=$HP, RP=$RP"
+      
+      - name: Update POINT files
+        if: steps.check_grant.outputs.is_grant == 'true' && steps.check.outputs.is_reviewer == 'true'
+        run: |
+          USER="${{ steps.parse.outputs.user }}"
+          HP="${{ steps.parse.outputs.hp }}"
+          RP="${{ steps.parse.outputs.rp }}"
+          
+          # 创建或更新用户积分文件
+          mkdir -p .github/POINT
+          
+          # 读取现有积分（如果存在）
+          if [ -f ".github/POINT/${USER}.json" ]; then
+            POINTS_DATA=$(cat ".github/POINT/${USER}.json")
+          else
+            POINTS_DATA='[]'
+          fi
+          
+          # 添加新积分记录
+          NEW_RECORD=$(jq -n \
+            --arg time "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg reviewers "${{ github.event.comment.user.login }}" \
+            --arg HP "$HP" \
+            --arg RP "$RP" \
+            --arg reason "Granted by reviewer" \
+            '{time: $time, HP: ($HP | tonumber), RP: ($RP | tonumber), reviewers: $reviewers, reason: $reason}')
+          
+          UPDATED_DATA=$(echo "$POINTS_DATA" | jq ". + [$NEW_RECORD]")
+          echo "$UPDATED_DATA" > ".github/POINT/${USER}.json"
+          
+          echo "✅ Updated .github/POINT/${USER}.json"
+      
+      - name: Update points overview
+        if: steps.check_grant.outputs.is_grant == 'true' && steps.check.outputs.is_reviewer == 'true'
+        run: |
+          USER="${{ steps.parse.outputs.user }}"
+          HP="${{ steps.parse.outputs.hp }}"
+          RP="${{ steps.parse.outputs.rp }}"
+          
+          # 更新CSV总览表
+          if [ -f ".github/POINT/points.csv" ]; then
+            # 如果用户已存在，更新积分
+            if grep -q "^${USER}," ".github/POINT/points.csv"; then
+              sed -i "s/^${USER},[0-9]*,[0-9]*/${USER},${HP},${RP}/" ".github/POINT/points.csv"
+            else
+              # 添加新用户
+              echo "${USER},${HP},${RP}" >> ".github/POINT/points.csv"
+            fi
+          else
+            # 创建新文件
+            echo "user,HP,RP" > ".github/POINT/points.csv"
+            echo "${USER},${HP},${RP}" >> ".github/POINT/points.csv"
+          fi
+          
+          echo "✅ Updated .github/POINT/points.csv"
+      
+      - name: Commit and push changes
+        if: steps.check_grant.outputs.is_grant == 'true' && steps.check.outputs.is_reviewer == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .github/POINT/
+          git commit -m "Grant points to ${{ steps.parse.outputs.user }}: ${{ steps.parse.outputs.hp }} HP, ${{ steps.parse.outputs.rp }} RP"
+          git push
+          
+          echo "✅ Points granted successfully"
+      
+      - name: Reply to comment
+        if: steps.check_grant.outputs.is_grant == 'true' && steps.check.outputs.is_reviewer == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Points granted successfully!\\n\\n**User:** @${{ steps.parse.outputs.user }}\\n**HP:** ${{ steps.parse.outputs.hp }}\\n**RP:** ${{ steps.parse.outputs.rp }}\\n\\nUpdated files:\\n- `.github/POINT/${{ steps.parse.outputs.user }}.json`\\n- `.github/POINT/points.csv`'
+            });

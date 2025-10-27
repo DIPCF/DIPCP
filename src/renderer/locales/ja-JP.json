@@ -48,6 +48,7 @@
 		"dashboard": "ダッシュボード",
 		"projectDetail": "プロジェクト詳細",
 		"reviews": "レビュー",
+		"discussions": "討論",
 		"settings": "設定"
 	},
 	"login": {
@@ -98,11 +99,13 @@
 			"usernameRequired": "GitHubユーザー名を入力してください",
 			"usernameMinLength": "ユーザー名は2文字以上である必要があります",
 			"usernameInvalidChars": "ユーザー名には文字、数字、アンダースコア、ハイフンのみ使用できます",
+			"usernameMismatch": "ユーザー名が一致しません：トークンは\"{tokenUser}\"のものですが、入力されたのは\"{inputUser}\"です",
 			"accessTokenRequired": "GitHubアクセストークンを入力してください",
 			"accessTokenInvalid": "有効なGitHubアクセストークンを入力してください",
 			"repositoryRequired": "リポジトリURLを入力してください",
 			"repositoryInvalid": "有効なGitHubリポジトリURLを入力してください",
-			"formInvalid": "フォーム入力を確認してください"
+			"formInvalid": "すべての必須フィールドを入力してください",
+			"invalidToken": "GitHub Access Tokenが無効または期限切れです。Tokenを確認してください"
 		},
 		"messages": {
 			"loginInProgress": "ログイン中...",
@@ -114,9 +117,12 @@
 			"downloadingFiles": "リポジトリファイルをダウンロード中...",
 			"settingUpWorkspace": "ワークスペースを設定中...",
 			"downloadComplete": "ファイルダウンロード完了",
-			"invalidRepositoryUrl": "無効なリポジトリURL"
+			"invalidRepositoryUrl": "無効なリポジトリURL",
+			"dataSyncComplete": "データ同期完了！",
+			"dataSyncFailedButLoginSuccess": "データ同期に失敗しましたが、ログインは成功しました"
 		},
 		"settingUp": {
+			"workflows": "GitHub Actionsワークフローを作成中...",
 			"branchProtection": "ブランチ保護を設定中...",
 			"codeOwners": "CODEOWNERSを設定中...",
 			"actionsPermissions": "Actions権限を設定中...",
@@ -127,14 +133,61 @@
 			"transferringRepository": "リポジトリを組織に移転中...",
 			"teamPermissions": "チーム権限を設定中...",
 			"creatingTeams": "チームを作成中...",
-			"settingTeamPermissions": "チーム権限を設定中..."
+			"settingTeamPermissions": "チーム権限を設定中...",
+			"roleFiles": "ロール定義ファイルを作成中...",
+			"discussions": "Discussionsを有効化中...",
+			"discussionsAlreadyEnabled": "Discussionsは既に有効です、スキップ中...",
+			"allSettingsComplete": "リポジトリ設定が完了しました、初期化をスキップ中..."
+		},
+		"files": {
+			"codeowners": {
+				"title": "CODEOWNERSファイル - 機密ファイルとディレクトリの保護用",
+				"description": "このファイルは保護されたファイルとディレクトリを定義します。変更にはCODEOWNERSレビューが必要です",
+				"protectPoint": "POINTディレクトリを保護、レビュアーのみが変更可能（ポイント管理用）",
+				"protectRoles": "ロール定義ファイルを保護、所有者のみが変更可能",
+				"protectCodeowners": "CODEOWNERS自体を保護、悪意のある変更を防止",
+				"protectWorkflows": "Actionsワークフローを保護、所有者のみが変更可能"
+			},
+			"pointReadme": {
+				"title": "POINTディレクトリ",
+				"description": "このディレクトリはユーザー貢献ポイントデータを保存します",
+				"protected": "保護通知",
+				"protectedDesc": "このディレクトリはCODEOWNERSで保護されており、レビュアーのみが変更できます",
+				"structure": "ファイル構造",
+				"userFile": "`.github/POINT/ユーザー名.json` - 個人ポイント詳細記録",
+				"overviewFile": "`.github/POINT/points.csv` - ポイント一覧表",
+				"permissions": "権限説明",
+				"reviewer": "レビュアー: POINTディレクトリへの書き込み権限を持ち、ポイント付与が可能",
+				"maintainer": "メインテナー: 読み取り専用権限、ポイントファイルを変更できません",
+				"contributor": "貢献者: 読み取り専用権限、自分のポイントを表示できます"
+			},
+			"roles": {
+				"reviewers": {
+					"title": "レビュアーリスト",
+					"format": "形式：1行に1つのGitHubユーザー名",
+					"description": "レビュアーロール定義ファイル"
+				},
+				"maintainers": {
+					"title": "メインテナーリスト",
+					"format": "形式：1行に1つのGitHubユーザー名",
+					"description": "メインテナーロール定義ファイル"
+				},
+				"directors": {
+					"title": "理事リスト（所有者）",
+					"format": "形式：1行に1つのGitHubユーザー名",
+					"description": "理事ロール定義ファイル"
+				}
+			}
 		},
 		"teams": {
 			"administrators": {
 				"description": "管理者チーム - リポジトリの完全な管理権限を持つ"
 			},
 			"reviewers": {
-				"description": "レビュアーチーム - コードレビューとブランチマージを担当"
+				"description": "レビュアーチーム - 貢献の品質を確認し、コメントでポイントを付与"
+			},
+			"maintainers": {
+				"description": "メインテナーチーム - PRのマージと貢献の管理を担当、CODEOWNERS制限あり"
 			}
 		},
 		"errors": {
@@ -157,7 +210,8 @@
 			"unauthorized": {
 				"title": "認証に失敗しました",
 				"message": "認証に失敗しました。GitHub Access Tokenが正しいかご確認ください。"
-			}
+			},
+			"libsodiumNotLoaded": "libsodiumライブラリが読み込まれていません"
 		}
 	},
 	"projectDetail": {
@@ -282,7 +336,12 @@
 			"createDirectoryFailed": "ディレクトリ作成に失敗しました",
 			"deleteFailed": "削除に失敗しました",
 			"uploadFileFailed": "ファイルアップロードに失敗しました",
-			"checkDirectoryFilesFailed": "ディレクトリファイルの確認に失敗しました"
+			"checkDirectoryFilesFailed": "ディレクトリファイルの確認に失敗しました",
+			"userNotLoggedIn": "ユーザーがログインしていません",
+			"repositoryInfoUnavailable": "リポジトリ情報またはアクセストークンが利用できません",
+			"cannotParseProjectUrl": "プロジェクトURLを解析できません",
+			"userNotLoggedInOrTokenUnavailable": "ユーザーがログインしていないか、アクセストークンが利用できません",
+			"cannotGetLatestCommit": "最新コミット情報を取得できません"
 		},
 		"ui": {
 			"unknownProject": "不明なプロジェクト",
@@ -454,7 +513,12 @@
 		"viewDetails": "詳細表示",
 		"reviewSuccess": "レビュー完了",
 		"reviewFailed": "レビューに失敗しました",
-		"noReviews": "レビューが利用できません"
+		"noReviews": "レビューが利用できません",
+		"notImplemented": {
+			"approve": "承認機能は実装されていません",
+			"reject": "却下機能は実装されていません",
+			"comment": "コメント追加機能は実装されていません"
+		}
 	},
 	"settings": {
 		"title": "設定",
@@ -549,6 +613,9 @@
 			"warningItem4": "• ユーザーアクセストークンとキャッシュデータ",
 			"warningNote": "終了前にすべての重要な変更を保存したことを確認してください！",
 			"confirmButton": "終了を確認"
+		},
+		"errors": {
+			"invalidRepositoryUrl": "無効なリポジトリURL"
 		}
 	},
 	"github": {
@@ -896,7 +963,10 @@
 		"starsReceived": "受けたスター",
 		"forksReceived": "受けたフォーク",
 		"recentActivity": "最近のアクティビティ",
-		"noRecentActivity": "最近のアクティビティがありません"
+		"noRecentActivity": "最近のアクティビティがありません",
+		"errors": {
+			"userNotLoggedInOrTokenUnavailable": "ユーザーがログインしていないか、アクセストークンが利用できません"
+		}
 	},
 	"roleManagement": {
 		"title": "プロジェクト権限設定",
@@ -985,7 +1055,8 @@
 			"selectTeam": "チームを選択してください",
 			"addTeamFailed": "チームの追加に失敗しました: {error}",
 			"removeTeamFailed": "チームの削除に失敗しました: {error}",
-			"updatePermissionFailed": "権限の更新に失敗しました: {error}"
+			"updatePermissionFailed": "権限の更新に失敗しました: {error}",
+			"githubTokenNotFound": "GitHubトークンが見つかりません"
 		},
 		"confirm": {
 			"removeTeam": "このチームを削除してもよろしいですか？",

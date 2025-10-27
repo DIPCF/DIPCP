@@ -273,10 +273,8 @@ window.StorageService = {
 
 			for (const item of items) {
 				if (item.type === 'file') {
-					// 跳过.github目录的文件
-					if (!item.path.startsWith('.github/')) {
-						allFiles.push(item);
-					}
+					// 包含所有文件，包括.github目录
+					allFiles.push(item);
 				} else if (item.type === 'dir') {
 					// 递归处理子目录
 					await this.getAllFiles(octokit, owner, repo, item.path, allFiles);
@@ -290,7 +288,59 @@ window.StorageService = {
 		}
 	},
 
-	// 同步仓库数据 - 使用Octokit
+	// 下载单个文件
+	async downloadFile(octokit, owner, repo, file) {
+		try {
+			// 使用Octokit获取文件内容
+			const { data: fileData } = await octokit.rest.repos.getContent({
+				owner, repo, path: file.path
+			});
+
+			// 简化：使用当前时间作为时间戳，不再获取提交历史
+			const createdTime = new Date().toISOString();
+			const modifiedTime = new Date().toISOString();
+
+			// 检查是否有内容
+			if (fileData.content) {
+				try {
+					// 尝试解码base64内容，使用UTF-8编码
+					const binaryString = atob(fileData.content);
+					const bytes = new Uint8Array(binaryString.length);
+					for (let i = 0; i < binaryString.length; i++) {
+						bytes[i] = binaryString.charCodeAt(i);
+					}
+					const content = new TextDecoder('utf-8').decode(bytes);
+
+					// 保存到fileCache
+					await window.StorageService._execute('fileCache', 'put', {
+						path: file.path,
+						content: content,
+						sha: fileData.sha,
+						created: createdTime,
+						modified: modifiedTime,
+						isLocal: false,
+						size: content.length,
+						type: file.type
+					});
+
+					return true;
+				} catch (decodeError) {
+					// 如果base64解码失败，跳过该文件
+					console.log(`跳过无法解码的文件: ${file.path}`, decodeError);
+					return false;
+				}
+			} else {
+				// 没有内容，可能是空文件
+				console.log(`跳过空文件: ${file.path}`);
+				return false;
+			}
+		} catch (error) {
+			console.warn(`下载文件 ${file.path} 失败:`, error);
+			return false;
+		}
+	},
+
+	// 同步仓库数据 - 使用并发下载
 	async syncRepositoryData(owner, repo, token, progressCallback = null) {
 		try {
 			console.log(`开始同步仓库数据: ${owner}/${repo}`);
@@ -306,82 +356,43 @@ window.StorageService = {
 
 			console.log(`需要下载 ${allFiles.length} 个文件`);
 
-			// 下载所有文件到fileCache
+			// 并发下载配置
+			const CONCURRENCY = 10; // 同时下载的文件数
+			const totalFiles = allFiles.length;
 			let downloadedCount = 0;
-			for (const file of allFiles) {
-				try {
-					// 使用Octokit获取文件内容
-					const { data: fileData } = await octokit.rest.repos.getContent({
-						owner, repo, path: file.path
-					});
+			let processedCount = 0;
 
-					// 获取文件提交历史以获取创建和修改时间
-					let createdTime = new Date().toISOString();
-					let modifiedTime = new Date().toISOString();
+			// 分批处理文件
+			for (let i = 0; i < allFiles.length; i += CONCURRENCY) {
+				const batch = allFiles.slice(i, Math.min(i + CONCURRENCY, allFiles.length));
 
-					try {
-						const { data: commits } = await octokit.rest.repos.listCommits({
-							owner, repo, path: file.path, per_page: 1
-						});
+				// 并发下载当前批次
+				const results = await Promise.all(
+					batch.map(file => this.downloadFile(octokit, owner, repo, file))
+				);
 
-						if (commits && commits.length > 0) {
-							modifiedTime = commits[0].commit.committer.date;
-							createdTime = modifiedTime; // 默认使用最后提交时间
-						}
-
-						// 获取首次提交时间
-						const { data: allCommits } = await octokit.rest.repos.listCommits({
-							owner, repo, path: file.path
-						});
-
-						if (allCommits && allCommits.length > 0) {
-							createdTime = allCommits[allCommits.length - 1].commit.committer.date;
-						}
-					} catch (commitError) {
-						console.warn(`获取文件 ${file.path} 的提交历史失败:`, commitError);
+				// 统计成功下载的文件数
+				results.forEach(success => {
+					if (success) {
+						downloadedCount++;
 					}
+					processedCount++;
 
-					// 检查是否有内容
-					if (fileData.content) {
-						try {
-							// 尝试解码base64内容，使用UTF-8编码
-							const binaryString = atob(fileData.content);
-							const bytes = new Uint8Array(binaryString.length);
-							for (let i = 0; i < binaryString.length; i++) {
-								bytes[i] = binaryString.charCodeAt(i);
-							}
-							const content = new TextDecoder('utf-8').decode(bytes);
-
-							// 保存到fileCache
-							await window.StorageService._execute('fileCache', 'put', {
-								path: file.path,
-								content: content,
-								sha: fileData.sha,
-								created: createdTime,
-								modified: modifiedTime,
-								isLocal: false,
-								size: content.length,
-								type: file.type
-							});
-
-							downloadedCount++;
-
-							// 调用进度回调
-							if (progressCallback) {
-								const progress = Math.round((downloadedCount / allFiles.length) * 100);
-								progressCallback(progress, downloadedCount, allFiles.length, file.path);
-							}
-						} catch (decodeError) {
-							// 如果base64解码失败，跳过该文件
-							console.log(`跳过无法解码的文件: ${file.path}`, decodeError);
+					// 更新进度（每10个文件更新一次，避免频繁UI更新）
+					if (processedCount % 10 === 0 || processedCount === totalFiles) {
+						if (progressCallback) {
+							const progress = Math.round((processedCount / totalFiles) * 100);
+							progressCallback(progress, processedCount, totalFiles, null);
 						}
-					} else {
-						// 没有内容，可能是空文件
-						console.log(`跳过空文件: ${file.path}`);
 					}
-				} catch (error) {
-					console.warn(`下载文件 ${file.path} 失败:`, error);
-				}
+				});
+
+				console.log(`已处理 ${processedCount}/${totalFiles} 个文件`);
+			}
+
+			// 最终进度更新
+			if (progressCallback) {
+				progressCallback(100, totalFiles, totalFiles, null);
 			}
 
 			// 保存同步信息

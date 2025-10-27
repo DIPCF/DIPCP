@@ -48,6 +48,7 @@
 		"dashboard": "Dashboard",
 		"projectDetail": "Project Detail",
 		"reviews": "Reviews",
+		"discussions": "Discussions",
 		"settings": "Settings"
 	},
 	"login": {
@@ -98,11 +99,13 @@
 			"usernameRequired": "Please enter GitHub username",
 			"usernameMinLength": "Username must be at least 2 characters",
 			"usernameInvalidChars": "Username can only contain letters, numbers, underscores and hyphens",
+			"usernameMismatch": "Username mismatch: Token belongs to \"{tokenUser}\" but you entered \"{inputUser}\"",
 			"accessTokenRequired": "Please enter GitHub access token",
 			"accessTokenInvalid": "Please enter a valid GitHub access token",
 			"repositoryRequired": "Please enter repository URL",
 			"repositoryInvalid": "Please enter a valid GitHub repository URL",
-			"formInvalid": "Please check form input"
+			"formInvalid": "Please fill in all required fields",
+			"invalidToken": "GitHub Access Token is invalid or expired, please check your Token"
 		},
 		"messages": {
 			"loginInProgress": "Logging in...",
@@ -114,9 +117,12 @@
 			"downloadingFiles": "Downloading repository files...",
 			"settingUpWorkspace": "Setting up workspace...",
 			"downloadComplete": "File download completed",
-			"invalidRepositoryUrl": "Invalid repository URL"
+			"invalidRepositoryUrl": "Invalid repository URL",
+			"dataSyncComplete": "Data sync completed!",
+			"dataSyncFailedButLoginSuccess": "Data sync failed, but login successful"
 		},
 		"settingUp": {
+			"workflows": "Creating GitHub Actions workflows...",
 			"branchProtection": "Setting up branch protection...",
 			"codeOwners": "Setting up CODEOWNERS...",
 			"actionsPermissions": "Setting up Actions permissions...",
@@ -127,14 +133,61 @@
 			"transferringRepository": "Transferring repository to organization...",
 			"teamPermissions": "Setting up team permissions...",
 			"creatingTeams": "Creating teams...",
-			"settingTeamPermissions": "Setting up team permissions..."
+			"settingTeamPermissions": "Setting up team permissions...",
+			"roleFiles": "Creating role definition files...",
+			"discussions": "Enabling Discussions...",
+			"discussionsAlreadyEnabled": "Discussions already enabled, skipping...",
+			"allSettingsComplete": "Repository settings complete, skipping initialization..."
+		},
+		"files": {
+			"codeowners": {
+				"title": "CODEOWNERS file - For protecting sensitive files and directories",
+				"description": "This file defines protected files and directories. Modifications require CODEOWNERS review",
+				"protectPoint": "Protect POINT directory, only reviewers can modify (for points management)",
+				"protectRoles": "Protect role definition files, only owners can modify",
+				"protectCodeowners": "Protect CODEOWNERS itself, prevent malicious modification",
+				"protectWorkflows": "Protect Actions workflows, only owners can modify"
+			},
+			"pointReadme": {
+				"title": "POINT Directory",
+				"description": "This directory stores user contribution points data",
+				"protected": "Protection Notice",
+				"protectedDesc": "This directory is protected by CODEOWNERS, only reviewers can modify",
+				"structure": "File Structure",
+				"userFile": "`.github/POINT/username.json` - Personal points detailed records",
+				"overviewFile": "`.github/POINT/points.csv` - Points overview table",
+				"permissions": "Permission Description",
+				"reviewer": "Reviewers: Have write permission to POINT directory for granting points",
+				"maintainer": "Maintainers: Read-only permission, cannot modify points files",
+				"contributor": "Contributors: Read-only permission, can view own points"
+			},
+			"roles": {
+				"reviewers": {
+					"title": "Reviewers List",
+					"format": "Format: One GitHub username per line",
+					"description": "Reviewers role definition file"
+				},
+				"maintainers": {
+					"title": "Maintainers List",
+					"format": "Format: One GitHub username per line",
+					"description": "Maintainers role definition file"
+				},
+				"directors": {
+					"title": "Directors List (Owners)",
+					"format": "Format: One GitHub username per line",
+					"description": "Directors role definition file"
+				}
+			}
 		},
 		"teams": {
 			"administrators": {
 				"description": "Administrators team - Has full management permissions for the repository"
 			},
 			"reviewers": {
-				"description": "Reviewers team - Responsible for code review and branch merging"
+				"description": "Reviewers team - Responsible for reviewing contributions and granting points through comments"
+			},
+			"maintainers": {
+				"description": "Maintainers team - Responsible for merging PRs and managing contributions, but restricted by CODEOWNERS"
 			}
 		},
 		"errors": {
@@ -157,7 +210,8 @@
 			"unauthorized": {
 				"title": "Authentication Failed",
 				"message": "Authentication failed. Please check if your GitHub Access Token is correct."
-			}
+			},
+			"libsodiumNotLoaded": "libsodium library not loaded"
 		}
 	},
 	"projectDetail": {
@@ -282,7 +336,12 @@
 			"createDirectoryFailed": "Failed to create directory",
 			"deleteFailed": "Delete failed",
 			"uploadFileFailed": "Failed to upload file",
-			"checkDirectoryFilesFailed": "Failed to check directory files"
+			"checkDirectoryFilesFailed": "Failed to check directory files",
+			"userNotLoggedIn": "User not logged in",
+			"repositoryInfoUnavailable": "Repository information or access token unavailable",
+			"cannotParseProjectUrl": "Cannot parse project URL",
+			"userNotLoggedInOrTokenUnavailable": "User not logged in or access token unavailable",
+			"cannotGetLatestCommit": "Cannot get latest commit information"
 		},
 		"ui": {
 			"unknownProject": "Unknown Project",
@@ -454,7 +513,12 @@
 		"viewDetails": "View Details",
 		"reviewSuccess": "Review completed",
 		"reviewFailed": "Review failed",
-		"noReviews": "No reviews available"
+		"noReviews": "No reviews available",
+		"notImplemented": {
+			"approve": "Approve functionality not implemented",
+			"reject": "Reject functionality not implemented",
+			"comment": "Add comment functionality not implemented"
+		}
 	},
 	"settings": {
 		"title": "Settings",
@@ -549,6 +613,9 @@
 			"warningItem4": "• User access token and cache data",
 			"warningNote": "Please ensure you have saved all important changes before exiting!",
 			"confirmButton": "Confirm Exit"
+		},
+		"errors": {
+			"invalidRepositoryUrl": "Invalid repository URL"
 		}
 	},
 	"github": {
@@ -896,7 +963,10 @@
 		"starsReceived": "Stars Received",
 		"forksReceived": "Forks Received",
 		"recentActivity": "Recent Activity",
-		"noRecentActivity": "No Recent Activity"
+		"noRecentActivity": "No Recent Activity",
+		"errors": {
+			"userNotLoggedInOrTokenUnavailable": "User not logged in or access token unavailable"
+		}
 	},
 	"roleManagement": {
 		"title": "Project Permission Settings",
@@ -985,7 +1055,8 @@
 			"selectTeam": "Please select a team",
 			"addTeamFailed": "Failed to add team: {error}",
 			"removeTeamFailed": "Failed to remove team: {error}",
-			"updatePermissionFailed": "Failed to update permission: {error}"
+			"updatePermissionFailed": "Failed to update permission: {error}",
+			"githubTokenNotFound": "GitHub token not found"
 		},
 		"confirm": {
 			"removeTeam": "Are you sure you want to remove this team?",

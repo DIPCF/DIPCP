@@ -21,6 +21,7 @@ SPCP应用
 ├── 项目详情页面
 ├── 编辑器页面
 ├── 审核页面
+├── 讨论页面
 ├── 用户设置页面
 ├── 用户资料页面
 └── 帮助页面
@@ -34,6 +35,7 @@ SPCP应用
 ├── 项目 (Projects)
 ├── 贡献 (Contributions)
 ├── 审核 (Reviews)
+├── 讨论 (Discussions)
 └── 设置 (Settings) - 包含主题切换功能
 
 用户菜单
@@ -58,6 +60,7 @@ SPCP应用
 - [项目详情页面](./project-detail-page.md) - 智能布局的文件管理和项目信息
 - [编辑器页面](./editor-page.md) - 智能布局的Markdown编辑器和文件信息管理
 - [审核页面](./reviews-page.md)
+- [讨论页面](./discussions-page.md) - 基于GitHub Discussions的社区互动功能
 - [用户设置页面](./settings-page.md)
 - [用户资料页面](./user-profile-page.md) - 用户基本信息和贡献统计展示
 

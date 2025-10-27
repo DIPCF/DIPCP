@@ -14,6 +14,7 @@ class Header extends Component {
 				{ href: '/', key: 'navigation.dashboard', text: '仪表盘' },
 				{ href: '/project-detail', key: 'navigation.projectDetail', text: '项目详情' },
 				{ href: '/reviews', key: 'navigation.reviews', text: '审核' },
+				{ href: '/discussions', key: 'navigation.discussions', text: '讨论' },
 				{ href: '/settings', key: 'navigation.settings', text: '设置' }
 			],
 			onLogout: props.onLogout || null,

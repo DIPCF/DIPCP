@@ -48,6 +48,7 @@
 		"dashboard": "仪表盘",
 		"projectDetail": "项目详情",
 		"reviews": "审核",
+		"discussions": "讨论",
 		"settings": "设置"
 	},
 	"login": {
@@ -98,9 +99,11 @@
 			"usernameRequired": "请输入GitHub用户名",
 			"usernameMinLength": "用户名至少2个字符",
 			"usernameInvalidChars": "用户名只能包含字母、数字、下划线和连字符",
+			"usernameMismatch": "用户名不匹配：Token对应的用户是\"{tokenUser}\"，但您输入的是\"{inputUser}\"",
 			"repositoryRequired": "请输入仓库地址",
 			"repositoryInvalid": "请输入有效的GitHub仓库地址",
-			"formInvalid": "请检查表单输入"
+			"formInvalid": "请填写所有必填字段",
+			"invalidToken": "GitHub Access Token无效或已过期，请检查您的Token是否正确"
 		},
 		"messages": {
 			"loginInProgress": "登录中...",
@@ -112,9 +115,12 @@
 			"downloadingFiles": "下载仓库文件...",
 			"settingUpWorkspace": "设置工作区...",
 			"downloadComplete": "文件下载完成",
-			"invalidRepositoryUrl": "无效的仓库地址"
+			"invalidRepositoryUrl": "无效的仓库地址",
+			"dataSyncComplete": "数据同步完成！",
+			"dataSyncFailedButLoginSuccess": "数据同步失败，但登录成功"
 		},
 		"settingUp": {
+			"workflows": "正在创建GitHub Actions工作流...",
 			"branchProtection": "正在设置分支保护...",
 			"codeOwners": "正在设置CODEOWNERS...",
 			"actionsPermissions": "正在设置Actions权限...",
@@ -125,14 +131,61 @@
 			"transferringRepository": "正在转移仓库到组织...",
 			"teamPermissions": "正在设置团队权限...",
 			"creatingTeams": "正在创建团队...",
-			"settingTeamPermissions": "正在设置团队权限..."
+			"settingTeamPermissions": "正在设置团队权限...",
+			"roleFiles": "正在创建角色定义文件...",
+			"discussions": "正在启用Discussions...",
+			"discussionsAlreadyEnabled": "Discussions功能已启用，跳过...",
+			"allSettingsComplete": "仓库设置已完成，跳过初始化..."
+		},
+		"files": {
+			"codeowners": {
+				"title": "CODEOWNERS文件 - 用于保护敏感文件和目录",
+				"description": "此文件定义了受保护的文件和目录，修改这些文件必须通过CODEOWNERS审查",
+				"protectPoint": "保护POINT目录，只允许审核委员修改（用于积分管理）",
+				"protectRoles": "保护角色定义文件，只允许所有者修改",
+				"protectCodeowners": "保护CODEOWNERS本身，防止被恶意修改",
+				"protectWorkflows": "保护Actions工作流，只允许所有者修改"
+			},
+			"pointReadme": {
+				"title": "POINT目录",
+				"description": "此目录用于存储用户贡献积分数据",
+				"protected": "受保护说明",
+				"protectedDesc": "此目录由CODEOWNERS保护，只有审核委员（reviewers）可以修改",
+				"structure": "文件结构",
+				"userFile": "`.github/POINT/用户名.json` - 个人积分详细记录",
+				"overviewFile": "`.github/POINT/points.csv` - 积分总览表",
+				"permissions": "权限说明",
+				"reviewer": "审核委员: 拥有POINT目录的写权限，用于赋分",
+				"maintainer": "维护者: 只有读权限，无法修改积分文件",
+				"contributor": "贡献者: 只有读权限，可以查看自己的积分"
+			},
+			"roles": {
+				"reviewers": {
+					"title": "审核委员列表",
+					"format": "格式：一行一个GitHub用户名",
+					"description": "审核委员角色定义文件"
+				},
+				"maintainers": {
+					"title": "维护者列表",
+					"format": "格式：一行一个GitHub用户名",
+					"description": "维护者角色定义文件"
+				},
+				"directors": {
+					"title": "理事列表（所有者）",
+					"format": "格式：一行一个GitHub用户名",
+					"description": "理事角色定义文件"
+				}
+			}
 		},
 		"teams": {
 			"administrators": {
 				"description": "管理员团队 - 拥有仓库的完全管理权限"
 			},
 			"reviewers": {
-				"description": "审核委员团队 - 负责代码审查和分支合并"
+				"description": "审核委员团队 - 负责审核贡献质量并通过评论授予积分"
+			},
+			"maintainers": {
+				"description": "维护者团队 - 负责合并PR和管理贡献，但受CODEOWNERS限制"
 			}
 		},
 		"errors": {
@@ -155,7 +208,8 @@
 			"unauthorized": {
 				"title": "认证失败",
 				"message": "认证失败，请检查您的GitHub Access Token是否正确。"
-			}
+			},
+			"libsodiumNotLoaded": "libsodium库未加载"
 		}
 	},
 	"projectDetail": {
@@ -280,7 +334,12 @@
 			"createDirectoryFailed": "创建目录失败",
 			"deleteFailed": "删除失败",
 			"uploadFileFailed": "上传文件失败",
-			"checkDirectoryFilesFailed": "检查目录文件失败"
+			"checkDirectoryFilesFailed": "检查目录文件失败",
+			"userNotLoggedIn": "用户未登录",
+			"repositoryInfoUnavailable": "仓库信息或访问令牌不可用",
+			"cannotParseProjectUrl": "无法解析项目URL",
+			"userNotLoggedInOrTokenUnavailable": "用户未登录或访问令牌不可用",
+			"cannotGetLatestCommit": "无法获取最新提交信息"
 		},
 		"ui": {
 			"unknownProject": "未知项目",
@@ -454,7 +513,12 @@
 		"viewDetails": "查看详情",
 		"reviewSuccess": "审核完成",
 		"reviewFailed": "审核失败",
-		"noReviews": "暂无审核内容"
+		"noReviews": "暂无审核内容",
+		"notImplemented": {
+			"approve": "审核通过功能暂未实现",
+			"reject": "审核拒绝功能暂未实现",
+			"comment": "添加评论功能暂未实现"
+		}
 	},
 	"settings": {
 		"title": "设置",
@@ -566,6 +630,9 @@
 			"warningItem4": "• 用户访问令牌和缓存数据",
 			"warningNote": "请确保在退出前已保存所有重要修改！",
 			"confirmButton": "确认退出"
+		},
+		"errors": {
+			"invalidRepositoryUrl": "无效的仓库地址"
 		}
 	},
 	"github": {
@@ -913,7 +980,10 @@
 		"starsReceived": "获得星标",
 		"forksReceived": "获得分叉",
 		"recentActivity": "最近活动",
-		"noRecentActivity": "暂无最近活动"
+		"noRecentActivity": "暂无最近活动",
+		"errors": {
+			"userNotLoggedInOrTokenUnavailable": "用户未登录或访问令牌不可用"
+		}
 	},
 	"roleManagement": {
 		"title": "项目权限设置",
@@ -1002,7 +1072,8 @@
 			"selectTeam": "请选择团队",
 			"addTeamFailed": "添加团队失败：{error}",
 			"removeTeamFailed": "移除团队失败：{error}",
-			"updatePermissionFailed": "更新权限失败：{error}"
+			"updatePermissionFailed": "更新权限失败：{error}",
+			"githubTokenNotFound": "未找到GitHub token"
 		},
 		"confirm": {
 			"removeTeam": "确定要移除该团队吗？",

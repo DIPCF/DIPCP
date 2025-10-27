@@ -236,7 +236,7 @@ class UserProfilePage extends BasePage {
 			// 获取当前用户信息
 			const userInfo = window.app.getUserFromStorage();
 			if (!userInfo.user || !userInfo.user.token) {
-				throw new Error('用户未登录或访问令牌不可用');
+				throw new Error(this.t('userProfile.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
 			}
 
 			// 获取目标用户的基本信息
