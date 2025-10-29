@@ -36,7 +36,7 @@ class ProjectDetailPage extends BasePage {
 			// 成员数据缓存
 			membersCache: null,
 			membersLoading: false,
-			// 目录折叠状态
+			// 目录折叠状态 - 默认所有目录都折叠
 			collapsedDirs: new Set()
 		};
 	}
@@ -379,10 +379,8 @@ class ProjectDetailPage extends BasePage {
 	initModal() {
 		if (!this.state.modal) {
 			this.state.modal = new Modal();
-			const modalElement = this.state.modal.render();
-			document.body.appendChild(modalElement);
-			this.state.modal.element = modalElement;
-			this.state.modal.bindEvents();
+			this.state.modal.element = null;
+			// 不在这里渲染，而是在显示时才渲染
 		}
 	}
 
@@ -397,7 +395,18 @@ class ProjectDetailPage extends BasePage {
 	 */
 	showInputModal(title, message, placeholder = '', defaultValue = '', callback = null) {
 		this.initModal();
+
+		// 调用showInput来设置状态，如果element不存在会创建
 		this.state.modal.showInput(title, message, placeholder, defaultValue, callback);
+
+		// 如果element不存在，说明是第一次创建，需要创建DOM
+		if (!this.state.modal.element) {
+			const modalElement = this.state.modal.render();
+			if (modalElement) {
+				document.body.appendChild(modalElement);
+				this.state.modal.element = modalElement;
+			}
+		}
 	}
 
 	/**
@@ -409,7 +418,18 @@ class ProjectDetailPage extends BasePage {
 	 */
 	showConfirmModal(title, message, callback = null) {
 		this.initModal();
+
+		// 调用showConfirm来设置状态，如果element不存在会创建
 		this.state.modal.showConfirm(title, message, callback);
+
+		// 如果element不存在，说明是第一次创建，需要创建DOM
+		if (!this.state.modal.element) {
+			const modalElement = this.state.modal.render();
+			if (modalElement) {
+				document.body.appendChild(modalElement);
+				this.state.modal.element = modalElement;
+			}
+		}
 	}
 
 	/**
@@ -420,7 +440,18 @@ class ProjectDetailPage extends BasePage {
 	 */
 	showInfoModal(title, message) {
 		this.initModal();
+
+		// 调用showInfo来设置状态，如果element不存在会创建
 		this.state.modal.showInfo(title, message);
+
+		// 如果element不存在，说明是第一次创建，需要创建DOM
+		if (!this.state.modal.element) {
+			const modalElement = this.state.modal.render();
+			if (modalElement) {
+				document.body.appendChild(modalElement);
+				this.state.modal.element = modalElement;
+			}
+		}
 	}
 
 	/**
@@ -634,9 +665,10 @@ class ProjectDetailPage extends BasePage {
 					loading: false,
 					files: [],
 					project: null,
-					userRole: 'visitor' // 确保访客角色
+					userRole: 'visitor', // 确保访客角色
+					collapsedDirs: new Set()
 				});
-				this.rerender();
+				// 不需要 rerender，因为页面已经显示了加载中的状态
 				return Promise.resolve();
 			}
 
@@ -701,6 +733,24 @@ class ProjectDetailPage extends BasePage {
 						!file.path.startsWith('_deletions/')
 					);
 
+					// 构建文件树以获取所有目录路径
+					const tree = this.buildFileTree(files);
+
+					// 收集所有目录路径
+					const allCollapsedDirs = new Set();
+					const collectDirPaths = (node) => {
+						Object.keys(node).forEach(key => {
+							const item = node[key];
+							if (item && (item.type === 'dir' || item.path.endsWith('/'))) {
+								allCollapsedDirs.add(item.path);
+								if (item.children) {
+									collectDirPaths(item.children);
+								}
+							}
+						});
+					};
+					collectDirPaths(tree);
+
 					// 从用户数据中获取仓库信息
 					const user = this.state.user;
 					const repoInfo = user?.repositoryInfo;
@@ -717,7 +767,8 @@ class ProjectDetailPage extends BasePage {
 					this.setState({
 						loading: false,
 						project: projectData,
-						files: files
+						files: files,
+						collapsedDirs: allCollapsedDirs
 					});
 
 
@@ -740,7 +791,8 @@ class ProjectDetailPage extends BasePage {
 					this.setState({
 						loading: false,
 						project: projectData,
-						files: []
+						files: [],
+						collapsedDirs: new Set()
 					});
 
 				}
@@ -888,6 +940,29 @@ class ProjectDetailPage extends BasePage {
 			});
 		}
 
+		// 成员卡片点击事件
+		this.bindContributorCardEvents();
+
+	}
+
+	/**
+	 * 绑定成员卡片点击事件
+	 */
+	bindContributorCardEvents() {
+		const contributorCards = this.element.querySelectorAll('.contributor-card');
+		contributorCards.forEach(card => {
+			// 移除旧的事件监听器
+			const newCard = card.cloneNode(true);
+			card.parentNode.replaceChild(newCard, card);
+
+			// 添加新的点击事件
+			newCard.addEventListener('click', () => {
+				const username = newCard.dataset.username;
+				if (username && window.app && window.app.navigateTo) {
+					window.app.navigateTo(`/user-profile?username=${username}`);
+				}
+			});
+		});
 	}
 
 	/**
@@ -1147,6 +1222,31 @@ class ProjectDetailPage extends BasePage {
 			infoPanelContent: content
 		});
 		this.updateInfoPanelDOM(true, content, title);
+
+		// 延迟滚动，确保DOM已渲染
+		setTimeout(() => {
+			this.scrollToInfoPanel();
+		}, 100);
+	}
+
+	/**
+	 * 滚动到信息面板
+	 * @returns {void}
+	 */
+	scrollToInfoPanel() {
+		const infoPanel = this.element.querySelector('#infoPanel');
+		if (infoPanel) {
+			// 平滑滚动到信息面板，确保用户能看到新打开的内容
+			setTimeout(() => {
+				infoPanel.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+				// 额外滚动，确保内容可见
+				window.scrollBy({
+					top: window.innerHeight * 0.3, // 再向下滚动30%的视口高度
+					behavior: 'smooth'
+				});
+			}, 50);
+		}
 	}
 
 	/**
@@ -1223,6 +1323,11 @@ class ProjectDetailPage extends BasePage {
 		if (this.state.membersCache && !forceRefresh) {
 			const content = this.renderContributorsList(this.state.membersCache);
 			this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
+
+			// 绑定成员卡片点击事件
+			setTimeout(() => {
+				this.bindContributorCardEvents();
+			}, 100);
 			return;
 		}
 
@@ -1233,6 +1338,11 @@ class ProjectDetailPage extends BasePage {
 				this.setState({ membersCache: cachedMembers });
 				const content = this.renderContributorsList(cachedMembers);
 				this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
+
+				// 绑定成员卡片点击事件
+				setTimeout(() => {
+					this.bindContributorCardEvents();
+				}, 100);
 				return;
 			}
 		}
@@ -1292,6 +1402,11 @@ class ProjectDetailPage extends BasePage {
 			const content = this.renderContributorsList(contributors);
 			this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
 
+			// 绑定成员卡片点击事件（延迟执行，确保DOM已渲染）
+			setTimeout(() => {
+				this.bindContributorCardEvents();
+			}, 100);
+
 		} catch (error) {
 			console.error('获取贡献者列表失败:', error);
 			this.setState({ membersLoading: false });
@@ -1350,7 +1465,7 @@ class ProjectDetailPage extends BasePage {
 			const roleInfo = this.getRoleInfo(role);
 
 			return `
-				<div class="stat-card contributor-card" onclick="window.app.navigateTo('/user-profile?username=${name}')" style="cursor: pointer;">
+				<div class="stat-card contributor-card" data-username="${name}" style="cursor: pointer;">
 					<div class="stat-icon contributor-avatar" style="background-image: url('${avatar}'); background-size: cover; background-position: center;">
 						${avatar.startsWith('http') ? '' : avatar}
 					</div>
@@ -1384,10 +1499,12 @@ class ProjectDetailPage extends BasePage {
 	 */
 	getRoleDisplayName(role) {
 		const roleMap = {
-			'admin': this.t('projectDetail.roleAdmin', '管理员'),
+			'owner': this.t('projectDetail.roleOwner', '所有者'),
+			'director': this.t('projectDetail.roleDirector', '理事'),
+			'maintainer': this.t('projectDetail.roleMaintainer', '维护者'),
+			'reviewer': this.t('projectDetail.roleReviewer', '审核委员'),
 			'collaborator': this.t('projectDetail.roleCollaborator', '协作者'),
-			'contributor': this.t('projectDetail.roleContributor', '贡献者'),
-			'read': this.t('projectDetail.roleRead', '只读')
+			'visitor': this.t('projectDetail.roleVisitor', '访客')
 		};
 		return roleMap[role] || this.t('projectDetail.roleUnknown', '未知');
 	}
@@ -1399,21 +1516,29 @@ class ProjectDetailPage extends BasePage {
 	 */
 	getRoleInfo(role) {
 		const roleInfo = {
-			'admin': {
-				displayName: this.t('projectDetail.roleAdmin', '管理员'),
-				className: 'role-admin'
+			'owner': {
+				displayName: this.t('projectDetail.roleOwner', '所有者'),
+				className: 'role-owner'
+			},
+			'director': {
+				displayName: this.t('projectDetail.roleDirector', '理事'),
+				className: 'role-director'
+			},
+			'maintainer': {
+				displayName: this.t('projectDetail.roleMaintainer', '维护者'),
+				className: 'role-maintainer'
+			},
+			'reviewer': {
+				displayName: this.t('projectDetail.roleReviewer', '审核委员'),
+				className: 'role-reviewer'
 			},
 			'collaborator': {
 				displayName: this.t('projectDetail.roleCollaborator', '协作者'),
 				className: 'role-collaborator'
 			},
-			'contributor': {
-				displayName: this.t('projectDetail.roleContributor', '贡献者'),
-				className: 'role-contributor'
-			},
-			'read': {
-				displayName: this.t('projectDetail.roleRead', '只读'),
-				className: 'role-read'
+			'visitor': {
+				displayName: this.t('projectDetail.roleVisitor', '访客'),
+				className: 'role-visitor'
 			}
 		};
 		return roleInfo[role] || {
@@ -2019,7 +2144,6 @@ class ProjectDetailPage extends BasePage {
 		}
 	}
 
-
 	/**
 	 * 同步项目
 	 * @param {string} owner - 仓库所有者
@@ -2048,6 +2172,9 @@ class ProjectDetailPage extends BasePage {
 
 			// 重新加载项目数据
 			await this.loadProjectData();
+
+			// 更新文件树显示
+			this.updateFileListDOM(this.state.files);
 
 			// 保存同步信息
 			const syncInfo = {

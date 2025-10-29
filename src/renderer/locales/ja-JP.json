@@ -1,9 +1,16 @@
 {
+	"roles": {
+		"maintainer": "メンテナー",
+		"reviewer": "審査委員",
+		"director": "理事",
+		"contributor": "貢献者"
+	},
 	"common": {
 		"title": "I18n テスト",
 		"loading": "読み込み中...",
 		"save": "保存",
 		"cancel": "キャンセル",
+		"submitting": "送信中...",
 		"confirm": "確認",
 		"delete": "削除",
 		"edit": "編集",
@@ -42,13 +49,15 @@
 		"add": "追加",
 		"remove": "削除",
 		"actions": "アクション",
-		"preview": "プレビュー"
+		"preview": "プレビュー",
+		"processing": "処理中..."
 	},
 	"navigation": {
 		"dashboard": "ダッシュボード",
 		"projectDetail": "プロジェクト詳細",
 		"reviews": "レビュー",
 		"discussions": "討論",
+		"issues": "問題",
 		"settings": "設定"
 	},
 	"login": {
@@ -122,6 +131,7 @@
 			"dataSyncFailedButLoginSuccess": "データ同期に失敗しましたが、ログインは成功しました"
 		},
 		"settingUp": {
+			"initialFiles": "初期ファイルを作成中...",
 			"workflows": "GitHub Actionsワークフローを作成中...",
 			"branchProtection": "ブランチ保護を設定中...",
 			"codeOwners": "CODEOWNERSを設定中...",
@@ -246,10 +256,15 @@
 		"membersLoadHint": "考えられる理由: 権限不足またはネットワーク接続の問題",
 		"refreshMembers": "更新",
 		"viewProfile": "プロフィール表示",
-		"roleAdmin": "管理者",
+		"roleOwner": "オーナー",
+		"roleDirector": "ディレクター",
+		"roleMaintainer": "メンテナー",
+		"roleReviewer": "レビュアー",
 		"roleCollaborator": "コラボレーター",
-		"roleRead": "読み取り専用",
+		"roleVisitor": "訪問者",
 		"roleUnknown": "不明",
+		"pendingDescription": "ここにレビュー待ちのコンテンツリストが表示されます。",
+		"activityDescription": "ここに最近のプロジェクト活動（コミット、マージなど）が表示されます。",
 		"active": "アクティブ",
 		"inactive": "非アクティブ",
 		"loading": "読み込み中...",
@@ -536,6 +551,10 @@
 		"japanese": "日本語",
 		"settingsSaved": "設定が保存されました",
 		"settingsFailed": "設定の保存に失敗しました",
+		"sync": "同期設定",
+		"syncInterval": "同期間隔（秒）",
+		"min": "最小",
+		"max": "最大",
 		"theme": {
 			"title": "テーマ設定",
 			"lightDesc": "昼間の使用に適しています",
@@ -598,7 +617,8 @@
 		"userRole": {
 			"title": "ユーザーロール",
 			"owner": "オーナー",
-			"admin": "管理者",
+			"director": "ディレクター",
+			"maintainer": "メンテナー",
 			"reviewer": "レビュアー",
 			"collaborator": "コラボレーター",
 			"visitor": "訪問者"
@@ -964,7 +984,14 @@
 		"forksReceived": "受けたフォーク",
 		"recentActivity": "最近のアクティビティ",
 		"noRecentActivity": "最近のアクティビティがありません",
+		"inviteMaintainer": "メンテナーとして招待",
+		"inviteReviewer": "レビュワーとして招待",
+		"inviteDirector": "ディレクターとして招待",
+		"inviteSent": "招待を送信しました",
 		"errors": {
+			"notLoggedIn": "まずログインしてください",
+			"noRepository": "リポジトリ情報が設定されていません",
+			"inviteFailed": "招待の送信に失敗しました: {error}",
 			"userNotLoggedInOrTokenUnavailable": "ユーザーがログインしていないか、アクセストークンが利用できません"
 		}
 	},
@@ -1065,6 +1092,156 @@
 		"messages": {
 			"saveSuccess": "設定が正常に保存されました",
 			"saveError": "保存に失敗しました: {error}"
+		}
+	},
+	"discussions": {
+		"title": "討論",
+		"searchPlaceholder": "討論を検索...",
+		"newDiscussion": "新しい討論",
+		"sort": {
+			"latest": "最新",
+			"hottest": "人気",
+			"replies": "最も返信が多い"
+		},
+		"category": {
+			"general": "一般的な討論",
+			"ideas": "アイデアと提案",
+			"polls": "投票",
+			"qna": "質問と回答",
+			"showAndTell": "展示と共有",
+			"announcements": "お知らせ"
+		},
+		"noDiscussions": "このカテゴリに討論がありません",
+		"empty": "討論がありません",
+		"selectDiscussion": "詳細を表示する討論を選択してください",
+		"backToList": "討論リストに戻る",
+		"edit": "編集",
+		"delete": "削除",
+		"replies": "返信",
+		"addReply": "返信を追加...",
+		"submitReply": "返信を送信",
+		"scrollToTop": "トップにスクロール",
+		"noReplies": "返信はまだありません",
+		"like": "いいね",
+		"createNew": "新しい討論を作成",
+		"categoryLabel": "カテゴリ",
+		"titleLabel": "タイトル",
+		"titlePlaceholder": "討論タイトルを入力...",
+		"contentLabel": "内容",
+		"contentPlaceholder": "討論内容を入力（Markdown対応）...",
+		"replyEmpty": "返信内容は空にできません",
+		"replySubmitted": "返信を送信しました",
+		"replyFailed": "返信の送信に失敗しました",
+		"titleRequired": "タイトルは空にできません",
+		"contentRequired": "内容は空にできません",
+		"created": "討論を作成しました",
+		"createFailed": "討論の作成に失敗しました",
+		"featureNotImplemented": "この機能はまだ実装されていません",
+		"confirmDeleteComment": "このコメントを削除してもよろしいですか？",
+		"close": "討論を閉じる",
+		"closed": "閉じられた",
+		"confirmClose": "この討論を閉じてもよろしいですか？",
+		"closeFailed": "討論の閉鎖に失敗しました",
+		"timeAgo": {
+			"justNow": "たった今",
+			"minutes": "{minutes}分前",
+			"hours": "{hours}時間前",
+			"days": "{days}日前",
+			"weeks": "{weeks}週間前",
+			"months": "{months}ヶ月前"
+		},
+		"invitation": {
+			"title": "役割招待",
+			"description": "役割招待を受け取りました。承認または拒否を選択してください",
+			"accept": "招待を承認",
+			"reject": "招待を拒否",
+			"accepted": "招待が承認されました。GitHub Actions が自動的にリクエストを処理します。",
+			"rejected": "招待が拒否されました。",
+			"acceptFailed": "招待の承認に失敗しました：{error}",
+			"rejectFailed": "招待の拒否に失敗しました：{error}"
+		}
+	},
+	"issues": {
+		"title": "問題",
+		"newIssue": "+ 新しい問題",
+		"searchPlaceholder": "🔍 検索またはジャンプ...",
+		"filters": "フィルター▼",
+		"labels": "ラベル▼",
+		"sort": "並び替え▼",
+		"open": "オープン",
+		"opened": "オープン済み",
+		"closed": "クローズ済み",
+		"close": "クローズ",
+		"by": "作者",
+		"comments": "コメント",
+		"noIssues": "問題なし",
+		"backToList": "問題リストに戻る",
+		"writeComment": "💬 コメントを書く...",
+		"format": "🎨 フォーマット",
+		"attachFiles": "📎 ファイルを添付",
+		"comment": "💬 コメント",
+		"assignees": "担当者",
+		"assignYourself": "自分を割り当てる",
+		"edit": "編集",
+		"addToProject": "プロジェクトに追加",
+		"addToMilestone": "マイルストーンに追加",
+		"projects": "プロジェクト",
+		"milestone": "マイルストーン",
+		"today": "今日",
+		"yesterday": "昨日",
+		"daysAgo": "日前",
+		"weeksAgo": "週前",
+		"monthsAgo": "ヶ月前",
+		"page": "📄 ページ1",
+		"noComments": "コメントはまだありません"
+	},
+	"repositorySelection": {
+		"title": "リポジトリ選択",
+		"subtitle": "既存のリポジトリを選択するか、新しいリポジトリを作成してください",
+		"tabs": {
+			"existing": "既存リポジトリ選択",
+			"create": "新規リポジトリ作成"
+		},
+		"history": {
+			"title": "最近アクセスしたリポジトリ",
+			"noHistory": "履歴がありません",
+			"lastAccessed": "最終アクセス:"
+		},
+		"urlInput": {
+			"title": "またはリポジトリアドレスを入力",
+			"label": "GitHubリポジトリURL",
+			"placeholder": "https://github.com/owner/repo",
+			"help": "完全なGitHubリポジトリアドレスを入力してください"
+		},
+		"create": {
+			"title": "新規リポジトリ作成",
+			"nameLabel": "リポジトリ名",
+			"namePlaceholder": "my-new-repository",
+			"descriptionLabel": "リポジトリ説明",
+			"descriptionPlaceholder": "リポジトリの簡単な説明..."
+		},
+		"continue": {
+			"button": "続行",
+			"loading": "処理中...",
+			"success": "処理完了！"
+		},
+		"syncing": "ファイル同期中...",
+		"errors": {
+			"notLoggedIn": "まずログインしてください",
+			"repoExists": "リポジトリ名が既に存在します",
+			"noRepoName": "リポジトリ名を入力してください"
+		}
+	},
+	"cla": {
+		"title": "コントリビューターライセンス契約",
+		"content": "リポジトリ所有者として、知的財産権の所有権を完全に財団に移転するためのコントリビューターライセンス契約に署名する必要があります。",
+		"realNameLabel": "実名を入力してください",
+		"realNamePlaceholder": "実名を入力してください（法的文書用）",
+		"agree": "同意して署名",
+		"disagree": "同意しない",
+		"rejected": "ユーザーがCLA契約の署名を拒否しました",
+		"errors": {
+			"noRealName": "実名を入力してください"
 		}
 	}
 }

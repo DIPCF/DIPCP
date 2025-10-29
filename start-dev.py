@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # 切换到renderer目录
     os.chdir(os.path.join(os.path.dirname(__file__), 'src', 'renderer'))
     
-    with socketserver.TCPServer(("", PORT), NoCacheHTTPRequestHandler) as httpd:
+    with socketserver.ThreadingTCPServer(("", PORT), NoCacheHTTPRequestHandler) as httpd:
         print(f"开发服务器启动在 http://localhost:{PORT}")
         print("缓存已禁用，文件修改会自动刷新")
         print("按 Ctrl+C 停止服务器")

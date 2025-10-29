@@ -1,9 +1,16 @@
 {
+	"roles": {
+		"maintainer": "维护者",
+		"reviewer": "审核委员",
+		"director": "理事",
+		"contributor": "贡献者"
+	},
 	"common": {
 		"title": "多语言测试",
 		"loading": "载入中...",
 		"save": "保存",
 		"cancel": "取消",
+		"submitting": "提交中...",
 		"confirm": "确认",
 		"delete": "删除",
 		"edit": "编辑",
@@ -42,13 +49,15 @@
 		"add": "添加",
 		"remove": "移除",
 		"actions": "操作",
-		"preview": "预览"
+		"preview": "预览",
+		"processing": "处理中..."
 	},
 	"navigation": {
 		"dashboard": "仪表盘",
 		"projectDetail": "项目详情",
 		"reviews": "审核",
 		"discussions": "讨论",
+		"issues": "问题",
 		"settings": "设置"
 	},
 	"login": {
@@ -120,6 +129,7 @@
 			"dataSyncFailedButLoginSuccess": "数据同步失败，但登录成功"
 		},
 		"settingUp": {
+			"initialFiles": "正在创建初始文件...",
 			"workflows": "正在创建GitHub Actions工作流...",
 			"branchProtection": "正在设置分支保护...",
 			"codeOwners": "正在设置CODEOWNERS...",
@@ -244,10 +254,15 @@
 		"membersLoadHint": "可能的原因：权限不足或网络连接问题",
 		"refreshMembers": "刷新",
 		"viewProfile": "查看资料",
-		"roleAdmin": "管理员",
-		"roleCollaborator": "贡献者",
-		"roleRead": "只读",
+		"roleOwner": "所有者",
+		"roleDirector": "理事",
+		"roleMaintainer": "维护者",
+		"roleReviewer": "审核委员",
+		"roleCollaborator": "协作者",
+		"roleVisitor": "访客",
 		"roleUnknown": "未知",
+		"pendingDescription": "这里显示待审核的内容列表。",
+		"activityDescription": "这里显示项目最近的活动记录，包括提交、合并等。",
 		"active": "活跃",
 		"inactive": "非活跃",
 		"loading": "载入中...",
@@ -536,6 +551,10 @@
 		"japanese": "日本語",
 		"settingsSaved": "设置已保存",
 		"settingsFailed": "设置保存失败",
+		"sync": "同步设置",
+		"syncInterval": "同步时间间隔（秒）",
+		"min": "最小",
+		"max": "最大",
 		"theme": {
 			"title": "主题设置",
 			"lightDesc": "适合日间使用",
@@ -547,6 +566,62 @@
 		"light": "明亮主题",
 		"darkMode": "暗黑模式",
 		"lightMode": "明亮模式"
+	},
+	"repositorySelection": {
+		"title": "选择仓库",
+		"subtitle": "选择现有仓库或创建新仓库",
+		"tabs": {
+			"existing": "选择现有仓库",
+			"create": "创建新仓库"
+		},
+		"history": {
+			"title": "最近访问的仓库",
+			"empty": "暂无历史记录",
+			"noDescription": "无描述",
+			"lastAccessed": "最后访问",
+			"select": "选择"
+		},
+		"urlInput": {
+			"title": "或输入仓库地址",
+			"label": "GitHub仓库URL",
+			"placeholder": "https://github.com/owner/repo",
+			"help": "请输入完整的GitHub仓库地址"
+		},
+		"create": {
+			"title": "创建新仓库",
+			"nameLabel": "仓库名称",
+			"namePlaceholder": "my-new-repository",
+			"descriptionLabel": "仓库描述",
+			"descriptionPlaceholder": "仓库的简短描述...",
+			"publicNote": "新创建的仓库默认为公开仓库"
+		},
+		"continue": {
+			"button": "继续",
+			"loading": "处理中...",
+			"success": "处理完成！"
+		},
+		"syncing": "正在同步文件...",
+		"errors": {
+			"noUrl": "请输入仓库地址",
+			"invalidUrl": "无效的GitHub仓库URL",
+			"personalRepo": "此应用仅支持组织仓库",
+			"repoNotFound": "仓库不存在或不是公开仓库",
+			"notLoggedIn": "请先登录",
+			"repoExists": "仓库名称已存在",
+			"noRepoName": "请输入仓库名称"
+		}
+	},
+	"cla": {
+		"title": "贡献者许可协议",
+		"content": "作为仓库所有者，您需要签署贡献者许可协议，将知识产权所有权完全转让给基金会。",
+		"realNameLabel": "请输入您的真实姓名",
+		"realNamePlaceholder": "请输入您的真实姓名（用于法律文件）",
+		"agree": "同意并签署",
+		"disagree": "不同意",
+		"rejected": "用户拒绝签署CLA协议",
+		"errors": {
+			"noRealName": "请输入您的真实姓名"
+		}
 	},
 	"dashboard": {
 		"title": "仪表盘",
@@ -615,7 +690,8 @@
 		"userRole": {
 			"title": "用户身份",
 			"owner": "所有者",
-			"admin": "管理员",
+			"director": "理事",
+			"maintainer": "维护者",
 			"reviewer": "审核委员",
 			"collaborator": "贡献者",
 			"visitor": "访客"
@@ -981,7 +1057,14 @@
 		"forksReceived": "获得分叉",
 		"recentActivity": "最近活动",
 		"noRecentActivity": "暂无最近活动",
+		"inviteMaintainer": "邀请成为维护者",
+		"inviteReviewer": "邀请成为审核委员",
+		"inviteDirector": "邀请成为理事",
+		"inviteSent": "邀请已发送",
 		"errors": {
+			"notLoggedIn": "请先登录",
+			"noRepository": "未配置仓库信息",
+			"inviteFailed": "发送邀请失败：{error}",
 			"userNotLoggedInOrTokenUnavailable": "用户未登录或访问令牌不可用"
 		}
 	},
@@ -1083,5 +1166,106 @@
 			"saveSuccess": "设置已成功保存",
 			"saveError": "保存失败：{error}"
 		}
+	},
+	"discussions": {
+		"title": "讨论",
+		"searchPlaceholder": "搜索讨论...",
+		"newDiscussion": "新讨论",
+		"sort": {
+			"latest": "最新",
+			"hottest": "最热",
+			"replies": "最多回复"
+		},
+		"category": {
+			"general": "一般讨论",
+			"ideas": "想法和建议",
+			"polls": "投票",
+			"qna": "问答",
+			"showAndTell": "展示和分享",
+			"announcements": "公告"
+		},
+		"noDiscussions": "该分类下暂无讨论",
+		"empty": "暂无讨论",
+		"selectDiscussion": "请选择一个讨论查看详情",
+		"backToList": "返回讨论列表",
+		"edit": "编辑",
+		"delete": "删除",
+		"replies": "回复",
+		"addReply": "添加回复...",
+		"submitReply": "提交回复",
+		"scrollToTop": "向上滚动到讨论",
+		"noReplies": "暂无回复",
+		"like": "点赞",
+		"createNew": "创建新讨论",
+		"categoryLabel": "分类",
+		"titleLabel": "标题",
+		"titlePlaceholder": "输入讨论标题...",
+		"contentLabel": "内容",
+		"contentPlaceholder": "输入讨论内容（支持Markdown格式）...",
+		"replyEmpty": "回复内容不能为空",
+		"replySubmitted": "回复已提交",
+		"replyFailed": "提交回复失败",
+		"titleRequired": "标题不能为空",
+		"contentRequired": "内容不能为空",
+		"created": "讨论已创建",
+		"createFailed": "创建讨论失败",
+		"featureNotImplemented": "该功能尚未实现",
+		"confirmDeleteComment": "确定要删除这条评论吗？",
+		"close": "关闭讨论",
+		"closed": "已关闭",
+		"confirmClose": "确定要关闭这条讨论吗？",
+		"closeFailed": "关闭讨论失败",
+		"timeAgo": {
+			"justNow": "刚刚",
+			"minutes": "{minutes}分钟前",
+			"hours": "{hours}小时前",
+			"days": "{days}天前",
+			"weeks": "{weeks}周前",
+			"months": "{months}个月前"
+		},
+		"invitation": {
+			"title": "角色邀请",
+			"description": "你收到了角色邀请，请选择接受或拒绝",
+			"accept": "接受邀请",
+			"reject": "拒绝邀请",
+			"accepted": "邀请已接受！GitHub Actions 将自动处理您的请求。",
+			"rejected": "邀请已拒绝。",
+			"acceptFailed": "接受邀请失败：{error}",
+			"rejectFailed": "拒绝邀请失败：{error}"
+		}
+	},
+	"issues": {
+		"title": "问题",
+		"newIssue": "+ 新问题",
+		"searchPlaceholder": "🔍 搜索或跳转到...",
+		"filters": "筛选▼",
+		"labels": "标签▼",
+		"sort": "排序▼",
+		"open": "打开",
+		"opened": "活跃的",
+		"closed": "已关闭",
+		"close": "关闭",
+		"by": "作者",
+		"comments": "评论",
+		"noIssues": "暂无问题",
+		"backToList": "返回问题列表",
+		"writeComment": "💬 写评论...",
+		"format": "🎨 格式",
+		"attachFiles": "📎 附加文件",
+		"comment": "💬 评论",
+		"assignees": "指派人",
+		"assignYourself": "指派给自己",
+		"edit": "编辑",
+		"addToProject": "添加到项目",
+		"addToMilestone": "添加到里程碑",
+		"projects": "项目",
+		"milestone": "里程碑",
+		"today": "今天",
+		"yesterday": "昨天",
+		"daysAgo": "天前",
+		"weeksAgo": "周前",
+		"monthsAgo": "个月前",
+		"page": "📄 第1页",
+		"noComments": "暂无评论"
 	}
 }

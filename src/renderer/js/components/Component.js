@@ -43,17 +43,6 @@ class Component {
 	}
 
 	/**
-	 * 重新渲染组件
-	 */
-	rerender() {
-		if (this.element && this.element.parentNode) {
-			const newElement = this.render();
-			this.element.parentNode.replaceChild(newElement, this.element);
-			this.element = newElement;
-		}
-	}
-
-	/**
 	 * 添加事件监听器
 	 * @param {string} event - 事件类型
 	 * @param {Function} handler - 事件处理函数

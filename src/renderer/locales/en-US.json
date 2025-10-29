@@ -1,9 +1,16 @@
 {
+	"roles": {
+		"maintainer": "Maintainer",
+		"reviewer": "Reviewer",
+		"director": "Director",
+		"contributor": "Contributor"
+	},
 	"common": {
 		"title": "I18n Test",
 		"loading": "Loading...",
 		"save": "Save",
 		"cancel": "Cancel",
+		"submitting": "Submitting...",
 		"confirm": "Confirm",
 		"delete": "Delete",
 		"edit": "Edit",
@@ -42,13 +49,15 @@
 		"add": "Add",
 		"remove": "Remove",
 		"actions": "Actions",
-		"preview": "Preview"
+		"preview": "Preview",
+		"processing": "Processing..."
 	},
 	"navigation": {
 		"dashboard": "Dashboard",
 		"projectDetail": "Project Detail",
 		"reviews": "Reviews",
 		"discussions": "Discussions",
+		"issues": "Issues",
 		"settings": "Settings"
 	},
 	"login": {
@@ -122,6 +131,7 @@
 			"dataSyncFailedButLoginSuccess": "Data sync failed, but login successful"
 		},
 		"settingUp": {
+			"initialFiles": "Creating initial files...",
 			"workflows": "Creating GitHub Actions workflows...",
 			"branchProtection": "Setting up branch protection...",
 			"codeOwners": "Setting up CODEOWNERS...",
@@ -246,10 +256,15 @@
 		"membersLoadHint": "Possible reasons: insufficient permissions or network connection issues",
 		"refreshMembers": "Refresh",
 		"viewProfile": "View Profile",
-		"roleAdmin": "Administrator",
+		"roleOwner": "Owner",
+		"roleDirector": "Director",
+		"roleMaintainer": "Maintainer",
+		"roleReviewer": "Reviewer",
 		"roleCollaborator": "Collaborator",
-		"roleRead": "Read Only",
+		"roleVisitor": "Visitor",
 		"roleUnknown": "Unknown",
+		"pendingDescription": "Here shows the list of pending content reviews.",
+		"activityDescription": "Here shows the recent activities of the project, including commits, merges, etc.",
 		"active": "Active",
 		"inactive": "Inactive",
 		"loading": "Loading...",
@@ -536,6 +551,10 @@
 		"japanese": "日本語",
 		"settingsSaved": "Settings saved",
 		"settingsFailed": "Failed to save settings",
+		"sync": "Sync Settings",
+		"syncInterval": "Sync interval (seconds)",
+		"min": "Min",
+		"max": "Max",
 		"theme": {
 			"title": "Theme Settings",
 			"lightDesc": "Suitable for daytime use",
@@ -598,7 +617,8 @@
 		"userRole": {
 			"title": "User Role",
 			"owner": "Owner",
-			"admin": "Administrator",
+			"director": "Director",
+			"maintainer": "Maintainer",
 			"reviewer": "Reviewer",
 			"collaborator": "Collaborator",
 			"visitor": "Visitor"
@@ -964,7 +984,14 @@
 		"forksReceived": "Forks Received",
 		"recentActivity": "Recent Activity",
 		"noRecentActivity": "No Recent Activity",
+		"inviteMaintainer": "Invite as Maintainer",
+		"inviteReviewer": "Invite as Reviewer",
+		"inviteDirector": "Invite as Director",
+		"inviteSent": "Invitation sent",
 		"errors": {
+			"notLoggedIn": "Please log in first",
+			"noRepository": "Repository information not configured",
+			"inviteFailed": "Failed to send invitation: {error}",
 			"userNotLoggedInOrTokenUnavailable": "User not logged in or access token unavailable"
 		}
 	},
@@ -1065,6 +1092,156 @@
 		"messages": {
 			"saveSuccess": "Settings saved successfully",
 			"saveError": "Save failed: {error}"
+		}
+	},
+	"discussions": {
+		"title": "Discussions",
+		"searchPlaceholder": "Search discussions...",
+		"newDiscussion": "New Discussion",
+		"sort": {
+			"latest": "Latest",
+			"hottest": "Hottest",
+			"replies": "Most Replies"
+		},
+		"category": {
+			"general": "General Discussion",
+			"ideas": "Ideas and Suggestions",
+			"polls": "Polls",
+			"qna": "Q&A",
+			"showAndTell": "Show and tell",
+			"announcements": "Announcements"
+		},
+		"noDiscussions": "No discussions in this category",
+		"empty": "No discussions",
+		"selectDiscussion": "Please select a discussion to view details",
+		"backToList": "Back to Discussions",
+		"edit": "Edit",
+		"delete": "Delete",
+		"replies": "Replies",
+		"addReply": "Add a reply...",
+		"submitReply": "Submit Reply",
+		"scrollToTop": "Scroll to Top",
+		"noReplies": "No replies yet",
+		"like": "Like",
+		"createNew": "Create New Discussion",
+		"categoryLabel": "Category",
+		"titleLabel": "Title",
+		"titlePlaceholder": "Enter discussion title...",
+		"contentLabel": "Content",
+		"contentPlaceholder": "Enter discussion content (Markdown supported)...",
+		"replyEmpty": "Reply content cannot be empty",
+		"replySubmitted": "Reply submitted",
+		"replyFailed": "Failed to submit reply",
+		"titleRequired": "Title cannot be empty",
+		"contentRequired": "Content cannot be empty",
+		"created": "Discussion created",
+		"createFailed": "Failed to create discussion",
+		"featureNotImplemented": "This feature is not implemented yet",
+		"confirmDeleteComment": "Are you sure you want to delete this comment?",
+		"close": "Close Discussion",
+		"closed": "Closed",
+		"confirmClose": "Are you sure you want to close this discussion?",
+		"closeFailed": "Failed to close discussion",
+		"timeAgo": {
+			"justNow": "Just now",
+			"minutes": "{minutes} minutes ago",
+			"hours": "{hours} hours ago",
+			"days": "{days} days ago",
+			"weeks": "{weeks} weeks ago",
+			"months": "{months} months ago"
+		},
+		"invitation": {
+			"title": "Role Invitation",
+			"description": "You have received a role invitation. Please choose to accept or reject it",
+			"accept": "Accept Invitation",
+			"reject": "Reject Invitation",
+			"accepted": "Invitation accepted! GitHub Actions will automatically process your request.",
+			"rejected": "Invitation rejected.",
+			"acceptFailed": "Failed to accept invitation: {error}",
+			"rejectFailed": "Failed to reject invitation: {error}"
+		}
+	},
+	"issues": {
+		"title": "Issues",
+		"newIssue": "+ New Issue",
+		"searchPlaceholder": "🔍 Search or jump to...",
+		"filters": "Filters▼",
+		"labels": "Labels▼",
+		"sort": "Sort▼",
+		"open": "Open",
+		"opened": "opened",
+		"closed": "closed",
+		"close": "Closed",
+		"by": "by",
+		"comments": "comments",
+		"noIssues": "No Issues",
+		"backToList": "Back to Issues",
+		"writeComment": "💬 Write a comment...",
+		"format": "🎨 Format",
+		"attachFiles": "📎 Attach files",
+		"comment": "💬 Comment",
+		"assignees": "Assignees",
+		"assignYourself": "assign yourself",
+		"edit": "edit",
+		"addToProject": "add to project",
+		"addToMilestone": "add to milestone",
+		"projects": "Projects",
+		"milestone": "Milestone",
+		"today": "today",
+		"yesterday": "yesterday",
+		"daysAgo": "days ago",
+		"weeksAgo": "weeks ago",
+		"monthsAgo": "months ago",
+		"page": "📄 Page 1",
+		"noComments": "No comments yet"
+	},
+	"repositorySelection": {
+		"title": "Select Repository",
+		"subtitle": "Choose an existing repository or create a new one",
+		"tabs": {
+			"existing": "Select Existing Repository",
+			"create": "Create New Repository"
+		},
+		"history": {
+			"title": "Recently Visited Repositories",
+			"noHistory": "No history available",
+			"lastAccessed": "Last accessed:"
+		},
+		"urlInput": {
+			"title": "Or enter repository address",
+			"label": "GitHub Repository URL",
+			"placeholder": "https://github.com/owner/repo",
+			"help": "Please enter the complete GitHub repository address"
+		},
+		"create": {
+			"title": "Create New Repository",
+			"nameLabel": "Repository Name",
+			"namePlaceholder": "my-new-repository",
+			"descriptionLabel": "Repository Description",
+			"descriptionPlaceholder": "Brief description of the repository..."
+		},
+		"continue": {
+			"button": "Continue",
+			"loading": "Processing...",
+			"success": "Processing Complete!"
+		},
+		"syncing": "Syncing files...",
+		"errors": {
+			"notLoggedIn": "Please log in first",
+			"repoExists": "Repository name already exists",
+			"noRepoName": "Please enter repository name"
+		}
+	},
+	"cla": {
+		"title": "Contributor License Agreement",
+		"content": "As a repository owner, you need to sign a Contributor License Agreement to transfer intellectual property ownership completely to the foundation.",
+		"realNameLabel": "Please enter your real name",
+		"realNamePlaceholder": "Please enter your real name (for legal documents)",
+		"agree": "Agree and Sign",
+		"disagree": "Disagree",
+		"rejected": "User refused to sign CLA agreement",
+		"errors": {
+			"noRealName": "Please enter your real name"
 		}
 	}
 }

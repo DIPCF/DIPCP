@@ -33,17 +33,24 @@ class UserProfilePage extends BasePage {
 
 	/**
 	 * 渲染页面内容
-	 * @returns {HTMLElement} 页面容器元素
+	 * @param {string} [path] - 路由路径
+	 * @returns {HTMLElement} 渲染后的DOM元素
 	 */
-	render() {
+	render(path) {
+		// 渲染页面内容
 		const container = document.createElement('div');
 		container.className = 'user-profile';
+		const headerHTML = this.renderHeader();
+		const userInfoHTML = this.renderUserInfo();
+		const userStatsHTML = this.renderUserStats();
+		const userActivityHTML = this.renderUserActivity();
+
 		container.innerHTML = `
-			${this.renderHeader()}
+			${headerHTML}
 			<main class="user-profile-main">
-				${this.renderUserInfo()}
-				${this.renderUserStats()}
-				${this.renderUserActivity()}
+				${userInfoHTML}
+				${userStatsHTML}
+				${userActivityHTML}
 			</main>
 		`;
 		return container;
@@ -86,6 +93,8 @@ class UserProfilePage extends BasePage {
 		}
 
 		const user = this.state.userInfo;
+		const isAdmin = this.checkAdminPermission();
+
 		return `
 			<div class="user-info-card">
 				<div class="user-avatar">
@@ -93,7 +102,19 @@ class UserProfilePage extends BasePage {
 					<span class="avatar-fallback" style="display: none;">👤</span>
 				</div>
 				<div class="user-details">
-					<h2 class="user-name">${user.name || user.login}</h2>
+					<div class="breadcrumb-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+						<h2 class="user-name" style="margin: 0;">${user.name || user.login}</h2>
+						${isAdmin ? `
+							<div class="dropdown">
+								<button class="dropdown-toggle" id="inviteMenuBtn">⋯</button>
+								<div class="dropdown-menu" id="inviteMenu">
+									<a href="#" class="dropdown-item" data-role="maintainer">👤 ${this.t('userProfile.inviteMaintainer', '邀请成为维护者')}</a>
+									<a href="#" class="dropdown-item" data-role="reviewer">✨ ${this.t('userProfile.inviteReviewer', '邀请成为审核委员')}</a>
+									<a href="#" class="dropdown-item" data-role="director">👑 ${this.t('userProfile.inviteDirector', '邀请成为理事')}</a>
+								</div>
+							</div>
+						` : ''}
+					</div>
 					<p class="user-username">@${user.login}</p>
 					${user.bio ? `<p class="user-bio">${user.bio}</p>` : ''}
 					<div class="user-meta">
@@ -203,14 +224,15 @@ class UserProfilePage extends BasePage {
 	 * 挂载组件到容器
 	 * @param {HTMLElement} container - 容器元素
 	 */
-	mount(container) {
+	async mount(container) {
+		// 调用父类的mount方法，它会调用render()并挂载
 		super.mount(container);
 
 		// 设置全局引用，供onclick使用
 		window.currentPage = this;
 
-		// 绑定事件
-		this.bindEvents();
+		// 绑定事件（异步）
+		await this.bindEvents();
 
 		// 加载用户数据
 		this.loadUserData();
@@ -219,9 +241,149 @@ class UserProfilePage extends BasePage {
 	/**
 	 * 绑定事件监听器
 	 */
-	bindEvents() {
+	async bindEvents() {
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
+
+		// 绑定邀请菜单
+		await this.bindInviteMenuEvents();
+	}
+
+	/**
+	 * 检查当前用户是否是理事（Admin权限）
+	 * @returns {boolean} 是否是理事
+	 */
+	checkAdminPermission() {
+		const role = this.state.userRole || this.state.permissionInfo?.role;
+		return role === 'director' || role === 'owner';
+	}
+
+	/**
+	 * 获取用户的权限信息
+	 * @param {string} username - 用户名
+	 * @returns {Promise<Object>} 用户权限信息
+	 */
+	async getUserPermissions(username) {
+		// 默认返回所有权限都为false
+		// 实际应该从CODEOWNERS或权限配置文件中读取
+		return {
+			isMaintainer: false,
+			isReviewer: false,
+			isDirector: false
+		};
+	}
+
+	/**
+	 * 处理邀请操作
+	 * @param {string} role - 角色类型：maintainer/reviewer/director
+	 */
+	async handleInvite(role) {
+		try {
+			const targetUser = this.state.userInfo;
+			const currentUser = this.state.user;
+			const repoInfo = this.state.user.repositoryInfo;
+
+			// 根据角色确定权限级别和编号
+			const roleInfo = {
+				maintainer: {
+					permission: 'push',
+					label: this.t('roles.maintainer', '维护者'),
+					emoji: '👤',
+					code: '#1'
+				},
+				reviewer: {
+					permission: 'triage',
+					label: this.t('roles.reviewer', '审核委员'),
+					emoji: '✨',
+					code: '#2'
+				},
+				director: {
+					permission: 'admin',
+					label: this.t('roles.director', '理事'),
+					emoji: '👑',
+					code: '#3'
+				}
+			};
+
+			const info = roleInfo[role];
+
+			// 获取当前用户的用户名（login或username）
+			const currentUsername = currentUser.login || currentUser.username || '';
+
+			// 创建邀请Issue
+			await this.createInviteIssue({
+				username: targetUser.login || targetUser.username,
+				role: info.label,
+				emoji: info.emoji,
+				roleCode: info.code,
+				currentUser: currentUsername,
+				owner: repoInfo.owner,
+				repo: repoInfo.repo
+			});
+
+			this.showModal(`${info.emoji} ${this.t('userProfile.inviteSent', '邀请已发送')}`, `${this.t('userProfile.inviteSent', '邀请已发送')}`);
+		} catch (error) {
+			this.showModal(
+				this.t('userProfile.errors.inviteFailed', '发送邀请失败：{error}').replace('{error}', error.message),
+				''
+			);
+		}
+	}
+
+	/**
+	 * 创建邀请Issue
+	 * @param {Object} params - 邀请参数
+	 */
+	async createInviteIssue(params) {
+		const { username, role, emoji, roleCode, currentUser, owner, repo } = params;
+		const octokit = new window.Octokit({ auth: this.state.user.token });
+
+		// Issue标题格式：邀请 @username 成为role (roleCode)
+		const issueTitle = `${emoji} 邀请 @${username} 成为${role} ${roleCode}`;
+		const issueBody = `
+您好 @${username}！
+
+我们希望能邀请您成为 **${repo}** 项目的${role}。
+
+**邀请者：** @${currentUser}
+**角色：** ${role} ${roleCode}
+**权限：** ${this.getRolePermission(role)}
+
+请回复 **ACCEPT** 接受邀请，或回复 **REJECT** 拒绝邀请。
+
+期待您的加入！🙌
+
+---
+
+*此邀请通过GitHub Issues发送，您将收到通知。*
+		`;
+
+		try {
+			// 使用REST API创建Issue
+			const { data: issue } = await octokit.rest.issues.create({
+				owner,
+				repo,
+				title: issueTitle,
+				body: issueBody,
+				labels: ['role-invitation']
+			});
+
+			return issue;
+		} catch (error) {
+			throw new Error(`创建Issue失败: ${error.message}`);
+		}
+	}
+
+	/**
+	 * 获取角色对应的权限描述
+	 */
+	getRolePermission(role) {
+		const permissions = {
+			maintainer: '审核内容、提出修改建议、合并到仓库主分支',
+			reviewer: '为创作者授予积分，管理和裁决积分相关的申诉',
+			director: '管理用户权限，制定社区发展策略'
+		};
+		return permissions[role] || '协同创作权限';
 	}
 
 	/**
@@ -256,8 +418,8 @@ class UserProfilePage extends BasePage {
 				userActivity: userActivity
 			});
 
-			this.rerender();
-			this.bindEvents();
+			// 只更新用户信息部分，不重新绑定事件
+			await this.updateUserInfoDisplay();
 
 		} catch (error) {
 			console.error('加载用户数据失败:', error);
@@ -265,8 +427,9 @@ class UserProfilePage extends BasePage {
 				loading: false,
 				error: error.message
 			});
-			this.rerender();
-			this.bindEvents();
+
+			// 只更新错误显示部分
+			await this.updateUserInfoDisplay();
 		}
 	}
 
@@ -380,6 +543,77 @@ class UserProfilePage extends BasePage {
 	}
 
 	/**
+	 * 更新用户信息显示（局部更新）
+	 */
+	async updateUserInfoDisplay() {
+		if (!this.element) return;
+
+		// 更新用户基本信息
+		const mainContent = this.element.querySelector('main.user-profile-main');
+		if (mainContent) {
+			mainContent.innerHTML = `
+				${this.renderUserInfo()}
+				${this.renderUserStats()}
+				${this.renderUserActivity()}
+			`;
+			// 需要重新绑定邀请菜单事件
+			await this.bindInviteMenuEvents();
+		}
+	}
+
+	/**
+	 * 绑定邀请菜单事件
+	 */
+	async bindInviteMenuEvents() {
+		const inviteMenuBtn = this.element.querySelector('#inviteMenuBtn');
+		const inviteMenu = this.element.querySelector('#inviteMenu');
+
+		if (inviteMenuBtn && inviteMenu) {
+			// 异步加载用户权限并隐藏已有权限的选项
+			if (this.state.userInfo) {
+				const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
+				const menuItems = inviteMenu.querySelectorAll('.dropdown-item');
+
+				menuItems.forEach(item => {
+					const role = item.dataset.role;
+					if ((role === 'maintainer' && userPermissions.isMaintainer) ||
+						(role === 'reviewer' && userPermissions.isReviewer) ||
+						(role === 'director' && userPermissions.isDirector)) {
+						item.style.display = 'none';
+					}
+				});
+			}
+
+			inviteMenuBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				inviteMenu.classList.toggle('show');
+			});
+
+			// 下拉菜单项点击事件
+			const dropdownItems = inviteMenu.querySelectorAll('.dropdown-item');
+			dropdownItems.forEach(item => {
+				item.addEventListener('click', async (e) => {
+					e.preventDefault();
+					const role = e.currentTarget.dataset.role;
+
+					// 关闭下拉菜单
+					inviteMenu.classList.remove('show');
+
+					// 处理邀请
+					await this.handleInvite(role);
+				});
+			});
+
+			// 点击其他地方关闭下拉菜单
+			document.addEventListener('click', (e) => {
+				if (!inviteMenuBtn.contains(e.target) && !inviteMenu.contains(e.target)) {
+					inviteMenu.classList.remove('show');
+				}
+			});
+		}
+	}
+
+	/**
 	 * 格式化时间
 	 * @param {string} dateString - 日期字符串
 	 * @returns {string} 格式化后的时间文本
@@ -402,6 +636,19 @@ class UserProfilePage extends BasePage {
 		} else {
 			return date.toLocaleDateString();
 		}
+	}
+
+	/**
+	 * 显示模态框
+	 * @param {string} title - 标题
+	 * @param {string} message - 消息内容
+	 */
+	showModal(title, message) {
+		// 如果没有创建过modal，创建一个新的
+		if (!this.state.modal) {
+			this.state.modal = new window.Modal();
+		}
+		this.state.modal.showInfo(title, message);
 	}
 
 	/**

@@ -21,12 +21,16 @@ class SettingsPage extends BasePage {
 		// 从 localStorage 获取用户信息
 		const userInfo = window.app.getUserFromStorage();
 
+		// 从localStorage读取同步时间间隔（默认30秒）
+		const syncInterval = parseInt(localStorage.getItem('spcp-sync-interval')) || 30;
+
 		this.state = {
 			user: userInfo.user,
 			userRole: userInfo.userRole,
 			permissionInfo: userInfo.permissionInfo,
 			language: props.language || currentLanguage,
 			theme: props.theme || currentTheme,
+			syncInterval: syncInterval, // 同步时间间隔（秒）
 		};
 	}
 
@@ -43,6 +47,7 @@ class SettingsPage extends BasePage {
 				<div class="settings-container">
 					${this.renderLanguageSection()}
 					${this.renderThemeSection()}
+					${this.renderSyncSection()}
 					${this.renderAccountSection()}
 				</div>
 			</div>
@@ -113,6 +118,39 @@ class SettingsPage extends BasePage {
                                 <span class="theme-desc">${this.t('settings.theme.darkDesc', '适合夜间使用')}</span>
                             </div>
                         </button>
+                    </div>
+                </div>
+            </div>
+        `;
+	}
+
+	/**
+	 * 渲染同步设置区域
+	 * @returns {string} 同步设置HTML字符串
+	 */
+	renderSyncSection() {
+		return `
+            <div class="settings-section">
+                <h2>${this.t('settings.sync', '同步设置')}</h2>
+                <div class="sync-settings">
+                    <div class="setting-item">
+                        <label for="sync-interval-input">
+                            ${this.t('settings.syncInterval', '同步时间间隔（秒）')}
+                            <span class="setting-value">${this.state.syncInterval}</span>
+                        </label>
+                        <input 
+                            type="range" 
+                            id="sync-interval-input" 
+                            min="10" 
+                            max="60" 
+                            step="10"
+                            value="${this.state.syncInterval}" 
+                            class="range-input"
+                        />
+                        <div class="range-info">
+                            <span>${this.t('settings.min', '最小')}: 10</span>
+                            <span>${this.t('settings.max', '最大')}: 60</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -231,6 +269,7 @@ class SettingsPage extends BasePage {
 				<div class="settings-container">
 					${this.renderLanguageSection()}
 					${this.renderThemeSection()}
+					${this.renderSyncSection()}
 					${this.renderAccountSection()}
 				</div>
 			`;
@@ -280,6 +319,33 @@ class SettingsPage extends BasePage {
 				}
 			});
 		});
+
+		// 同步时间间隔滑块
+		const syncIntervalInput = this.element.querySelector('#sync-interval-input');
+		if (syncIntervalInput) {
+			syncIntervalInput.addEventListener('input', (e) => {
+				const interval = parseInt(e.target.value);
+				this.setState({ syncInterval: interval });
+
+				// 更新显示的数值
+				const valueSpan = this.element.querySelector('.setting-value');
+				if (valueSpan) {
+					valueSpan.textContent = interval;
+				}
+
+				// 保存到localStorage
+				localStorage.setItem('spcp-sync-interval', interval.toString());
+			});
+
+			// 只有在用户释放滑块时才保存（避免频繁更新）
+			syncIntervalInput.addEventListener('change', (e) => {
+				const interval = parseInt(e.target.value);
+
+				// 保存到localStorage
+				localStorage.setItem('spcp-sync-interval', interval.toString());
+
+			});
+		}
 
 		// 退出项目按钮
 		const exitProjectBtn = this.element.querySelector('#exit-project-btn');
@@ -369,7 +435,6 @@ class SettingsPage extends BasePage {
 						<li>${this.t('dashboard.logout.warningItem1', '• 本地编辑的文件内容')}</li>
 						<li>${this.t('dashboard.logout.warningItem2', '• 新建但未提交的文件')}</li>
 						<li>${this.t('dashboard.logout.warningItem3', '• 本地工作区的所有修改')}</li>
-						<li>${this.t('dashboard.logout.warningItem4', '• 用户配置和缓存数据')}</li>
 					</ul>
 					<p><strong>${this.t('dashboard.logout.warningNote', '请确保在退出前已保存所有重要修改！')}</strong></p>
 				</div>
@@ -407,25 +472,34 @@ class SettingsPage extends BasePage {
 	 * 处理退出项目
 	 */
 	handleLogout() {
-		// 清除本地存储的用户数据
+		// 清除本地存储的用户数据（工作区和文件缓存）
 		if (window.StorageService) {
 			window.StorageService.clearUserData();
 		}
 
-		// 清除localStorage中的用户相关数据
-		localStorage.removeItem('spcp-user');
+		// 清除localStorage中的工作区相关数据，但保留登录凭据
 		localStorage.removeItem('spcp-config');
-		localStorage.removeItem('spcp-language');
 
-		// 重置应用状态
-		const userInfo = window.app.getUserFromStorage();
-		window.app.state.user = userInfo.user;
-		window.app.state.isAuthenticated = !!userInfo.user;
-		window.app.state.userRole = userInfo.userRole;
-		window.app.state.permissionInfo = userInfo.permissionInfo;
+		// 更新用户信息，移除仓库相关信息但保留登录凭据
+		const userInfo = JSON.parse(localStorage.getItem('spcp-user') || '{}');
+		const updatedUserInfo = {
+			username: userInfo.username,
+			email: userInfo.email,
+			avatarUrl: userInfo.avatarUrl,
+			name: userInfo.name,
+			token: userInfo.token,
+			loginTime: userInfo.loginTime
+		};
+		localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
 
-		// 导航到登录页面
-		window.app.navigateTo('login');
+		// 重置应用状态，保留用户信息但不保留仓库信息
+		window.app.state.user = updatedUserInfo;
+		window.app.state.isAuthenticated = true;
+		window.app.state.userRole = null;
+		window.app.state.permissionInfo = null;
+
+		// 导航到仓库选择页面
+		window.app.navigateTo('/repository-selection');
 	}
 }
 

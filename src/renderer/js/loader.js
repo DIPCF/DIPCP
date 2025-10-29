@@ -189,8 +189,11 @@ class DynamicLoader {
 				'js/pages/EditorPage.js',
 				'js/pages/SettingsPage.js',
 				'js/pages/ReviewsPage.js',
+				'js/pages/IssuesPage.js',
 				'js/pages/TermsPage.js',
 				'js/pages/PrivacyPage.js',
+				'js/pages/DiscussionsPage.js',
+				'js/pages/RepositorySelectionPage.js',
 				'js/pages/UserProfilePage.js'
 			],
 			// 第八组：应用（依赖所有页面）

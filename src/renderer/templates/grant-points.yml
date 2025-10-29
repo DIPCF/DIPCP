@@ -7,6 +7,8 @@ on:
 jobs:
   grant-points:
     runs-on: ubuntu-latest
+    # 只在带有 grant-points 标签的 Issue 上运行
+    if: contains(github.event.issue.labels.*.name, 'grant-points')
     
     steps:
       - name: Check if comment contains /grant command

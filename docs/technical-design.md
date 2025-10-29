@@ -27,18 +27,21 @@
 │  │  Git操作    │ │  审核流程   │ │  积分系统   │ │  权限控制   │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                │
-│  │ Discussions│ │  搜索功能   │ │  用户管理   │                │
+│  │ Discussions│ │ Issues     │ │  搜索功能   │                │
 │  └─────────────┘ └─────────────┘ └─────────────┘                │
+│  ┌─────────────┐                                                │
+│  │  用户管理   │                                                │
+│  └─────────────┘                                                │
 ├─────────────────────────────────────────────────────────────────┤
 │  数据存储层 (GitHub仓库)                                        │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
 │  │ GitHub API  │ │  Git仓库    │ │ Discussions│ │  项目文件   │ │
 │  │ (认证+数据) │ │ (版本控制)  │ │  讨论数据   │ │ (内容管理)  │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-│  ┌─────────────┐ ┌─────────────┐                                │
-│  │  用户数据   │ │ GitHub Pages│                                │
-│  │ (明文存储)  │ │ (静态部署)  │                                │
-│  └─────────────┘ └─────────────┘                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│  │   Issues    │ │  用户数据   │ │ GitHub Pages│ │             │ │
+│  │ 问题跟踪    │ │ (明文存储)  │ │ (静态部署)  │ │             │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -740,6 +743,62 @@ POINT/ @organization/reviewers-team
 - **状态管理**: `updateUserToCollaborator()` 更新用户角色和权限
 - **UI反馈**: 实时进度条和状态提示，提供流畅的用户体验
 
+#### 3.1.5 角色邀请系统
+
+**设计目的**：
+- 允许理事（Director/Admin）主动邀请其他用户成为维护者、审核委员或理事
+- 通过GitHub Issues发送邀请通知
+- 自动化处理邀请接受流程，写入权限文件
+
+**核心流程**：
+
+1. **邀请发送**（由理事执行）
+   - 理事在用户资料页面点击邀请按钮
+   - 选择角色（维护者/审核委员/理事）
+   - 系统自动创建GitHub Issue并@mention目标用户
+   - 添加`role-invitation`标签标识邀请Issue
+   - 被邀请用户收到GitHub通知（邮件+推送）
+
+2. **通知机制**（用户登录时）
+   - 系统检测未读的@mention Issue
+   - 在导航栏"Issues"按钮显示红色圆点
+   - 在Issues列表中标记未读Issue
+   - Issue卡片右上角显示红色圆点
+
+3. **接受/拒绝邀请**（用户操作）
+   - 用户打开邀请Issue
+   - 系统自动显示"接受"和"拒绝"按钮
+   - 点击"接受"后，在Issue中添加"接受"评论
+   - 点击"拒绝"后，在Issue中添加"拒绝"评论
+
+4. **自动化处理**（GitHub Actions）
+   - 监听Issue评论事件，检测"接受"或"accept"关键词
+   - 从Issue标题提取用户名和角色信息
+   - 将用户名添加到对应的权限文件：
+     - 维护者 → `.github/maintainers.txt`
+     - 审核委员 → `.github/reviewers.txt`
+     - 理事 → `.github/directors.txt`
+   - 自动创建Pull Request
+   - 添加确认评论并关闭Issue
+
+5. **权限更新**（手动确认）
+   - 等待理事会确认并合并Pull Request
+   - 权限文件更新后生效
+   - 用户获得相应角色权限
+
+**技术特点**：
+- **公开透明**: 所有邀请记录在GitHub Issue中可追溯
+- **自动化**: 使用GitHub Actions自动处理接受流程
+- **多通知**: 用户通过邮件、推送、网页通知收到邀请
+- **权限隔离**: 只有理事可以发送邀请
+- **智能隐藏**: 自动隐藏已拥有权限的邀请选项
+- **Event触发**: 使用issue_comment事件触发GitHub Actions工作流
+
+**角色映射**：
+- **维护者（Maintainer）**: 推送到仓库、合并Pull Request权限
+- **审核委员（Reviewer）**: 审核代码、参与决策权限
+- **理事（Director）**: 完全管理权限、可以邀请其他用户
+
 ### 3.2 数据安全
 
 #### 3.2.1 本地缓存安全
@@ -916,6 +975,53 @@ sequenceDiagram
     GraphQL->>Discussion: 添加评论
     Discussion-->>GraphQL: 返回评论ID
     GraphQL-->>UI: 更新讨论显示
+```
+
+#### 4.1.7 角色邀请流程
+```mermaid
+sequenceDiagram
+    participant Director as 理事
+    participant UI as 界面
+    participant GitHub as GitHub
+    participant Issue as Issue
+    participant User as 被邀请用户
+    participant Actions as GitHub Actions
+    participant File as 权限文件
+    participant PR as Pull Request
+    
+    Note over Director: 1. 邀请发送
+    Director->>UI: 打开用户资料页面
+    UI->>UI: 显示邀请菜单（维护者/审核委员/理事）
+    Director->>UI: 选择角色
+    UI->>GitHub: 创建Issue + @mention用户
+    GitHub->>Issue: 创建邀请Issue
+    GitHub->>User: 发送通知（邮件+推送）
+    
+    Note over User: 2. 接收通知
+    User->>UI: 登录SPCP
+    UI->>GitHub: 查询Issues列表
+    GitHub-->>UI: 返回包含@mention的Issue
+    UI->>UI: 显示红色圆点提示
+    User->>UI: 打开邀请Issue
+    
+    Note over User: 3. 接受邀请
+    UI->>UI: 显示"接受"/"拒绝"按钮
+    User->>UI: 点击"接受"按钮
+    UI->>Issue: 添加评论"接受"
+    Issue->>GitHub: 触发issue_comment事件
+    
+    Note over Actions: 4. 自动化处理
+    GitHub->>Actions: 触发workflow（监听"接受"评论）
+    Actions->>Actions: 提取用户名和角色
+    Actions->>File: 添加用户名到权限文件
+    File->>PR: 创建Pull Request
+    Actions->>Issue: 添加确认评论并关闭Issue
+    PR-->>Director: 等待审核合并
+    
+    Note over Director: 5. 确认合并
+    Director->>PR: 审核并合并PR
+    PR->>File: 更新权限文件
+    File-->>User: 用户获得对应角色权限
 ```
 
 ### 4.2 数据同步机制

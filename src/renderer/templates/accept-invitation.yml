@@ -1,0 +1,241 @@
+name: Accept Invitation
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  accept-invitation:
+    runs-on: ubuntu-latest
+    # 只在Issue有"role-invitation"标签时触发
+    if: contains(github.event.issue.labels.*.name, 'role-invitation')
+    steps:
+      - name: Check if issue is already closed
+        id: check_status
+        run: |
+          if [ "${{ github.event.issue.state }}" = "closed" ]; then
+            echo "Issue is already closed. Skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Checkout repository
+        if: steps.check_status.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.COLLABORATOR_TOKEN }}
+          
+      - name: Verify comment content
+        if: steps.check_status.outputs.skip != 'true'
+        id: verify_comment
+        run: |
+             COMMENT_BODY="${{ github.event.comment.body }}"
+             
+             # 移除首尾空白字符，但保持大小写敏感
+             COMMENT_BODY=$(echo "$COMMENT_BODY" | tr -d '[:space:]')
+             
+             echo "Comment body (trimmed): $COMMENT_BODY"
+             
+             # 检查评论内容是否精确匹配 "ACCEPT" 或 "REJECT"（大小写敏感）
+             if [ "$COMMENT_BODY" = "ACCEPT" ] || [ "$COMMENT_BODY" = "REJECT" ]; then
+               echo "✅ Comment content is valid"
+             else
+               echo "❌ Comment content does not match 'ACCEPT' or 'REJECT' (case-sensitive)"
+               exit 1
+             fi
+             
+             # 设置操作类型
+             if [ "$COMMENT_BODY" = "ACCEPT" ]; then
+               echo "action=accept" >> $GITHUB_OUTPUT
+             elif [ "$COMMENT_BODY" = "REJECT" ]; then
+               echo "action=reject" >> $GITHUB_OUTPUT
+             fi
+      
+      - name: Handle rejection
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'reject'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❌ 邀请已被拒绝。'
+            });
+            
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'not_planned'
+            });
+      
+      - name: Verify Issue author permissions
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept'
+        id: verify_author
+        run: |
+          ISSUE_AUTHOR="${{ github.event.issue.user.login }}"
+          echo "Issue author: $ISSUE_AUTHOR"
+          
+          # 检查 Director（只有Director才有权限创建角色邀请）
+          if [ -f ".github/directors.txt" ]; then
+            if grep -q "^$ISSUE_AUTHOR$" ".github/directors.txt"; then
+              AUTHORIZED=true
+              echo "Issue author is a director"
+            else
+              AUTHORIZED=false
+            fi
+          else
+            AUTHORIZED=false
+          fi
+          
+          if [ "$AUTHORIZED" != "true" ]; then
+            echo "❌ Issue author does not have permission to create role invitation. Only Director can create role invitations."
+            exit 1
+          fi
+          
+          echo "authorized=$AUTHORIZED" >> $GITHUB_OUTPUT
+          
+      - name: Extract invitation details
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept'
+        id: extract_details
+        run: |
+          # 从Issue标题提取用户名和角色
+          TITLE="${{ github.event.issue.title }}"
+          echo "Issue title: $TITLE"
+          
+          # 提取被邀请的用户名
+          if echo "$TITLE" | grep -q "@"; then
+            INVITED_USER=$(echo "$TITLE" | sed -n 's/.*@\([^[:space:]]*\).*/\1/p' | head -1)
+          fi
+          
+          # 提取角色（使用编号：#1=maintainer, #2=reviewer, #3=director）
+          if echo "$TITLE" | grep -q "#1"; then
+            ROLE="maintainer"
+            FILE=".github/maintainers.txt"
+          elif echo "$TITLE" | grep -q "#2"; then
+            ROLE="reviewer"
+            FILE=".github/reviewers.txt"
+          elif echo "$TITLE" | grep -q "#3"; then
+            ROLE="director"
+            FILE=".github/directors.txt"
+          else
+            ROLE="unknown"
+            FILE=""
+          fi
+          
+          echo "invited_user=$INVITED_USER" >> $GITHUB_OUTPUT
+          echo "role=$ROLE" >> $GITHUB_OUTPUT
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          
+          echo "Extracted: user=$INVITED_USER, role=$ROLE, file=$FILE"
+      
+      - name: Verify comment author is invited user
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept'
+        id: verify_commenter
+        run: |
+          COMMENT_AUTHOR="${{ github.event.comment.user.login }}"
+          INVITED_USER="${{ steps.extract_details.outputs.invited_user }}"
+          
+          echo "Comment author: $COMMENT_AUTHOR"
+          echo "Invited user: $INVITED_USER"
+          
+          if [ "$COMMENT_AUTHOR" != "$INVITED_USER" ]; then
+            echo "❌ Comment author ($COMMENT_AUTHOR) is not the invited user ($INVITED_USER)"
+            exit 1
+          fi
+          
+          echo "✅ Comment author matches invited user"
+      
+      - name: Configure Git
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Add user to role file
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        run: |
+          FILE="${{ steps.extract_details.outputs.file }}"
+          USERNAME="${{ steps.extract_details.outputs.invited_user }}"
+          
+          echo "Adding $USERNAME to $FILE"
+          
+          # 检查文件是否存在，不存在则创建
+          if [ ! -f "$FILE" ]; then
+            echo "# ${FILE}" > "$FILE"
+            echo "# Generated by GitHub Actions" >> "$FILE"
+          fi
+          
+          # 检查用户名是否已存在
+          if ! grep -q "^$USERNAME$" "$FILE"; then
+            echo "$USERNAME" >> "$FILE"
+            echo "Added $USERNAME to $FILE"
+          else
+            echo "$USERNAME already exists in $FILE"
+            exit 0
+          fi
+      
+      - name: Commit changes
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        run: |
+          git add "${{ steps.extract_details.outputs.file }}"
+          git commit -m "Add ${{ steps.extract_details.outputs.invited_user }} as ${{ steps.extract_details.outputs.role }}"
+      
+      - name: Push changes
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        run: |
+          git push origin HEAD:${{ github.ref }} || git push origin HEAD:main || git push origin HEAD:master
+      
+      - name: Add comment to issue
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ 邀请已接受！已将 @${{ steps.extract_details.outputs.invited_user }} 添加为 ${{ steps.extract_details.outputs.role }}。`
+            });
+      
+      - name: Add error comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ Permission verification failed. Only Director can create role invitations, and only the invited user can accept the invitation.`
+            });
+            
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'not_planned'
+            });
+
+      - name: Close issue on success
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept' && steps.extract_details.outputs.file != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'completed'
+            });
+

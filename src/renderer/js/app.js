@@ -130,12 +130,15 @@ class SPCPApp {
 		// 定义路由
 		this.routes.set('/', 'DashboardPage');
 		this.routes.set('/login', 'LoginPage');
+		this.routes.set('/repository-selection', 'RepositorySelectionPage');
 		this.routes.set('/project-detail', 'ProjectDetailPage');
 		this.routes.set('/editor', 'EditorPage');
 		this.routes.set('/reviews', 'ReviewsPage');
+		this.routes.set('/issues', 'IssuesPage');
 		this.routes.set('/settings', 'SettingsPage');
 		this.routes.set('/terms', 'TermsPage');
 		this.routes.set('/privacy', 'PrivacyPage');
+		this.routes.set('/discussions', 'DiscussionsPage');
 		this.routes.set('/user-profile', 'UserProfilePage');
 		this.routes.set('/role-management', 'RoleManagementPage');
 
@@ -174,27 +177,33 @@ class SPCPApp {
 		const path = window.location.pathname;
 		const route = this.matchRoute(path);
 
-		// 根据用户认证状态和权限决定重定向逻辑
-		if (this.state.user && this.state.user.token && this.state.permissionInfo) {
-			// 有用户信息和权限信息
-			if (this.state.permissionInfo.role === 'owner') {
-				// 所有者，如果访问登录页或仪表盘，跳转到项目详情页
-				if (route === 'LoginPage' || route === 'DashboardPage') {
-					this.navigateTo('/project-detail');
-					return;
-				}
-			} else if (this.state.permissionInfo.role === 'collaborator') {
-				// 协作者，如果访问登录页，跳转到项目详情页，但可以访问仪表盘
-				if (route === 'LoginPage') {
-					this.navigateTo('/project-detail');
-					return;
-				}
+		// 如果已登录用户访问登录页面，重定向到仓库选择页面
+		if (this.state.user && this.state.user.token && route === 'LoginPage') {
+			this.navigateTo('/repository-selection');
+			return;
+		}
+
+		// 如果未登录用户访问需要认证的页面，重定向到登录页面
+		if (!this.state.user || !this.state.user.token) {
+			if (route === 'RepositorySelectionPage' || route === 'ProjectDetailPage' ||
+				route === 'EditorPage' || route === 'ReviewsPage' || route === 'IssuesPage' ||
+				route === 'SettingsPage' || route === 'DiscussionsPage' || route === 'UserProfilePage' ||
+				route === 'RoleManagementPage') {
+				this.navigateTo('/login');
+				return;
+			}
+		}
+
+		// 处理根路径重定向
+		if (path === '/' || path === '') {
+			if (this.state.user && this.state.user.token) {
+				// 已登录用户重定向到仓库选择页面
+				this.navigateTo('/repository-selection');
+				return;
 			} else {
-				// 访客，如果访问登录页，跳转到仪表盘
-				if (route === 'LoginPage') {
-					this.navigateTo('/');
-					return;
-				}
+				// 未登录用户重定向到登录页面
+				this.navigateTo('/login');
+				return;
 			}
 		}
 
