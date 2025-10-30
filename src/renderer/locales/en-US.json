@@ -429,6 +429,8 @@
 		"saveFailed": "Save failed",
 		"submitSuccess": "Review submitted successfully",
 		"submitFailed": "Failed to submit review",
+		"submitting": "Submitting...",
+		"commitMessage": "Update file via SPCP: ",
 		"submitNotImplemented": "Submit review feature not implemented",
 		"saveNotImplemented": "Save file feature not implemented",
 		"image": {
@@ -467,7 +469,10 @@
 			"fileModifiedConfirm": "File has been modified, save before submitting?",
 			"submitReviewInDevelopment": "Submit review feature is under development...",
 			"unsavedChangesConfirm": "You have unsaved changes, are you sure you want to leave?",
-			"unsavedChangesSaveConfirm": "You have unsaved changes, do you want to save?"
+			"unsavedChangesSaveConfirm": "You have unsaved changes, do you want to save?",
+			"userNotLoggedInOrTokenUnavailable": "User not logged in or access token unavailable",
+			"repositoryInfoUnavailable": "Repository information unavailable",
+			"filePathMissing": "File path missing"
 		},
 		"ui": {
 			"startWriting": "Start writing content...",
@@ -1251,7 +1256,7 @@
 			"nameLabel": "Repository Name",
 			"namePlaceholder": "English letters and numbers, max 100 characters",
 			"descriptionLabel": "Repository Description",
-			"descriptionPlaceholder": "Brief description of the repository, max 350 characters",
+			"descriptionPlaceholder": "Brief description of the repository, max 350 characters"
 		},
 		"continue": {
 			"button": "Continue",

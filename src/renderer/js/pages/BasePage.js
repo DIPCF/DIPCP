@@ -15,7 +15,7 @@ class BasePage extends Component {
 		console.log(`Rendering page: ${this.constructor.name} for path: ${path}`);
 	}
 
-	mount(container) {
+	mount(container, path = null) {
 		super.mount(container);
 
 		// 应用主题

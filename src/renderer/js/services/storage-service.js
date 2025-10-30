@@ -1,7 +1,7 @@
 // 存储服务 - 真正的实现
 window.StorageService = {
 	dbName: 'SPCP_Database',
-	dbVersion: 3,
+	dbVersion: 4,
 
 	// 初始化IndexedDB
 	async initDB() {
@@ -32,6 +32,11 @@ window.StorageService = {
 				// 创建成员数据缓存存储
 				if (!db.objectStoreNames.contains('membersCache')) {
 					db.createObjectStore('membersCache', { keyPath: 'projectId' });
+				}
+
+				// 创建文件提交状态存储
+				if (!db.objectStoreNames.contains('fileSubmissionStatus')) {
+					db.createObjectStore('fileSubmissionStatus', { keyPath: 'fileKey' });
 				}
 			};
 		});
@@ -157,6 +162,40 @@ window.StorageService = {
 			await Promise.all(promises);
 		} catch (error) {
 			console.error('Error clearing cache:', error);
+		}
+	},
+
+	// 文件提交状态管理
+	async getFileSubmissionStatus(owner, repo, filePath) {
+		try {
+			const fileKey = `${owner}/${repo}:${filePath}`;
+			const result = await this._execute('fileSubmissionStatus', 'get', fileKey);
+			return result ? result.hasSubmitted : false;
+		} catch (error) {
+			console.error('Error getting file submission status:', error);
+			return false;
+		}
+	},
+
+	async setFileSubmissionStatus(owner, repo, filePath, hasSubmitted) {
+		try {
+			const fileKey = `${owner}/${repo}:${filePath}`;
+			await this._execute('fileSubmissionStatus', 'put', {
+				fileKey: fileKey,
+				hasSubmitted: hasSubmitted,
+				timestamp: Date.now()
+			});
+		} catch (error) {
+			console.error('Error setting file submission status:', error);
+		}
+	},
+
+	async clearFileSubmissionStatus(owner, repo, filePath) {
+		try {
+			const fileKey = `${owner}/${repo}:${filePath}`;
+			await this._execute('fileSubmissionStatus', 'delete', fileKey);
+		} catch (error) {
+			console.error('Error clearing file submission status:', error);
 		}
 	},
 
@@ -311,6 +350,9 @@ window.StorageService = {
 					}
 					const content = new TextDecoder('utf-8').decode(bytes);
 
+					// 计算文件大小（UTF-8字节数）
+					const fileSize = new Blob([content]).size;
+
 					// 保存到fileCache
 					await window.StorageService._execute('fileCache', 'put', {
 						path: file.path,
@@ -319,7 +361,7 @@ window.StorageService = {
 						created: createdTime,
 						modified: modifiedTime,
 						isLocal: false,
-						size: content.length,
+						size: fileSize,
 						type: file.type
 					});
 

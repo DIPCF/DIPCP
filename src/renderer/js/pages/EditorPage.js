@@ -20,16 +20,22 @@ class EditorPage extends BasePage {
 		// 从 localStorage 获取用户信息
 		const userInfo = window.app.getUserFromStorage();
 
+		// 根据mode决定初始预览模式：默认为预览模式，只有在明确传入mode=edit时才进入编辑模式
+		const viewMode = props.mode || 'view';
+		const initialPreviewMode = viewMode === 'view';
+
 		this.state = {
 			filePath: props.filePath || '',
 			fileName: props.fileName || '',
 			content: props.content || '',
 			isModified: false,
-			previewMode: false,
-			viewMode: props.mode || 'edit', // 'edit' 或 'view'
+			hasSubmitted: false, // 将在loadFileContent中异步加载
+			previewMode: initialPreviewMode,
+			viewMode: viewMode, // 'edit' 或 'view'
 			showInfoPanel: false,
 			infoPanelContent: null,
 			projectName: props.projectName || 'SPCP',
+			repoInfo: userInfo.user.repositoryInfo,
 			user: userInfo.user,
 			userRole: userInfo.userRole,
 			permissionInfo: userInfo.permissionInfo,
@@ -136,6 +142,21 @@ class EditorPage extends BasePage {
 			// 优先从localWorkspace查找（用户编辑的文件）
 			if (window.StorageService) {
 				await window.StorageService.initDB();
+
+				// 加载文件提交状态
+				const repoInfo = this.state.repoInfo || (this.state.user && this.state.user.repositoryInfo);
+				if (repoInfo && this.state.filePath) {
+					const hasSubmitted = await window.StorageService.getFileSubmissionStatus(
+						repoInfo.owner,
+						repoInfo.repo,
+						this.state.filePath
+					);
+					this.setState({ hasSubmitted });
+					// 更新提交按钮状态
+					if (this.element) {
+						this.updateSubmitButtonState();
+					}
+				}
 
 				// 先尝试从localWorkspace获取（用户编辑的文件）
 				let fileData = await window.StorageService._execute('localWorkspace', 'get', this.state.filePath);
@@ -246,13 +267,13 @@ class EditorPage extends BasePage {
 		return `
             <div class="editor-toolbar">
                 <div class="editor-toolbar-left">
-                    <button class="btn btn-sm" id="saveBtn">${getText('editor.save', '💾 保存')}</button>
+                    <button class="btn btn-sm" id="saveBtn" disabled style="${this.state.previewMode ? 'display: none;' : ''}">${getText('editor.save', '💾 保存')}</button>
                     <button class="btn btn-sm ${this.state.previewMode ? 'active' : ''}" id="previewBtn">
                         ${this.state.previewMode ? getText('editor.edit', '✏️ 编辑') : getText('editor.preview', '👁 预览')}
                     </button>
                 </div>
                 <div class="editor-toolbar-right">
-                    <button class="btn btn-primary btn-sm" id="submitBtn">${getText('editor.submitReview', '📤 提交审核')}</button>
+					<button class="btn btn-primary btn-sm" id="submitBtn" style="${(this.state.isModified || this.state.hasSubmitted) ? 'display: none;' : ''}">${getText('editor.submitReview', '📤 提交审核')}</button>
                 </div>
             </div>
         `;
@@ -296,9 +317,13 @@ class EditorPage extends BasePage {
 	 * @returns {string} 文本编辑器HTML字符串
 	 */
 	renderTextEditor(getText) {
+		// 根据viewMode和previewMode决定是否readonly
+		// viewMode='view'时默认readonly，除非用户点击了编辑按钮（previewMode=false）
+		const readonly = this.state.viewMode === 'view' && this.state.previewMode;
+
 		return `
 			<div class="editor-panel" id="editorPanel" style="display: ${this.state.previewMode ? 'none' : 'block'};">
-				<textarea id="markdownEditor" placeholder="${getText('editor.ui.loading', '加载中...')}" ${this.state.viewMode === 'view' ? 'readonly' : ''}>${this.state.content}</textarea>
+				<textarea id="markdownEditor" placeholder="${getText('editor.ui.loading', '加载中...')}" ${readonly ? 'readonly' : ''}>${this.state.content}</textarea>
 			</div>
 			<div class="preview-panel" id="previewPanel" style="display: ${this.state.previewMode ? 'flex' : 'none'};">
 				<div class="preview-content" id="previewContent">
@@ -497,11 +522,27 @@ class EditorPage extends BasePage {
 		// 编辑器内容变化
 		const editor = this.element.querySelector('#markdownEditor');
 		if (editor) {
-			editor.addEventListener('input', (e) => {
+			editor.addEventListener('input', async (e) => {
 				this.setState({
 					content: e.target.value,
-					isModified: true
+					isModified: true,
+					hasSubmitted: false
 				});
+
+				// 清除已提交状态（通过StorageService）
+				try {
+					if (window.StorageService) {
+						const repoInfo = this.state.repoInfo || (this.state.user && this.state.user.repositoryInfo);
+						if (repoInfo && this.state.filePath) {
+							await window.StorageService.clearFileSubmissionStatus(
+								repoInfo.owner,
+								repoInfo.repo,
+								this.state.filePath
+							);
+						}
+					}
+				} catch (e) { /* noop */ }
+
 				this.updateSaveButtonState();
 			});
 		}
@@ -570,9 +611,139 @@ class EditorPage extends BasePage {
 	 * @returns {void}
 	 */
 	handleSubmitReview() {
-		console.log('提交审核功能');
-		// TODO: 实现提交审核逻辑
-		alert(this.t('editor.submitNotImplemented', '提交审核功能暂未实现'));
+		// 包一层立即执行的异步函数，避免更改对外API签名
+		(async () => {
+			try {
+				// 基础校验
+				const user = this.state.user;
+				const repoInfo = this.state.repoInfo || (user && user.repositoryInfo);
+				const filePath = this.state.filePath;
+				if (!user || !user.token) {
+					alert(this.t('editor.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
+					return;
+				}
+				if (!repoInfo || !repoInfo.owner || !repoInfo.repo) {
+					alert(this.t('editor.errors.repositoryInfoUnavailable', '仓库信息不可用'));
+					return;
+				}
+				if (!filePath) {
+					alert(this.t('editor.errors.filePathMissing', '文件路径缺失'));
+					return;
+				}
+
+				// 禁用提交按钮，防止重复点击
+				const submitBtn = this.element && this.element.querySelector('#submitBtn');
+				if (submitBtn) {
+					submitBtn.disabled = true;
+					submitBtn.textContent = '⏳ ' + this.t('editor.submitting', '正在提交...');
+				}
+
+				// 初始化 Octokit
+				const octokit = new window.Octokit({ auth: user.token });
+
+				// 获取仓库信息，确认默认分支
+				const { data: repo } = await octokit.rest.repos.get({ owner: repoInfo.owner, repo: repoInfo.repo });
+				const defaultBranch = repo.default_branch || 'main';
+
+				// 获取默认分支最新提交SHA
+				const { data: baseRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${defaultBranch}` });
+				const baseSha = baseRef.object.sha;
+
+				// 目标分支命名：spcp/<username>
+				const safeUser = (user.login || user.username || 'user').replace(/[^a-zA-Z0-9-_]/g, '-');
+				const branchName = `spcp/${safeUser}`;
+
+				// 尝试读取目标分支，不存在则创建
+				let branchExists = true;
+				try {
+					await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${branchName}` });
+				} catch (err) {
+					if (err && err.status === 404) {
+						branchExists = false;
+					} else {
+						throw err;
+					}
+				}
+
+				if (!branchExists) {
+					await octokit.rest.git.createRef({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						ref: `refs/heads/${branchName}`,
+						sha: baseSha
+					});
+				} else {
+					// 分支已存在：可选地快进到最新基线（避免落后）
+					await octokit.rest.git.updateRef({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						ref: `heads/${branchName}`,
+						sha: baseSha,
+						force: true
+					});
+				}
+
+				// 读取目标分支上的文件，若存在需要sha以便更新
+				let existingSha = undefined;
+				try {
+					const { data: existing } = await octokit.rest.repos.getContent({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						path: filePath,
+						ref: branchName
+					});
+					if (existing && !Array.isArray(existing) && existing.sha) {
+						existingSha = existing.sha;
+					}
+				} catch (err) {
+					// 404 表示文件不存在于该分支，忽略
+					if (!(err && err.status === 404)) {
+						throw err;
+					}
+				}
+
+				// 将当前内容以 Base64 提交
+				const content = this.state.content || '';
+				const base64Content = btoa(unescape(encodeURIComponent(content)));
+				const commitMessage = this.t('editor.commitMessage', '通过SPCP更新文件：') + (this.state.fileName || this.state.filePath || '文件');
+
+				await octokit.rest.repos.createOrUpdateFileContents({
+					owner: repoInfo.owner,
+					repo: repoInfo.repo,
+					path: filePath,
+					message: commitMessage,
+					content: base64Content,
+					branch: branchName,
+					sha: existingSha
+				});
+
+				// 提交成功，提示并更新状态（标记已提交以隐藏提交按钮）
+				this.setState({ isModified: false, hasSubmitted: true });
+				this.updateSaveButtonState();
+
+				// 持久化提交状态到StorageService
+				try {
+					if (window.StorageService) {
+						await window.StorageService.setFileSubmissionStatus(
+							repoInfo.owner,
+							repoInfo.repo,
+							filePath,
+							true
+						);
+					}
+				} catch (e) {
+					console.error('保存提交状态失败:', e);
+				}
+			} catch (error) {
+				console.error('提交审核失败:', error);
+			} finally {
+				const submitBtnFinal = this.element && this.element.querySelector('#submitBtn');
+				if (submitBtnFinal) {
+					submitBtnFinal.disabled = false;
+					submitBtnFinal.textContent = this.t('editor.submitReview', '📤 提交审核');
+				}
+			}
+		})();
 	}
 
 	/**
@@ -596,6 +767,9 @@ class EditorPage extends BasePage {
 			if (window.StorageService) {
 				await window.StorageService.initDB();
 
+				// 计算文件大小（UTF-8字节数）
+				const fileSize = new Blob([content]).size;
+
 				// 只保存到localWorkspace（编辑后的文件）
 				await window.StorageService._execute('localWorkspace', 'put', {
 					path: this.state.filePath,
@@ -604,7 +778,9 @@ class EditorPage extends BasePage {
 					created: new Date().toISOString(),
 					modified: new Date().toISOString(),
 					isLocal: true,
-					isModified: true
+					isModified: true,
+					size: fileSize, // 使用UTF-8字节数
+					type: 'file' // 添加文件类型
 				});
 
 				// 更新状态
@@ -657,6 +833,20 @@ class EditorPage extends BasePage {
 			saveBtn.disabled = !this.state.isModified;
 			saveBtn.textContent = this.state.isModified ? '💾 保存*' : '💾 保存';
 		}
+
+		// 同时更新提交按钮的显示
+		this.updateSubmitButtonState();
+	}
+
+	/**
+	 * 更新提交按钮状态
+	 * @returns {void}
+	 */
+	updateSubmitButtonState() {
+		const submitBtn = this.element.querySelector('#submitBtn');
+		if (submitBtn) {
+			submitBtn.style.display = (this.state.isModified || this.state.hasSubmitted) ? 'none' : 'inline-block';
+		}
 	}
 
 	/**
@@ -689,6 +879,8 @@ class EditorPage extends BasePage {
 		const editorPanel = this.element.querySelector('#editorPanel');
 		const previewPanel = this.element.querySelector('#previewPanel');
 		const previewBtn = this.element.querySelector('#previewBtn');
+		const editor = this.element.querySelector('#markdownEditor');
+		const saveBtn = this.element.querySelector('#saveBtn');
 
 		if (editorPanel) {
 			editorPanel.style.display = previewMode ? 'none' : 'block';
@@ -702,6 +894,20 @@ class EditorPage extends BasePage {
 			previewBtn.textContent = previewMode ? '✏️ 编辑' : '👁 预览';
 			previewBtn.classList.toggle('active', previewMode);
 		}
+
+		// 更新编辑器readonly状态
+		if (editor) {
+			// 如果是viewMode='view'且是预览模式，才设置为readonly
+			editor.readOnly = this.state.viewMode === 'view' && previewMode;
+		}
+
+		// 更新保存按钮的显示/隐藏
+		if (saveBtn) {
+			saveBtn.style.display = previewMode ? 'none' : 'inline-block';
+		}
+
+		// 更新保存按钮和提交按钮的状态
+		this.updateSaveButtonState();
 
 		// 如果切换到预览模式，更新预览内容
 		if (previewMode) {

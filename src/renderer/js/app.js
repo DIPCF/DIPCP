@@ -337,31 +337,29 @@ class SPCPApp {
 				...pageProps,
 				filePath: queryParams.file || '',
 				fileName: queryParams.file ? queryParams.file.split('/').pop() : '',
-				mode: queryParams.mode || 'edit'
+				mode: queryParams.mode || 'view'
 			};
 		}
 
 		this.currentPage = new PageClass(pageProps);
 
-		// 渲染页面
-		await this.currentPage.render(fullPath);
-
-		// 挂载到DOM
-		this.mountPage();
+		// 挂载到DOM（mount方法内部会调用render，并传递fullPath参数）
+		this.mountPage(fullPath);
 	}
 
 	/**
 	 * 挂载页面到DOM
 	 * 将当前页面组件挂载到应用容器中
+	 * @param {string} fullPath - 完整路径
 	 * @returns {void}
 	 */
-	mountPage() {
+	mountPage(fullPath) {
 		const appContainer = document.getElementById('app');
 		if (appContainer && this.currentPage) {
 			// 清空容器
 			appContainer.innerHTML = '';
-			// 挂载页面组件
-			this.currentPage.mount(appContainer);
+			// 挂载页面组件，传递fullPath参数
+			this.currentPage.mount(appContainer, fullPath);
 		}
 	}
 

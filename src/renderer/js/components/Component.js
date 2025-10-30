@@ -21,9 +21,10 @@ class Component {
 	/**
 	 * 挂载组件到DOM
 	 * @param {HTMLElement} container - 挂载容器
+	 * @param {any} path - 路径参数（可选）
 	 */
-	mount(container) {
-		this.element = this.render();
+	mount(container, path = null) {
+		this.element = path ? this.render(path) : this.render();
 		if (container) {
 			container.appendChild(this.element);
 		}

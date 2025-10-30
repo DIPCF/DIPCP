@@ -429,6 +429,8 @@
 		"saveFailed": "保存失败",
 		"submitSuccess": "提交审核成功",
 		"submitFailed": "提交审核失败",
+		"submitting": "正在提交...",
+		"commitMessage": "通过SPCP更新文件：",
 		"submitNotImplemented": "提交审核功能暂未实现",
 		"saveNotImplemented": "保存文件功能暂未实现",
 		"image": {
@@ -467,7 +469,10 @@
 			"fileModifiedConfirm": "文件已修改，是否先保存再提交？",
 			"submitReviewInDevelopment": "提交审核功能开发中...",
 			"unsavedChangesConfirm": "您有未保存的更改，确定要离开吗？",
-			"unsavedChangesSaveConfirm": "您有未保存的更改，是否保存？"
+			"unsavedChangesSaveConfirm": "您有未保存的更改，是否保存？",
+			"userNotLoggedInOrTokenUnavailable": "用户未登录或访问令牌不可用",
+			"repositoryInfoUnavailable": "仓库信息不可用",
+			"filePathMissing": "文件路径缺失"
 		},
 		"ui": {
 			"startWriting": "开始编写内容...",

@@ -429,6 +429,8 @@
 		"saveFailed": "保存に失敗しました",
 		"submitSuccess": "レビューが正常に送信されました",
 		"submitFailed": "レビュー送信に失敗しました",
+		"submitting": "送信中...",
+		"commitMessage": "SPCP経由でファイルを更新：",
 		"submitNotImplemented": "レビュー送信機能は実装されていません",
 		"saveNotImplemented": "ファイル保存機能は実装されていません",
 		"image": {
@@ -467,7 +469,10 @@
 			"fileModifiedConfirm": "ファイルが変更されています。送信前に保存しますか？",
 			"submitReviewInDevelopment": "レビュー送信機能は開発中です...",
 			"unsavedChangesConfirm": "保存されていない変更があります。本当に離れますか？",
-			"unsavedChangesSaveConfirm": "保存されていない変更があります。保存しますか？"
+			"unsavedChangesSaveConfirm": "保存されていない変更があります。保存しますか？",
+			"userNotLoggedInOrTokenUnavailable": "ユーザーがログインしていないか、アクセストークンが利用できません",
+			"repositoryInfoUnavailable": "リポジトリ情報が利用できません",
+			"filePathMissing": "ファイルパスがありません"
 		},
 		"ui": {
 			"startWriting": "コンテンツの記述を開始...",
@@ -1251,7 +1256,7 @@
 			"nameLabel": "リポジトリ名",
 			"namePlaceholder": "英数字、100文字以内",
 			"descriptionLabel": "リポジトリ説明",
-			"descriptionPlaceholder": "リポジトリの簡単な説明、350文字以内",
+			"descriptionPlaceholder": "リポジトリの簡単な説明、350文字以内"
 		},
 		"continue": {
 			"button": "続行",

@@ -74,11 +74,12 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {string} 面包屑HTML字符串
 	 */
 	renderBreadcrumb() {
+		console.log('🔵 [ProjectDetailPage] renderBreadcrumb开始执行, state:', this.state);
 		return `
             <div class="breadcrumb-container">
                 <div class="breadcrumb">
                     <span class="breadcrumb-item">
-                        📁 <span id="projectTitle">${this.state.project?.name || this.t('common.loading', '载入中...')}</span>
+                        📁 <span id="projectTitle">${this.state.user.repositoryInfo?.owner}/${this.state.user.repositoryInfo?.repo}</span>
                     </span>
                 </div>
                 <div class="dropdown">
@@ -577,8 +578,8 @@ class ProjectDetailPage extends BasePage {
 				// 文件
 				const localIcon = item.isLocal ? '🏠' : '';
 
-				// 格式化文件大小
-				const fileSize = item.size ? this.formatFileSize(item.size) : '-';
+				// 格式化文件大小（0也合法，只有undefined/null才显示-）
+				const fileSize = item.size != null ? this.formatFileSize(item.size) : '-';
 
 				// 格式化创建时间（包含日期和时间）
 				const createdTime = item.created ? new Date(item.created).toLocaleString('zh-CN', {
@@ -972,12 +973,6 @@ class ProjectDetailPage extends BasePage {
 	 */
 	updateProjectInfoDOM(project) {
 		if (!this.element) return;
-
-		// 更新项目标题
-		const projectTitle = this.element.querySelector('#projectTitle');
-		if (projectTitle && project?.name) {
-			projectTitle.textContent = project.name;
-		}
 
 		// 更新项目信息卡片中的各个字段
 		const creator = this.element.querySelector('#creator');
@@ -1686,7 +1681,8 @@ class ProjectDetailPage extends BasePage {
 						isLocal: true,
 						content: '', // 空内容
 						created: new Date().toISOString(),
-						modified: new Date().toISOString()
+						modified: new Date().toISOString(),
+						size: 0 // 空文件大小为0
 					};
 
 					// 保存到IndexedDB - 只保存到localWorkspace
@@ -1700,7 +1696,9 @@ class ProjectDetailPage extends BasePage {
 							sha: '', // 新文件没有SHA
 							created: newFile.created,
 							modified: newFile.modified,
-							isLocal: true
+							isLocal: true,
+							size: 0, // 空文件大小为0
+							type: 'file' // 添加文件类型
 						});
 					}
 
@@ -2221,14 +2219,8 @@ class ProjectDetailPage extends BasePage {
 		const fileName = file.name || file.path.split('/').pop();
 
 		// 检查文件类型
-		if (this.isEditableFile(fileName)) {
-			// 可编辑文件，跳转到编辑器页面
-			const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=edit`;
-			if (window.app && window.app.navigateTo) {
-				window.app.navigateTo(editorUrl);
-			}
-		} else if (this.isViewableFile(fileName)) {
-			// 图像文件，跳转到查看模式
+		if (this.isEditableFile(fileName) || this.isViewableFile(fileName)) {
+			// 可编辑或查看文件，跳转到查看模式
 			const editorUrl = `/editor?file=${encodeURIComponent(file.path)}&mode=view`;
 			if (window.app && window.app.navigateTo) {
 				window.app.navigateTo(editorUrl);
