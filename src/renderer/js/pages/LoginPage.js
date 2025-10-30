@@ -112,7 +112,6 @@ class LoginPage extends BasePage {
 
 		return `
             <div class="form-group">
-                <label for="language-select">${this.t('login.language')}</label>
                 <select id="language-select" aria-label="选择语言">
                     ${options}
                 </select>
@@ -127,7 +126,6 @@ class LoginPage extends BasePage {
 	renderFormGroups() {
 		return `
             <div class="form-group">
-                <label for="github-username">${this.t('login.githubUsername')}</label>
                 <div class="input-with-help">
                     <input type="text" id="github-username" 
                         placeholder="${this.t('login.placeholders.githubUsername')}" 
@@ -137,7 +135,6 @@ class LoginPage extends BasePage {
             </div>
 
             <div class="form-group">
-                <label for="access-token">${this.t('login.accessToken')}</label>
                 <div class="input-with-help">
                     <input type="password" id="access-token" 
                         placeholder="${this.t('login.placeholders.accessToken')}" 

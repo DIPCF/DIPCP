@@ -69,17 +69,13 @@
 		"feature2": "✅ Zero Learning Cost, Download and Use",
 		"feature3": "✅ Zero Barrier, Only GitHub Account Required",
 		"feature4": "✅ Completely Transparent, Fully Traceable",
-		"language": "Language",
-		"githubUsername": "GitHub Username",
 		"repositoryUrl": "Repository URL",
 		"loginButton": "Login",
 		"loggingIn": "Logging in...",
 		"placeholders": {
-			"githubUsername": "Enter your GitHub username",
-			"repositoryUrl": "https://github.com/username/repository",
-			"accessToken": "Enter your GitHub Personal Access Token"
+			"githubUsername": "GitHub username",
+			"accessToken": "GitHub Access Token (not password!)"
 		},
-		"accessToken": "GitHub Access Token (not password!)",
 		"howToRegister": "How to Register",
 		"howToGetToken": "How to Get Token",
 		"registerHelpTitle": "How to Register a GitHub Account",
