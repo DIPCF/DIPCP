@@ -9,7 +9,7 @@
 
 ```bash
 # 全局所有者 - 组织管理员
-* @Zela-Foundation/owners
+* @DIPCF/owners
 ```
 #### 创建 `.github/workflows/cla-submission-simplified.yml` 文件：
 将cla-submission-simplified.yml中的内容复制粘贴。
@@ -17,12 +17,12 @@
 
 ### 2. 分支保护规则设置
 
-#### 在 `Zela-Foundation/Projects` 仓库中设置：
+#### 在 `DIPCF/Projects` 仓库中设置：
 
 > **注意**：以下设置选项与GitHub实际界面完全对应，请按照界面中的确切选项名称进行配置。
 
 1. **进入仓库设置**
-   - 访问 `https://github.com/Zela-Foundation/Projects/settings`
+   - 访问 `https://github.com/DIPCF/Projects/settings`
    - 点击左侧菜单 "Branches"
 
 2. **添加分支保护规则**
@@ -51,7 +51,7 @@
    ```
    ✅ Restrict who can push to matching branches
      指定允许推送到匹配分支的人员、团队或应用
-     - 建议只允许 @Zela-Foundation/owners 团队
+     - 建议只允许 @DIPCF/owners 团队
      - 或者使用 GitHub App/Bot 账户
    ```
 

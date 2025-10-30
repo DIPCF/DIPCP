@@ -15,7 +15,7 @@ class RepositorySelectionPage extends BasePage {
 		this.state = {
 			language: window.I18nService ? window.I18nService.currentLanguage : 'zh-CN',
 			formData: {
-				repositoryUrl: 'https://github.com/Zela-Foundation/SPCP',
+				repositoryUrl: 'https://github.com/DIPCF/SPCP',
 				newRepoName: '',
 				newRepoDescription: ''
 			},
@@ -95,7 +95,7 @@ class RepositorySelectionPage extends BasePage {
 
 		try {
 			// 从 GitHub raw 内容 URL 获取文件
-			const url = 'https://raw.githubusercontent.com/Zela-Foundation/Projects/main/Projects.json';
+			const url = 'https://raw.githubusercontent.com/DIPCF/Projects/main/Projects.json';
 			const response = await fetch(url);
 
 			if (!response.ok) {
@@ -1283,26 +1283,15 @@ ${this.state.userInfo.username},1000,1000
 			// 角色定义文件
 			{
 				path: '.github/reviewers.txt',
-				content: `# ${this.t('login.files.roles.reviewers.title')}
-# ${this.t('login.files.roles.reviewers.format')}
-
-`
+				content: `${this.state.userInfo.username}\n`
 			},
 			{
 				path: '.github/maintainers.txt',
-				content: `# ${this.t('login.files.roles.maintainers.title')}
-# ${this.t('login.files.roles.maintainers.format')}
-
-`
+				content: `${this.state.userInfo.username}\n`
 			},
 			{
 				path: '.github/directors.txt',
-				content: `# ${this.t('login.files.roles.directors.title')}
-# ${this.t('login.files.roles.directors.format')}
-
-${this.state.userInfo.username}
-
-`
+				content: `${this.state.userInfo.username}\n`
 			}
 		];
 

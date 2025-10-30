@@ -262,7 +262,7 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 
 			console.log('🔵 [signCLA] 创建CLA提交Issue...');
 			const { data: issue } = await octokit.rest.issues.create({
-				owner: 'Zela-Foundation',
+				owner: 'DIPCF',
 				repo: 'Projects',
 				title: issueTitle,
 				body: issueBody

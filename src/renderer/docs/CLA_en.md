@@ -1,6 +1,6 @@
-# Harmony Individual Contributor License Agreement
+# DIPCF Individual Contributor License Agreement
 
-Thank you for your interest in contributing to **[PROJECT_NAME]** ("We" or "Us").
+Thank you for your interest in contributing to Decentralized Intellectual Property Collaboration Foundation.
 
 This contributor agreement ("Agreement") documents the rights granted by contributors to Us. To make this document effective, please sign it and send it to Us by mail, email, fax, or electronic submission. This is a legally binding document, so please read it carefully before agreeing to it. The Agreement may cover more than one software project managed by Us.
 
@@ -124,21 +124,11 @@ If any provision of this Agreement is found void and unenforceable, such provisi
 
 ## Signature
 
-### You
-
-________________________  
-**Name:** ________________________  
-**Address:** ________________________  
-________________________
-
 ### Us
-
+DIPCF
 ________________________  
 **Name:** ________________________  
 **Title:** ________________________  
 **Address:** ________________________
 
 ---
-
-**Harmony Individual Contributor License Agreement (HA-CLA-I)**  
-Version 1.0 | July 4, 2011
