@@ -66,6 +66,7 @@ class DashboardPage extends BasePage {
 			<div class="content">
 				${this.renderWelcome()}
 				${this.renderApplicationSection()}
+				${this.renderUserRoles()}
 				${this.renderStatsGrid()}
 				${this.renderRecentActivity()}
 			</div>
@@ -90,7 +91,7 @@ class DashboardPage extends BasePage {
 		return `
             <div class="welcome">
                 <h2>${this.t('dashboard.welcome', '欢迎使用 DIPCP！')}</h2>
-                <p>${this.t('dashboard.subtitle', '无服务器项目贡献平台')}</p>
+                <p>${this.t('dashboard.subtitle', '去中心化IP协作平台')}</p>
             </div>
         `;
 	}
@@ -101,15 +102,19 @@ class DashboardPage extends BasePage {
 	 * @returns {string} 申请区域HTML字符串
 	 */
 	renderApplicationSection() {
-		// 只有访客用户显示申请区域
-		if (this.state.userRole === 'visitor') {
+		// 检查是否是访客用户（没有实际角色）
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+		const actualRoles = userRoles.filter(role => role !== 'visitor');
+
+		// 只有没有实际角色的用户才显示申请区域
+		if (actualRoles.length === 0) {
 			return `
 				<div class="application-section">
 					<div class="application-card">
 						<div class="application-icon">🤝</div>
 						<div class="application-content">
 							<h3>${this.t('dashboard.application.title', '成为贡献者')}</h3>
-							<p>${this.t('dashboard.application.description', '申请成为项目贡献者，参与代码开发和项目维护。')}</p>
+							<p>${this.t('dashboard.application.description', '申请成为项目贡献者，参与内容创作和项目维护。')}</p>
 							<button id="apply-contribution-btn" class="btn btn-primary">
 								${this.t('dashboard.application.applyButton', '申请成为贡献者')}
 							</button>
@@ -147,24 +152,51 @@ class DashboardPage extends BasePage {
 	}
 
 	/**
+	 * 渲染用户角色展示区域
+	 * @returns {string} 用户角色展示区域HTML字符串
+	 */
+	renderUserRoles() {
+		const userAvatar = this.getCachedUserAvatar();
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+
+		// 过滤掉visitor角色，只显示实际角色
+		const actualRoles = userRoles.filter(role => role !== 'visitor');
+
+		if (actualRoles.length === 0) {
+			return ''; // 如果没有任何实际角色，不显示此区域
+		}
+
+		const roleBadges = actualRoles.map(role => {
+			const roleInfo = this.getRoleInfo(role);
+			return `<span class="role-badge ${roleInfo.className}">${roleInfo.displayName}</span>`;
+		}).join('');
+
+		return `
+            <div class="user-roles-section">
+                <div class="user-roles-card">
+                    <div class="user-avatar">
+                        <div class="stat-icon role-icon" style="background-image: url('${userAvatar}'); background-size: cover; background-position: center;">
+                            ${userAvatar.startsWith('http') ? '' : userAvatar}
+                        </div>
+                    </div>
+                    <div class="user-roles-content">
+                        <h3>${this.state.user.username}</h3>
+                        <div class="user-roles-badges">
+                            ${roleBadges}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+	}
+
+	/**
 	 * 渲染统计网格
 	 * @returns {string} 统计网格HTML字符串
 	 */
 	renderStatsGrid() {
-		const roleInfo = this.getUserRoleInfo();
-		const userAvatar = this.getCachedUserAvatar();
-
 		return `
             <div class="stats-grid">
-                <div class="stat-card user-role-card">
-                    <div class="stat-icon role-icon" style="background-image: url('${userAvatar}'); background-size: cover; background-position: center;">
-                        ${userAvatar.startsWith('http') ? '' : userAvatar}
-                    </div>
-                    <div class="stat-content role-content">
-                        <h3>${this.t('dashboard.userRole.title', '用户身份')}</h3>
-                        <p class="stat-number role-badge ${roleInfo.className}">${roleInfo.displayName}</p>
-                    </div>
-                </div>
                 <div class="stat-card">
                     <div class="stat-icon">📊</div>
                     <div class="stat-content">
@@ -198,40 +230,48 @@ class DashboardPage extends BasePage {
 	}
 
 	/**
-	 * 获取用户身份信息
+	 * 获取角色信息
+	 * @param {string} role - 角色名称
 	 * @returns {Object} 包含显示名称和CSS类名的角色信息对象
 	 */
-	getUserRoleInfo() {
-		const role = this.state.userRole || 'visitor';
-
+	getRoleInfo(role) {
 		const roleMap = {
 			'owner': {
-				displayName: this.t('dashboard.userRole.owner', '所有者'),
+				displayName: '💼' + this.t('dashboard.userRole.owner', '所有者'),
 				className: 'role-owner'
 			},
 			'director': {
-				displayName: this.t('dashboard.userRole.director', '理事'),
+				displayName: '👑' + this.t('dashboard.userRole.director', '理事'),
 				className: 'role-director'
 			},
 			'reviewer': {
-				displayName: this.t('dashboard.userRole.reviewer', '审核委员'),
+				displayName: '✨' + this.t('dashboard.userRole.reviewer', '审核委员'),
 				className: 'role-reviewer'
 			},
 			'maintainer': {
-				displayName: this.t('dashboard.userRole.maintainer', '维护者'),
+				displayName: '📝' + this.t('dashboard.userRole.maintainer', '维护者'),
 				className: 'role-maintainer'
 			},
 			'collaborator': {
-				displayName: this.t('dashboard.userRole.collaborator', '贡献者'),
+				displayName: '🖋' + this.t('dashboard.userRole.collaborator', '贡献者'),
 				className: 'role-collaborator'
 			},
 			'visitor': {
-				displayName: this.t('dashboard.userRole.visitor', '访客'),
+				displayName: '👤' + this.t('dashboard.userRole.visitor', '访客'),
 				className: 'role-visitor'
 			}
 		};
 
 		return roleMap[role] || roleMap['visitor'];
+	}
+
+	/**
+	 * 获取用户身份信息（向后兼容）
+	 * @returns {Object} 包含显示名称和CSS类名的角色信息对象
+	 */
+	getUserRoleInfo() {
+		const role = this.state.userRole || 'visitor';
+		return this.getRoleInfo(role);
 	}
 
 	/**
@@ -612,17 +652,34 @@ class DashboardPage extends BasePage {
 	updateUserToCollaborator() {
 		// 更新组件状态
 		this.setState({
-			userRole: 'collaborator'
+			userRole: 'collaborator',
+			permissionInfo: {
+				roles: ['collaborator'],
+				hasPermission: true
+			}
 		});
 
 		// 更新localStorage中的用户信息
 		const userData = localStorage.getItem('dipcp-user');
 		if (userData) {
 			const user = JSON.parse(userData);
-			user.permissionInfo = user.permissionInfo || {};
-			user.permissionInfo.role = 'collaborator';
+			user.permissionInfo = {
+				roles: ['collaborator'],
+				hasPermission: true
+			};
 			localStorage.setItem('dipcp-user', JSON.stringify(user));
 		}
+
+		// 更新app.js的状态
+		if (window.app) {
+			window.app.state.userRole = 'collaborator';
+			window.app.state.userRoles = ['collaborator'];
+			window.app.state.permissionInfo = {
+				roles: ['collaborator'],
+				hasPermission: true
+			};
+		}
+
 		this.updateUserRoleDisplay();
 	}
 

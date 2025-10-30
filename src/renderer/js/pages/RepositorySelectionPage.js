@@ -327,7 +327,12 @@ class RepositorySelectionPage extends BasePage {
 
 		return `
             <div class="repository-history">
-                <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                <div class="repository-history-header">
+                    <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                    <button class="refresh-btn" id="refresh-projects-btn" title="${this.t('common.refresh', '刷新')}">
+                        <span class="refresh-icon">🔄</span>
+                    </button>
+                </div>
                 <div class="history-list">
                     ${projectItems}
                 </div>
@@ -493,6 +498,14 @@ class RepositorySelectionPage extends BasePage {
 			});
 		}
 
+		// 刷新项目列表按钮
+		const refreshBtn = this.element.querySelector('#refresh-projects-btn');
+		if (refreshBtn) {
+			refreshBtn.addEventListener('click', () => {
+				this.loadProjectsList(true); // 强制重新加载
+			});
+		}
+
 		// 继续按钮
 		const continueBtn = this.element.querySelector('#continue-btn');
 		if (continueBtn) {
@@ -654,7 +667,8 @@ class RepositorySelectionPage extends BasePage {
 		this.updateUserInfo(repoInfo, permissionInfo);
 
 		// 检查是否需要签署CLA和设置仓库
-		if (permissionInfo.role === 'owner') {
+		const roles = permissionInfo.roles || (permissionInfo.role ? [permissionInfo.role] : ['visitor']);
+		if (roles.includes('owner')) {
 			await this.showCLAAgreement(repoInfo, this.state.userInfo, async () => {
 				// CLA签署成功后的回调：执行仓库设置
 				// 从localStorage获取CLA签署时间
@@ -739,7 +753,11 @@ class RepositorySelectionPage extends BasePage {
 
 				// 更新用户信息
 				console.log('🔵 [CLA Callback] 更新用户信息...');
-				this.updateUserInfo(repoInfo, { role: 'owner', hasPermission: true });
+				// 仓库创建者拥有所有5种角色
+				this.updateUserInfo(repoInfo, {
+					roles: ['owner', 'director', 'reviewer', 'maintainer', 'collaborator'],
+					hasPermission: true
+				});
 
 				// 执行仓库设置，传入CLA签署时间
 				await this.setupRepository(repoInfo.owner, repoInfo.repo, this.state.userInfo.token, claSignedTime);
@@ -766,10 +784,10 @@ class RepositorySelectionPage extends BasePage {
 			throw new Error(this.t('repositorySelection.errors.repoNameTooLong', '仓库名称长度不能超过100个字符'));
 		}
 
-		// 检查是否只包含英文和数字
-		const validNameRegex = /^[a-zA-Z0-9]+$/;
+		// 检查是否只包含英文、数字、下划线和连字符
+		const validNameRegex = /^[a-zA-Z0-9_-]+$/;
 		if (!validNameRegex.test(name)) {
-			throw new Error(this.t('repositorySelection.errors.repoNameInvalid', '仓库名称只能包含英文字母和数字'));
+			throw new Error(this.t('repositorySelection.errors.repoNameInvalid', '仓库名称只能包含英文字母、数字、下划线和连字符'));
 		}
 
 		// 检查是否为空
@@ -998,11 +1016,21 @@ class RepositorySelectionPage extends BasePage {
 	 * @param {Object} permissionInfo - 权限信息
 	 */
 	updateUserInfo(repoInfo, permissionInfo) {
+		// 支持多重角色，兼容旧格式
+		const roles = permissionInfo.roles || (permissionInfo.role ? [permissionInfo.role] : ['visitor']);
+		const hasPermission = roles.includes('visitor') ? false : true;
+
+		const updatedPermissionInfo = {
+			...permissionInfo,
+			roles: roles,
+			hasPermission: hasPermission
+		};
+
 		const updatedUserInfo = {
 			...this.state.userInfo,
 			repositoryUrl: `https://github.com/${repoInfo.owner}/${repoInfo.repo}`,
 			repositoryInfo: repoInfo,
-			permissionInfo: permissionInfo
+			permissionInfo: updatedPermissionInfo
 		};
 
 		this.state.userInfo = updatedUserInfo;
@@ -1012,8 +1040,9 @@ class RepositorySelectionPage extends BasePage {
 		if (window.app) {
 			window.app.state.user = updatedUserInfo;
 			window.app.state.isAuthenticated = true;
-			window.app.state.userRole = permissionInfo.role;
-			window.app.state.permissionInfo = permissionInfo;
+			window.app.state.userRoles = roles;
+			window.app.state.userRole = roles[0] || 'visitor'; // 保持向后兼容
+			window.app.state.permissionInfo = updatedPermissionInfo;
 		}
 	}
 
@@ -1219,43 +1248,12 @@ class RepositorySelectionPage extends BasePage {
 		console.log('📅 [setupInitialFiles] 使用仓库创建时间:', time);
 
 		// 1. CODEOWNERS文件
-		const codeOwners = `# ${this.t('login.files.codeowners.title')}
-# ${this.t('login.files.codeowners.description')}
-
-# ${this.t('login.files.codeowners.protectPoint')}
-.github/POINT/ @${owner}/reviewers
-
-# ${this.t('login.files.codeowners.protectRoles')}
+		const codeOwners = `.github/POINT/ @${owner}/reviewers
 .github/reviewers.txt @${owner}/administrators
 .github/maintainers.txt @${owner}/administrators
 .github/directors.txt @${owner}/administrators
-
-# ${this.t('login.files.codeowners.protectCodeowners')}
 .github/CODEOWNERS @${owner}/administrators
-
-# ${this.t('login.files.codeowners.protectWorkflows')}
 .github/workflows/ @${owner}/administrators
-`;
-
-		// 2. POINT系统文件
-		const pointReadme = `# ${this.t('login.files.pointReadme.title')}
-
-${this.t('login.files.pointReadme.description')}
-
-## ${this.t('login.files.pointReadme.protected')}
-
-${this.t('login.files.pointReadme.protectedDesc')}
-
-## ${this.t('login.files.pointReadme.structure')}
-
-- ${this.t('login.files.pointReadme.userFile')}
-- ${this.t('login.files.pointReadme.overviewFile')}
-
-## ${this.t('login.files.pointReadme.permissions')}
-
-- **${this.t('login.files.pointReadme.reviewer')}**
-- **${this.t('login.files.pointReadme.maintainer')}**
-- **${this.t('login.files.pointReadme.contributor')}**
 `;
 
 		// 3. 收集所有需要创建的文件
@@ -1266,10 +1264,6 @@ ${this.t('login.files.pointReadme.protectedDesc')}
 				content: codeOwners
 			},
 			// POINT目录文件
-			{
-				path: '.github/POINT/README.md',
-				content: pointReadme
-			},
 			{
 				path: `.github/POINT/${this.state.userInfo.username}.json`,
 				content: `[{"time":"${time}","HP":1000,"RP":1000,"points":1000,"reviewers":"${this.state.userInfo.username}","reason":"创建仓库"}]`

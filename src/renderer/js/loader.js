@@ -189,6 +189,7 @@ class DynamicLoader {
 				'js/pages/EditorPage.js',
 				'js/pages/SettingsPage.js',
 				'js/pages/ReviewsPage.js',
+				'js/pages/MaintainersPage.js',
 				'js/pages/IssuesPage.js',
 				'js/pages/TermsPage.js',
 				'js/pages/PrivacyPage.js',

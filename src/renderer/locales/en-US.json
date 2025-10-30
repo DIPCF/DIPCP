@@ -56,6 +56,7 @@
 		"dashboard": "Dashboard",
 		"projectDetail": "Project Detail",
 		"reviews": "Reviews",
+		"maintainers": "Maintainers",
 		"discussions": "Discussions",
 		"issues": "Issues",
 		"settings": "Settings"
@@ -66,7 +67,7 @@
 		"subtitle": "Decentralized Intellectual Property Collaboration Platform",
 		"whyChoose": "Why Choose DIPCP?",
 		"feature1": "✅ Zero Ops Cost, No Server Required",
-		"feature2": "✅ Zero Learning Cost, Download and Use",
+		"feature2": "✅ Zero Learning Cost, Open and Use",
 		"feature3": "✅ Zero Barrier, Only GitHub Account Required",
 		"feature4": "✅ Completely Transparent, Fully Traceable",
 		"repositoryUrl": "Repository URL",
@@ -144,46 +145,6 @@
 			"discussions": "Enabling Discussions...",
 			"discussionsAlreadyEnabled": "Discussions already enabled, skipping...",
 			"allSettingsComplete": "Repository settings complete, skipping initialization..."
-		},
-		"files": {
-			"codeowners": {
-				"title": "CODEOWNERS file - For protecting sensitive files and directories",
-				"description": "This file defines protected files and directories. Modifications require CODEOWNERS review",
-				"protectPoint": "Protect POINT directory, only reviewers can modify (for points management)",
-				"protectRoles": "Protect role definition files, only owners can modify",
-				"protectCodeowners": "Protect CODEOWNERS itself, prevent malicious modification",
-				"protectWorkflows": "Protect Actions workflows, only owners can modify"
-			},
-			"pointReadme": {
-				"title": "POINT Directory",
-				"description": "This directory stores user contribution points data",
-				"protected": "Protection Notice",
-				"protectedDesc": "This directory is protected by CODEOWNERS, only reviewers can modify",
-				"structure": "File Structure",
-				"userFile": "`.github/POINT/username.json` - Personal points detailed records",
-				"overviewFile": "`.github/POINT/points.csv` - Points overview table",
-				"permissions": "Permission Description",
-				"reviewer": "Reviewers: Have write permission to POINT directory for granting points",
-				"maintainer": "Maintainers: Read-only permission, cannot modify points files",
-				"contributor": "Contributors: Read-only permission, can view own points"
-			},
-			"roles": {
-				"reviewers": {
-					"title": "Reviewers List",
-					"format": "Format: One GitHub username per line",
-					"description": "Reviewers role definition file"
-				},
-				"maintainers": {
-					"title": "Maintainers List",
-					"format": "Format: One GitHub username per line",
-					"description": "Maintainers role definition file"
-				},
-				"directors": {
-					"title": "Directors List (Owners)",
-					"format": "Format: One GitHub username per line",
-					"description": "Directors role definition file"
-				}
-			}
 		},
 		"teams": {
 			"administrators": {
@@ -536,6 +497,30 @@
 			"comment": "Add comment functionality not implemented"
 		}
 	},
+	"maintainers": {
+		"title": "Maintainers Page",
+		"subtitle": "Manage and maintain project content",
+		"pendingMaintainers": "Pending Maintenance",
+		"maintained": "Maintained",
+		"approved": "Approved",
+		"rejected": "Rejected",
+		"totalMaintainers": "Total Maintenance",
+		"maintainerList": "Maintainer List",
+		"maintainer": "Maintainer",
+		"maintainTime": "Maintain Time",
+		"maintainComment": "Maintain Comment",
+		"approve": "Approve",
+		"reject": "Reject",
+		"viewDetails": "View Details",
+		"maintainSuccess": "Maintenance completed",
+		"maintainFailed": "Maintenance failed",
+		"noMaintainers": "No maintenance available",
+		"notImplemented": {
+			"approve": "Approve functionality not implemented",
+			"reject": "Reject functionality not implemented",
+			"comment": "Add comment functionality not implemented"
+		}
+	},
 	"settings": {
 		"title": "Settings",
 		"language": "Language Settings",
@@ -605,18 +590,12 @@
 		"noActivity": "No recent activity",
 		"application": {
 			"title": "Become a Contributor",
-			"description": "Apply to become a project contributor and participate in code development and project maintenance.",
+			"description": "Apply to become a project contributor and participate in content creation and project maintenance.",
 			"applyButton": "Apply to Contribute",
 			"pendingTitle": "Application Submitted",
 			"pendingMessage": "Your contributor application is under review, please wait patiently.",
 			"checkStatusButton": "Check Review Status",
 			"modalTitle": "Apply to Become a Contributor",
-			"reasonLabel": "Application Reason (Optional)",
-			"reasonPlaceholder": "Please briefly explain why you want to participate in the project and your plans...",
-			"submitButton": "Submit Application",
-			"submitting": "Submitting...",
-			"submitSuccess": "Application submitted successfully! Please wait for review.",
-			"error": "Failed to submit application:",
 			"reviewing": {
 				"title": "Under Review",
 				"message": "Your application is being processed, it will take about 1 minute...",

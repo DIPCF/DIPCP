@@ -56,6 +56,7 @@
 		"dashboard": "ダッシュボード",
 		"projectDetail": "プロジェクト詳細",
 		"reviews": "レビュー",
+		"maintainers": "メンテナー",
 		"discussions": "討論",
 		"issues": "問題",
 		"settings": "設定"
@@ -66,7 +67,7 @@
 		"subtitle": "分散化IP協作プラットフォーム",
 		"whyChoose": "なぜDIPCPを選ぶのか？",
 		"feature1": "✅ ゼロ運用コスト、サーバー不要",
-		"feature2": "✅ ゼロ学習コスト、ダウンロードして使用",
+		"feature2": "✅ ゼロ学習コスト、開いて使用",
 		"feature3": "✅ ゼロ障壁、GitHubアカウントのみ必要",
 		"feature4": "✅ 完全透明、完全追跡可能",
 		"githubUsername": "GitHubユーザー名",
@@ -144,46 +145,6 @@
 			"discussions": "Discussionsを有効化中...",
 			"discussionsAlreadyEnabled": "Discussionsは既に有効です、スキップ中...",
 			"allSettingsComplete": "リポジトリ設定が完了しました、初期化をスキップ中..."
-		},
-		"files": {
-			"codeowners": {
-				"title": "CODEOWNERSファイル - 機密ファイルとディレクトリの保護用",
-				"description": "このファイルは保護されたファイルとディレクトリを定義します。変更にはCODEOWNERSレビューが必要です",
-				"protectPoint": "POINTディレクトリを保護、レビュアーのみが変更可能（ポイント管理用）",
-				"protectRoles": "ロール定義ファイルを保護、所有者のみが変更可能",
-				"protectCodeowners": "CODEOWNERS自体を保護、悪意のある変更を防止",
-				"protectWorkflows": "Actionsワークフローを保護、所有者のみが変更可能"
-			},
-			"pointReadme": {
-				"title": "POINTディレクトリ",
-				"description": "このディレクトリはユーザー貢献ポイントデータを保存します",
-				"protected": "保護通知",
-				"protectedDesc": "このディレクトリはCODEOWNERSで保護されており、レビュアーのみが変更できます",
-				"structure": "ファイル構造",
-				"userFile": "`.github/POINT/ユーザー名.json` - 個人ポイント詳細記録",
-				"overviewFile": "`.github/POINT/points.csv` - ポイント一覧表",
-				"permissions": "権限説明",
-				"reviewer": "レビュアー: POINTディレクトリへの書き込み権限を持ち、ポイント付与が可能",
-				"maintainer": "メインテナー: 読み取り専用権限、ポイントファイルを変更できません",
-				"contributor": "貢献者: 読み取り専用権限、自分のポイントを表示できます"
-			},
-			"roles": {
-				"reviewers": {
-					"title": "レビュアーリスト",
-					"format": "形式：1行に1つのGitHubユーザー名",
-					"description": "レビュアーロール定義ファイル"
-				},
-				"maintainers": {
-					"title": "メインテナーリスト",
-					"format": "形式：1行に1つのGitHubユーザー名",
-					"description": "メインテナーロール定義ファイル"
-				},
-				"directors": {
-					"title": "理事リスト（所有者）",
-					"format": "形式：1行に1つのGitHubユーザー名",
-					"description": "理事ロール定義ファイル"
-				}
-			}
 		},
 		"teams": {
 			"administrators": {
@@ -536,6 +497,30 @@
 			"comment": "コメント追加機能は実装されていません"
 		}
 	},
+	"maintainers": {
+		"title": "メンテナンスページ",
+		"subtitle": "プロジェクトコンテンツの管理とメンテナンス",
+		"pendingMaintainers": "保留中のメンテナンス",
+		"maintained": "メンテナンス済み",
+		"approved": "承認済み",
+		"rejected": "却下済み",
+		"totalMaintainers": "総メンテナンス数",
+		"maintainerList": "メンテナンスリスト",
+		"maintainer": "メンテナー",
+		"maintainTime": "メンテナンス時間",
+		"maintainComment": "メンテナンスコメント",
+		"approve": "承認",
+		"reject": "却下",
+		"viewDetails": "詳細表示",
+		"maintainSuccess": "メンテナンス完了",
+		"maintainFailed": "メンテナンスに失敗しました",
+		"noMaintainers": "メンテナンスが利用できません",
+		"notImplemented": {
+			"approve": "承認機能は実装されていません",
+			"reject": "却下機能は実装されていません",
+			"comment": "コメント追加機能は実装されていません"
+		}
+	},
 	"settings": {
 		"title": "設定",
 		"language": "言語設定",
@@ -605,18 +590,11 @@
 		"noActivity": "最近のアクティビティがありません",
 		"application": {
 			"title": "貢献者になる",
-			"description": "プロジェクト貢献者に応募し、コード開発とプロジェクトメンテナンスに参加します。",
+			"description": "プロジェクト貢献者に応募し、コンテンツ制作とプロジェクトメンテナンスに参加します。",
 			"applyButton": "貢献に応募",
 			"pendingTitle": "応募済み",
 			"pendingMessage": "貢献者応募が審査中です。お待ちください。",
 			"checkStatusButton": "審査状況を確認",
-			"modalTitle": "貢献者になるための応募",
-			"reasonLabel": "応募理由（任意）",
-			"reasonPlaceholder": "プロジェクトに参加したい理由と計画を簡単に説明してください...",
-			"submitButton": "応募を送信",
-			"submitting": "送信中...",
-			"submitSuccess": "応募が正常に送信されました！審査をお待ちください。",
-			"error": "応募の送信に失敗しました:",
 			"reviewing": {
 				"title": "審査中",
 				"message": "応募を処理中です。約1分かかります...",

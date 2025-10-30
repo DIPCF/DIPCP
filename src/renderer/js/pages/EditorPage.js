@@ -24,14 +24,18 @@ class EditorPage extends BasePage {
 		const viewMode = props.mode || 'view';
 		const initialPreviewMode = viewMode === 'view';
 
+		const filePath = props.filePath || '';
+		const readonly = this.isGithubProtectedFile(filePath);
+
 		this.state = {
-			filePath: props.filePath || '',
+			filePath: filePath,
 			fileName: props.fileName || '',
 			content: props.content || '',
 			isModified: false,
 			hasSubmitted: false, // 将在loadFileContent中异步加载
-			previewMode: initialPreviewMode,
-			viewMode: viewMode, // 'edit' 或 'view'
+			previewMode: initialPreviewMode || readonly, // .github 文件强制预览模式
+			viewMode: readonly ? 'view' : viewMode, // .github 文件强制 view 模式
+			readonly: readonly, // 是否只读
 			showInfoPanel: false,
 			infoPanelContent: null,
 			projectName: props.projectName || 'DIPCP',
@@ -42,6 +46,17 @@ class EditorPage extends BasePage {
 			// 功能模块状态缓存
 			moduleStates: this.loadModuleStates()
 		};
+	}
+
+	/**
+	 * 检查是否是 .github 目录中的受保护文件
+	 * @param {string} filePath - 文件路径
+	 * @returns {boolean} 是否是受保护文件
+	 */
+	isGithubProtectedFile(filePath) {
+		if (!filePath) return false;
+		// 检查路径是否以 .github/ 开头
+		return filePath.startsWith('.github/') || filePath.startsWith('/.github/');
 	}
 
 	/**
@@ -264,6 +279,11 @@ class EditorPage extends BasePage {
 	 * @returns {string} 工具栏HTML字符串
 	 */
 	renderToolbar(getText) {
+		// 如果是 .github 目录中的文件，不显示保存和提交按钮
+		if (this.state.readonly) {
+			return '';
+		}
+
 		return `
             <div class="editor-toolbar">
                 <div class="editor-toolbar-left">
@@ -507,6 +527,10 @@ class EditorPage extends BasePage {
 		const previewBtn = this.element.querySelector('#previewBtn');
 		if (previewBtn) {
 			previewBtn.addEventListener('click', () => {
+				// 如果是只读文件，不允许切换编辑模式
+				if (this.state.readonly) {
+					return;
+				}
 				this.togglePreview();
 			});
 		}
@@ -972,7 +996,13 @@ class EditorPage extends BasePage {
 	 * @returns {void}
 	 */
 	setFilePath(filePath) {
-		this.setState({ filePath });
+		const readonly = this.isGithubProtectedFile(filePath);
+		this.setState({
+			filePath,
+			readonly,
+			previewMode: readonly || this.state.previewMode, // .github 文件强制预览模式
+			viewMode: readonly ? 'view' : this.state.viewMode // .github 文件强制 view 模式
+		});
 		// 文件路径变化时，需要重新加载内容
 		this.loadFileContent();
 	}

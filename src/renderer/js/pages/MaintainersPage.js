@@ -1,13 +1,13 @@
 /**
- * 审核页面组件
- * 完全组件化的审核页面
+ * 维护页面组件
+ * 完全组件化的维护页面
  */
-class ReviewsPage extends BasePage {
+class MaintainersPage extends BasePage {
 	constructor(props = {}) {
 		super(props);
 		this.state = {
-			reviews: props.reviews || [],
-			selectedReview: null,
+			maintainers: props.maintainers || [],
+			selectedMaintainer: null,
 			loading: true,
 		};
 	}
@@ -18,68 +18,54 @@ class ReviewsPage extends BasePage {
 		container.innerHTML = `
 			${this.renderHeader()}
 			<div class="content">
-				${this.renderReviewsList()}
-				${this.renderReviewDetail()}
+				${this.renderMaintainersList()}
+				${this.renderMaintainerDetail()}
 			</div>
 		`;
 		return container;
 	}
 
 	renderHeader() {
-		return super.renderHeader('reviews', false, null);
+		return super.renderHeader('maintainers', false, null);
 	}
 
-	renderReviewsList() {
+	renderMaintainersList() {
 		return `
-            <div class="reviews-list">
-                <h2 data-i18n="reviews.pendingReviews">待审核内容</h2>
-                <div class="reviews-grid">
-                    ${this.renderReviewItems()}
+            <div class="maintainers-list">
+                <h2 data-i18n="maintainers.pendingMaintainers">待维护内容</h2>
+                <div class="maintainers-grid">
+                    ${this.renderMaintainerItems()}
                 </div>
             </div>
         `;
 	}
 
-	renderReviewItems() {
+	renderMaintainerItems() {
 		if (this.state.loading) {
 			return '<div class="loading">载入中...</div>';
 		}
 
-		if (this.state.reviews.length === 0) {
-			return '<div class="empty">暂无待审核内容</div>';
+		if (this.state.maintainers.length === 0) {
+			return '<div class="empty">暂无待维护内容</div>';
 		}
 
-		return this.state.reviews.map(review => `
-            <div class="review-item ${review.id === this.state.selectedReview?.id ? 'selected' : ''}" 
-                 data-review-id="${review.id}">
-                <div class="review-header">
-                    <h3 class="review-title">${review.title}</h3>
-                    <span class="review-status status-${review.status}">${review.status}</span>
+		return this.state.maintainers.map(maintainer => `
+            <div class="maintainer-item ${maintainer.id === this.state.selectedMaintainer?.id ? 'selected' : ''}" 
+                 data-maintainer-id="${maintainer.id}">
+                <div class="maintainer-header">
+                    <h3 class="maintainer-title">${maintainer.title}</h3>
+                    <span class="maintainer-status status-${maintainer.status}">${maintainer.status}</span>
                 </div>
-                <div class="review-meta">
-                    <span class="review-author">作者: ${review.author}</span>
-                    <span class="review-date">${review.date}</span>
-                </div>
-                <div class="review-preview">
-                    ${review.preview}
-                </div>
-                <div class="review-actions">
-                    <button class="btn btn-sm btn-success" data-action="approve" data-review-id="${review.id}">
-                        ✅ 通过
-                    </button>
-                    <button class="btn btn-sm btn-danger" data-action="reject" data-review-id="${review.id}">
-                        ❌ 拒绝
-                    </button>
-                    <button class="btn btn-sm btn-primary" data-action="view" data-review-id="${review.id}">
+                <div class="maintainer-actions">
+                    <button class="btn btn-sm btn-primary" data-action="view" data-maintainer-id="${maintainer.id}">
                         👁 查看
                     </button>
                 </div>
             </div>
         `).join('');
 	}
-
-	renderReviewDetail() {
-		if (!this.state.selectedReview) {
+	renderMaintainerDetail() {
+		if (!this.state.selectedMaintainer) {
 			return `
                 <div class="review-detail">
                     <div class="empty-detail">
@@ -89,12 +75,12 @@ class ReviewsPage extends BasePage {
             `;
 		}
 
-		const review = this.state.selectedReview;
+		const maintainer = this.state.selectedMaintainer;
 		return `
-            <div class="review-detail">
-                <div class="review-detail-header">
-                    <h2>${review.title}</h2>
-                    <div class="review-detail-actions">
+            <div class="maintainer-detail">
+                <div class="maintainer-detail-header">
+                    <h2>${maintainer.title}</h2>
+                    <div class="maintainer-detail-actions">
                         <button class="btn btn-success" data-action="approve-detail">
                             ✅ 通过审核
                         </button>
@@ -103,31 +89,31 @@ class ReviewsPage extends BasePage {
                         </button>
                     </div>
                 </div>
-                <div class="review-detail-content">
-                    <div class="review-info">
+                <div class="maintainer-detail-content">
+                    <div class="maintainer-info">
                         <div class="info-item">
                             <label>作者:</label>
-                            <span>${review.author}</span>
+                            <span>${maintainer.author}</span>
                         </div>
                         <div class="info-item">
                             <label>提交时间:</label>
-                            <span>${review.date}</span>
+                            <span>${maintainer.date}</span>
                         </div>
                         <div class="info-item">
                             <label>状态:</label>
-                            <span class="status status-${review.status}">${review.status}</span>
+                            <span class="status status-${maintainer.status}">${maintainer.status}</span>
                         </div>
                     </div>
-                    <div class="review-content">
+                    <div class="maintainer-content">
                         <h3>内容预览</h3>
                         <div class="content-preview">
-                            ${review.content}
+                            ${maintainer.content}
                         </div>
                     </div>
-                    <div class="review-comments">
+                    <div class="maintainer-comments">
                         <h3>评论</h3>
                         <div class="comments-list">
-                            ${this.renderComments(review.comments || [])}
+                            ${this.renderComments(maintainer.comments || [])}
                         </div>
                         <div class="comment-form">
                             <textarea placeholder="添加评论..." id="commentText"></textarea>
@@ -191,15 +177,15 @@ class ReviewsPage extends BasePage {
 				}
 			});
 		});
-		// 审核项目点击
-		const reviewItems = this.element.querySelectorAll('.review-item');
-		reviewItems.forEach(item => {
+		// 维护项目点击
+		const maintainerItems = this.element.querySelectorAll('.maintainer-item');
+		maintainerItems.forEach(item => {
 			item.addEventListener('click', (e) => {
-				const reviewId = e.currentTarget.dataset.reviewId;
-				const review = this.state.reviews.find(r => r.id === reviewId);
+				const maintainerId = e.currentTarget.dataset.maintainerId;
+				const maintainer = this.state.maintainers.find(m => m.id === maintainerId);
 
-				if (review) {
-					this.setState({ selectedReview: review });
+				if (maintainer) {
+					this.setState({ selectedMaintainer: maintainer });
 					this.update();
 				}
 			});
@@ -211,9 +197,9 @@ class ReviewsPage extends BasePage {
 			btn.addEventListener('click', (e) => {
 				e.stopPropagation();
 				const action = e.currentTarget.dataset.action;
-				const reviewId = e.currentTarget.dataset.reviewId;
+				const maintainerId = e.currentTarget.dataset.maintainerId;
 
-				this.handleAction(action, reviewId);
+				this.handleAction(action, maintainerId);
 			});
 		});
 
@@ -226,22 +212,22 @@ class ReviewsPage extends BasePage {
 		}
 	}
 
-	handleAction(action, reviewId) {
-		const review = this.state.reviews.find(r => r.id === reviewId) || this.state.selectedReview;
+	handleAction(action, maintainerId) {
+		const maintainer = this.state.maintainers.find(m => m.id === maintainerId) || this.state.selectedMaintainer;
 
-		if (!review) return;
+		if (!maintainer) return;
 
 		switch (action) {
 			case 'approve':
 			case 'approve-detail':
-				this.handleApprove(review);
+				this.handleApprove(maintainer);
 				break;
 			case 'reject':
 			case 'reject-detail':
-				this.handleReject(review);
+				this.handleReject(maintainer);
 				break;
 			case 'view':
-				this.setState({ selectedReview: review });
+				this.setState({ selectedMaintainer: maintainer });
 				this.update();
 				break;
 		}
@@ -257,32 +243,32 @@ class ReviewsPage extends BasePage {
 			content: commentText.value.trim()
 		};
 
-		this.handleComment(this.state.selectedReview, comment);
+		this.handleComment(this.state.selectedMaintainer, comment);
 
 		commentText.value = '';
 	}
 
-	updateReviews(reviews) {
-		this.setState({ reviews });
+	updateMaintainers(maintainers) {
+		this.setState({ maintainers });
 		this.update();
 	}
 
-	handleApprove(review) {
-		console.log('审核通过', review);
+	handleApprove(maintainer) {
+		console.log('维护通过', maintainer);
 		// TODO: 实现审核通过逻辑
-		alert(this.t('reviews.notImplemented.approve', '审核通过功能暂未实现'));
+		alert(this.t('maintainers.notImplemented.approve', '维护通过功能暂未实现'));
 	}
 
-	handleReject(review) {
-		console.log('审核拒绝', review);
+	handleReject(maintainer) {
+		console.log('维护拒绝', maintainer);
 		// TODO: 实现审核拒绝逻辑
-		alert(this.t('reviews.notImplemented.reject', '审核拒绝功能暂未实现'));
+		alert(this.t('maintainers.notImplemented.reject', '维护拒绝功能暂未实现'));
 	}
 
-	handleComment(review, comment) {
-		console.log('添加评论', review, comment);
+	handleComment(maintainer, comment) {
+		console.log('添加评论', maintainer, comment);
 		// TODO: 实现添加评论逻辑
-		alert(this.t('reviews.notImplemented.comment', '添加评论功能暂未实现'));
+		alert(this.t('maintainers.notImplemented.comment', '添加评论功能暂未实现'));
 	}
 
 	setLoading(loading) {
@@ -290,11 +276,11 @@ class ReviewsPage extends BasePage {
 		this.update();
 	}
 
-	selectReview(review) {
-		this.setState({ selectedReview: review });
+	selectMaintainer(maintainer) {
+		this.setState({ selectedMaintainer: maintainer });
 		this.update();
 	}
 }
 
 // 注册组件
-window.ReviewsPage = ReviewsPage;
+window.MaintainersPage = MaintainersPage;

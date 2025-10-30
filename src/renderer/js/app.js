@@ -77,31 +77,39 @@ class DIPCPApp {
 
 	/**
 	 * 从localStorage获取用户信息
-	 * @returns {Object} 包含user、userRole、permissionInfo的对象
+	 * @returns {Object} 包含user、userRoles、permissionInfo的对象
 	 */
 	getUserFromStorage() {
 		try {
 			const userData = localStorage.getItem('dipcp-user');
 			if (userData) {
 				const user = JSON.parse(userData);
+				// 支持多重角色，从单一role转为roles数组
+				const permissionInfo = user.permissionInfo || {};
+				const roles = permissionInfo.roles || (permissionInfo.role ? [permissionInfo.role] : ['visitor']);
+				const hasPermission = roles.includes('visitor') ? false : true;
+
 				return {
 					user: user,
-					userRole: user.permissionInfo?.role || 'visitor',
-					permissionInfo: user.permissionInfo || { role: 'visitor', hasPermission: false }
+					userRoles: roles,
+					userRole: roles[0] || 'visitor', // 保持向后兼容，返回第一个角色
+					permissionInfo: { ...permissionInfo, roles, hasPermission }
 				};
 			} else {
 				return {
 					user: null,
+					userRoles: ['visitor'],
 					userRole: 'visitor',
-					permissionInfo: { role: 'visitor', hasPermission: false }
+					permissionInfo: { roles: ['visitor'], hasPermission: false }
 				};
 			}
 		} catch (error) {
 			console.error('Error getting user from storage:', error);
 			return {
 				user: null,
+				userRoles: ['visitor'],
 				userRole: 'visitor',
-				permissionInfo: { role: 'visitor', hasPermission: false }
+				permissionInfo: { roles: ['visitor'], hasPermission: false }
 			};
 		}
 	}
@@ -116,6 +124,7 @@ class DIPCPApp {
 		const userInfo = this.getUserFromStorage();
 		this.state.user = userInfo.user;
 		this.state.isAuthenticated = !!userInfo.user;
+		this.state.userRoles = userInfo.userRoles;
 		this.state.userRole = userInfo.userRole;
 		this.state.permissionInfo = userInfo.permissionInfo;
 	}
@@ -134,6 +143,7 @@ class DIPCPApp {
 		this.routes.set('/project-detail', 'ProjectDetailPage');
 		this.routes.set('/editor', 'EditorPage');
 		this.routes.set('/reviews', 'ReviewsPage');
+		this.routes.set('/maintainers', 'MaintainersPage');
 		this.routes.set('/issues', 'IssuesPage');
 		this.routes.set('/settings', 'SettingsPage');
 		this.routes.set('/terms', 'TermsPage');

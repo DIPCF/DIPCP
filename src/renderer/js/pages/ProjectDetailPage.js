@@ -1294,6 +1294,61 @@ class ProjectDetailPage extends BasePage {
 	}
 
 	/**
+	 * 为成员列表添加角色信息
+	 * @async
+	 * @param {Array} contributors - 贡献者列表
+	 * @returns {Promise<Array>} 包含角色信息的贡献者列表
+	 */
+	async enrichContributorsWithRoles(contributors) {
+		// 定义角色文件
+		const roleFiles = [
+			{ path: '.github/directors.txt', role: 'director' },
+			{ path: '.github/reviewers.txt', role: 'reviewer' },
+			{ path: '.github/maintainers.txt', role: 'maintainer' }
+		];
+
+		// 从IndexedDB读取角色文件，构建用户名到角色的映射
+		const userRolesMap = new Map();
+
+		for (const { path, role } of roleFiles) {
+			try {
+				const fileContent = await window.StorageService._execute('fileCache', 'get', path);
+				if (fileContent && fileContent.content) {
+					const lines = fileContent.content.split('\n');
+					for (const line of lines) {
+						const trimmedLine = line.trim();
+						// 跳过注释和空行
+						if (trimmedLine && !trimmedLine.startsWith('#')) {
+							const username = trimmedLine.toLowerCase();
+							if (!userRolesMap.has(username)) {
+								userRolesMap.set(username, []);
+							}
+							userRolesMap.get(username).push(role);
+						}
+					}
+				}
+			} catch (error) {
+				// 文件不存在或读取失败，继续处理下一个文件
+				console.log(`无法读取角色文件 ${path}:`, error.message);
+			}
+		}
+
+		// 为每个成员添加角色信息
+		return contributors.map(contributor => {
+			const username = contributor.login?.toLowerCase() || '';
+			const roles = userRolesMap.get(username) || [];
+
+			// 所有项目成员必定是collaborator，然后可能还有其他角色
+			const allRoles = roles.length > 0 ? ['collaborator', ...roles] : ['collaborator'];
+
+			return {
+				...contributor,
+				roles: allRoles
+			};
+		});
+	}
+
+	/**
 	 * 切换成员信息显示状态
 	 * @returns {void}
 	 */
@@ -1330,8 +1385,10 @@ class ProjectDetailPage extends BasePage {
 		if (!forceRefresh) {
 			const cachedMembers = await this.loadMembersCache();
 			if (cachedMembers) {
-				this.setState({ membersCache: cachedMembers });
-				const content = this.renderContributorsList(cachedMembers);
+				// 为缓存数据添加角色信息
+				const enrichedMembers = await this.enrichContributorsWithRoles(cachedMembers);
+				this.setState({ membersCache: enrichedMembers });
+				const content = this.renderContributorsList(enrichedMembers);
 				this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
 
 				// 绑定成员卡片点击事件
@@ -1372,7 +1429,7 @@ class ProjectDetailPage extends BasePage {
 
 			// 访客用户使用listContributors，其他用户使用listCollaborators
 			let contributors;
-			if (user.permissionInfo?.role === 'visitor') {
+			if (user.permissionInfo?.roles?.includes('visitor') || !user.permissionInfo?.roles?.length) {
 				// 访客用户使用listContributors API（不需要特殊权限）
 				const { data: contributorsData } = await octokit.rest.repos.listContributors({
 					owner: repoInfo.owner, repo: repoInfo.repo
@@ -1385,6 +1442,9 @@ class ProjectDetailPage extends BasePage {
 				});
 				contributors = collaboratorsData;
 			}
+
+			// 为每个成员添加角色信息（从角色文件中读取）
+			contributors = await this.enrichContributorsWithRoles(contributors);
 
 			// 缓存数据到IndexedDB
 			await this.saveMembersCache(contributors);
@@ -1453,11 +1513,12 @@ class ProjectDetailPage extends BasePage {
 		const contributorsHtml = contributors.map(contributor => {
 			const avatar = contributor.avatar_url || '👤';
 			const name = contributor.login || 'Unknown';
-			// listContributors 没有 permissions 字段，所以需要根据数据结构判断
-			const role = contributor.permissions?.admin ? 'admin' :
-				contributor.permissions?.push ? 'collaborator' :
-					contributor.type === 'User' ? 'contributor' : 'read';
-			const roleInfo = this.getRoleInfo(role);
+			// 获取角色的图标
+			const roles = contributor.roles || [];
+			const roleIcons = roles.map(role => {
+				const roleInfo = this.getRoleInfo(role);
+				return roleInfo.displayName;
+			}).join(' ');
 
 			return `
 				<div class="stat-card contributor-card" data-username="${name}" style="cursor: pointer;">
@@ -1466,7 +1527,7 @@ class ProjectDetailPage extends BasePage {
 					</div>
 					<div class="stat-content">
 						<h3>${name}</h3>
-						<p class="stat-number role-badge ${roleInfo.className}">${roleInfo.displayName}</p>
+						<p class="stat-number">${roleIcons}</p>
 					</div>
 				</div>
 			`;
@@ -1510,36 +1571,16 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {Object} 角色信息对象
 	 */
 	getRoleInfo(role) {
-		const roleInfo = {
-			'owner': {
-				displayName: this.t('projectDetail.roleOwner', '所有者'),
-				className: 'role-owner'
-			},
-			'director': {
-				displayName: this.t('projectDetail.roleDirector', '理事'),
-				className: 'role-director'
-			},
-			'maintainer': {
-				displayName: this.t('projectDetail.roleMaintainer', '维护者'),
-				className: 'role-maintainer'
-			},
-			'reviewer': {
-				displayName: this.t('projectDetail.roleReviewer', '审核委员'),
-				className: 'role-reviewer'
-			},
-			'collaborator': {
-				displayName: this.t('projectDetail.roleCollaborator', '协作者'),
-				className: 'role-collaborator'
-			},
-			'visitor': {
-				displayName: this.t('projectDetail.roleVisitor', '访客'),
-				className: 'role-visitor'
-			}
+		const roleIcons = {
+			'owner': '💼',
+			'director': '👑',
+			'maintainer': '📝',
+			'reviewer': '✨',
+			'collaborator': '🖋',
+			'visitor': '👤'
 		};
-		return roleInfo[role] || {
-			displayName: this.t('projectDetail.roleUnknown', '未知'),
-			className: 'role-unknown'
-		};
+		const icon = roleIcons[role] || '❓';
+		return { displayName: icon };
 	}
 
 	/**

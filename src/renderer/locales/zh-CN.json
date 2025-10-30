@@ -56,6 +56,7 @@
 		"dashboard": "仪表盘",
 		"projectDetail": "项目详情",
 		"reviews": "审核",
+		"maintainers": "维护",
 		"discussions": "讨论",
 		"issues": "问题",
 		"settings": "设置"
@@ -66,7 +67,7 @@
 		"subtitle": "去中心化IP协作平台",
 		"whyChoose": "为什么选择 DIPCP？",
 		"feature1": "✅ 零运维成本，无需服务器",
-		"feature2": "✅ 零学习成本，下载即用",
+		"feature2": "✅ 零学习成本，打开即用",
 		"feature3": "✅ 零门槛参与，只需 GitHub 账号",
 		"feature4": "✅ 完全透明，全程可追溯",
 		"githubUsername": "GitHub用户名",
@@ -143,46 +144,6 @@
 			"discussions": "正在启用讨论...",
 			"discussionsAlreadyEnabled": "讨论功能已启用，跳过...",
 			"allSettingsComplete": "仓库设置已完成，跳过初始化..."
-		},
-		"files": {
-			"codeowners": {
-				"title": "代码所有者文件 - 用于保护敏感文件和目录",
-				"description": "此文件定义了受保护的文件和目录，修改这些文件必须通过代码所有者审查",
-				"protectPoint": "保护积分目录，只允许审核委员修改（用于积分管理）",
-				"protectRoles": "保护角色定义文件，只允许所有者修改",
-				"protectCodeowners": "保护代码所有者本身，防止被恶意修改",
-				"protectWorkflows": "保护工作流，只允许所有者修改"
-			},
-			"pointReadme": {
-				"title": "积分目录",
-				"description": "此目录用于存储用户贡献积分数据",
-				"protected": "受保护说明",
-				"protectedDesc": "此目录由代码所有者保护，只有审核委员可以修改",
-				"structure": "文件结构",
-				"userFile": "`.github/POINT/用户名.json` - 个人积分详细记录",
-				"overviewFile": "`.github/POINT/points.csv` - 积分总览表",
-				"permissions": "权限说明",
-				"reviewer": "审核委员: 拥有积分目录的写权限，用于赋分",
-				"maintainer": "维护者: 只有读权限，无法修改积分文件",
-				"contributor": "贡献者: 只有读权限，可以查看自己的积分"
-			},
-			"roles": {
-				"reviewers": {
-					"title": "审核委员列表",
-					"format": "格式：一行一个GitHub用户名",
-					"description": "审核委员角色定义文件"
-				},
-				"maintainers": {
-					"title": "维护者列表",
-					"format": "格式：一行一个GitHub用户名",
-					"description": "维护者角色定义文件"
-				},
-				"directors": {
-					"title": "理事列表（所有者）",
-					"format": "格式：一行一个GitHub用户名",
-					"description": "理事角色定义文件"
-				}
-			}
 		},
 		"teams": {
 			"administrators": {
@@ -537,6 +498,30 @@
 			"comment": "添加评论功能暂未实现"
 		}
 	},
+	"maintainers": {
+		"title": "维护页面",
+		"subtitle": "管理和维护项目内容",
+		"pendingMaintainers": "待维护",
+		"maintained": "已维护",
+		"approved": "已通过",
+		"rejected": "已拒绝",
+		"totalMaintainers": "总维护",
+		"maintainerList": "维护列表",
+		"maintainer": "维护员",
+		"maintainTime": "维护时间",
+		"maintainComment": "维护意见",
+		"approve": "通过",
+		"reject": "拒绝",
+		"viewDetails": "查看详情",
+		"maintainSuccess": "维护完成",
+		"maintainFailed": "维护失败",
+		"noMaintainers": "暂无维护内容",
+		"notImplemented": {
+			"approve": "维护通过功能暂未实现",
+			"reject": "维护拒绝功能暂未实现",
+			"comment": "添加评论功能暂未实现"
+		}
+	},
 	"settings": {
 		"title": "设置",
 		"language": "语言设置",
@@ -702,7 +687,7 @@
 		"noActivity": "暂无活动",
 		"application": {
 			"title": "成为贡献者",
-			"description": "申请成为项目贡献者，参与代码开发和项目维护。",
+			"description": "申请成为项目贡献者，参与内容创作和项目维护。",
 			"applyButton": "申请成为贡献者",
 			"waiting": {
 				"title": "申请已提交",
@@ -715,22 +700,9 @@
 				"message": "恭喜！您已成为项目协作者，现在可以参与项目开发了。",
 				"details": "Issue #{issueNumber} 已处理完成<br>您已获得协作者权限"
 			},
-			"manual": {
-				"title": "等待人工审核",
-				"message": "申请已提交，等待仓库管理员审核并发送协作者邀请...",
-				"details": "Issue #{issueNumber} 已创建<br>请耐心等待管理员处理您的申请",
-				"note": "审核结果将通过GitHub通知您"
-			},
 			"pendingTitle": "申请已提交",
 			"pendingMessage": "您的贡献者申请正在审核中，请耐心等待。",
 			"checkStatusButton": "确认审核状态",
-			"modalTitle": "申请成为贡献者",
-			"reasonLabel": "申请理由（可选）",
-			"reasonPlaceholder": "请简要说明您希望参与项目的原因和计划...",
-			"submitButton": "提交申请",
-			"submitting": "提交中...",
-			"submitSuccess": "申请已提交成功！请等待审核。",
-			"error": "提交申请失败：",
 			"reviewing": {
 				"title": "正在审核中",
 				"message": "您的申请正在处理中，大约需要1分钟...",

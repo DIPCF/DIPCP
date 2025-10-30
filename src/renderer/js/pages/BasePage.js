@@ -39,6 +39,37 @@ class BasePage extends Component {
 
 	// 渲染Header组件
 	renderHeader(currentPage = '', showUserInfo = false, user = null, onBack = null) {
+		// 获取用户权限信息
+		const userInfo = window.app ? window.app.getUserFromStorage() : null;
+		const userRoles = userInfo ? (userInfo.userRoles || [userInfo.userRole]) : ['visitor'];
+
+		// 基础导航项
+		const navigationItems = [
+			{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘') },
+			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情') }
+		];
+
+		// 只有具有审核权限的用户才显示审核菜单项
+		if (userRoles.includes('reviewer')) {
+			navigationItems.push(
+				{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核') },
+			);
+		}
+
+		// 只有具有维护权限的用户才显示维护菜单项
+		if (userRoles.includes('maintainer')) {
+			navigationItems.push(
+				{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护') },
+			);
+		}
+
+		// 添加讨论和设置菜单项
+		navigationItems.push(
+			{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题') },
+			{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论') },
+			{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置') }
+		);
+
 		// 使用Header组件
 		this.headerComponent = new window.Header({
 			title: 'DIPCP',
@@ -46,14 +77,7 @@ class BasePage extends Component {
 			user: user,
 			currentPage: currentPage,
 			onBack: onBack,
-			navigationItems: [
-				{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘') },
-				{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情') },
-				{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核') },
-				{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题') },
-				{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论') },
-				{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置') }
-			]
+			navigationItems: navigationItems
 		});
 
 		// 渲染Header组件并返回HTML字符串
@@ -153,6 +177,7 @@ class BasePage extends Component {
 			const response = await fetch(`/docs/${claFileName}`);
 			if (response.ok) {
 				const content = await response.text();
+				return content.replace(/\[PROJECT_NAME\]/g, 'DIPCP');
 			} else {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
