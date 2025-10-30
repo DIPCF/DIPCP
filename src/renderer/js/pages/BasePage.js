@@ -153,8 +153,6 @@ class BasePage extends Component {
 			const response = await fetch(`/docs/${claFileName}`);
 			if (response.ok) {
 				const content = await response.text();
-				// 替换项目名称占位符
-				return content.replace(/\[PROJECT_NAME\]/g, 'DIPCP');
 			} else {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}

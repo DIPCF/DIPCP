@@ -822,6 +822,11 @@ body {
 	margin-bottom: var(--spacing-6);
 }
 
+/* 登录页面的表单组需要更大的间距 */
+.login-form .form-group {
+	margin-bottom: var(--spacing-8);
+}
+
 .login-button-container {
 	margin-top: var(--spacing-8);
 }

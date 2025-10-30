@@ -160,6 +160,87 @@ class Component {
 
 		return element;
 	}
+
+	/**
+	 * 简单的Markdown转HTML转换器
+	 * 注意：这是一个简化版本，仅处理基本的Markdown语法
+	 * @param {string} markdown - Markdown文本
+	 * @returns {string} HTML文本
+	 */
+	markdownToHtml(markdown) {
+		if (!markdown) return '';
+
+		let html = markdown;
+
+		// 处理标题
+		html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+		html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+		html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+		// 处理粗体
+		html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+		// 处理斜体
+		html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+		// 处理链接
+		html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+		// 处理无序列表
+		html = html.replace(/^\- (.+)$/gim, '<li>$1</li>');
+
+		// 包裹列表项
+		let inList = false;
+		const lines = html.split('\n');
+		const processedLines = [];
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (line.trim().startsWith('<li>')) {
+				if (!inList) {
+					processedLines.push('<ul>');
+					inList = true;
+				}
+				processedLines.push(line);
+			} else {
+				if (inList) {
+					processedLines.push('</ul>');
+					inList = false;
+				}
+				processedLines.push(line);
+			}
+		}
+
+		if (inList) {
+			processedLines.push('</ul>');
+		}
+
+		html = processedLines.join('\n');
+
+		// 处理段落
+		const paragraphs = html.split('\n\n');
+		html = paragraphs
+			.filter(p => p.trim())
+			.map(p => {
+				// 如果已经是HTML标签，不添加<p>标签
+				if (p.trim().startsWith('<')) {
+					return p;
+				}
+				return `<p>${p}</p>`;
+			})
+			.join('\n');
+
+		// 处理水平线
+		html = html.replace(/^---$/gim, '<hr>');
+
+		// 处理代码块（简单处理）
+		html = html.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
+
+		// 处理行内代码
+		html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+		return html;
+	}
 }
 
 // 导出组件基类

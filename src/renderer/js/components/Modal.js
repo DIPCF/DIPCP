@@ -202,56 +202,6 @@ class Modal extends Component {
 		return modalElement;
 	}
 
-	/**
-	 * 渲染Markdown内容为HTML
-	 * @param {string} markdown - Markdown文本
-	 * @returns {string} HTML内容
-	 */
-	renderMarkdown(markdown) {
-		if (!markdown) return '';
-
-		// 首先压缩多个连续的空行为最多两个空行
-		let processed = markdown.replace(/\n{3,}/g, '\n\n');
-
-		// 简单的Markdown到HTML转换，不使用<p>标签，只用<br>
-		let html = processed
-			// 标题
-			.replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-			.replace(/^### (.*$)/gim, '<h3>$1</h3>')
-			.replace(/^## (.*$)/gim, '<h2>$1</h2>')
-			.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-			// 粗体
-			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-			.replace(/__(.*?)__/g, '<strong>$1</strong>')
-			// 斜体
-			.replace(/\*(.*?)\*/g, '<em>$1</em>')
-			.replace(/_(.*?)_/g, '<em>$1</em>')
-			// 水平线
-			.replace(/^---$/gim, '<hr>')
-			.replace(/^___$/gim, '<hr>')
-			.replace(/^\*\*\*$/gim, '<hr>')
-			// 列表
-			.replace(/^\* (.*$)/gim, '<li>$1</li>')
-			.replace(/^- (.*$)/gim, '<li>$1</li>')
-			.replace(/^(\d+)\. (.*$)/gim, '<li>$2</li>')
-			// 链接
-			.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-			// 代码块
-			.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-			.replace(/`([^`]+)`/g, '<code>$1</code>')
-			// 将换行转换为<br>，多个空行转换为多个<br>
-			.replace(/\n/g, '<br>');
-
-		// 处理列表
-		html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
-
-		// 合并多个连续的<br>标签为一个<br>
-		// 匹配：2个或更多连续的<br>标签（包括自闭合形式），标签之间可能有空白字符（包括换行符、制表符、空格等）
-		// 使用 (\s*<br\s*\/?>\s*)+ 匹配一个或多个"空白字符+<br>+空白字符"的组合，但只替换2个或更多的
-		html = html.replace(/(\s*<br\s*\/?>\s*){2,}/gi, '<br>');
-
-		return html;
-	}
 
 	/**
 	 * 渲染模态框主体内容
@@ -276,9 +226,9 @@ class Modal extends Component {
 						<div class="cla-message">
 							<p>${this.state.message}</p>
 						</div>
-						<div class="cla-agreement" id="cla-agreement-container">
-							<div class="cla-text" id="cla-markdown-content">${this.renderMarkdown(this.state.claContent)}</div>
-						</div>
+					<div class="cla-agreement" id="cla-agreement-container">
+						<div class="cla-text" id="cla-markdown-content">${this.markdownToHtml(this.state.claContent)}</div>
+					</div>
 						<div class="form-group">
 							<label for="modal-input">${this.state.inputLabel}</label>
 							<input
