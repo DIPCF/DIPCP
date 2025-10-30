@@ -73,267 +73,6 @@ class BasePage extends Component {
 	}
 
 	/**
-	 * 申请成为组织成员
-	 * @param {Object} userInfo - 用户信息
-	 * @param {string} applicationType - 申请类型 ('member' 或 'collaborator')
-	 * @param {Object} targetRepo - 目标仓库信息（可选）
-	 * @returns {Promise<Object>} 申请结果
-	 */
-	async applyMembership(userInfo, applicationType = 'member', targetRepo = null) {
-		try {
-			const application = await this.createMembershipApplication(
-				userInfo,
-				applicationType,
-				targetRepo
-			);
-			return application;
-		} catch (error) {
-			console.error('Error creating membership application:', error);
-			throw error;
-		}
-	}
-
-	/**
-	 * 创建成员申请
-	 * @param {Object} userInfo - 用户信息
-	 * @param {string} applicationType - 申请类型
-	 * @param {Object} targetRepo - 目标仓库信息
-	 * @returns {Promise<Object>} 申请结果
-	 */
-	async createMembershipApplication(userInfo, applicationType, targetRepo) {
-		try {
-			const octokit = new window.Octokit({ auth: userInfo.token });
-
-			let issueTitle, issueBody;
-
-			if (applicationType === 'member') {
-				// 申请成为组织成员
-				issueTitle = `Join Organization - ${userInfo.username}`;
-				issueBody = this.generateMemberApplicationBody(userInfo);
-			} else if (applicationType === 'collaborator') {
-				// 申请成为仓库协作者
-				issueTitle = `Become Collaborator - ${userInfo.username}`;
-				issueBody = this.generateCollaboratorApplicationBody(userInfo, targetRepo);
-			}
-
-			const { data } = await octokit.rest.issues.create({
-				owner: 'Zela-Foundation',
-				repo: 'Members',
-				title: issueTitle,
-				body: issueBody
-			});
-
-			return {
-				success: true,
-				applicationId: data.id,
-				issueNumber: data.number,
-				issueUrl: data.html_url
-			};
-		} catch (error) {
-			console.error('创建成员申请失败:', error);
-			return {
-				success: false,
-				error: error.message
-			};
-		}
-	}
-
-	/**
-	 * 生成组织成员申请内容
-	 * @param {Object} userInfo - 用户信息
-	 * @returns {string} 申请内容
-	 */
-	generateMemberApplicationBody(userInfo) {
-		return `# 组织成员申请
-
-**申请人信息：**
-- GitHub用户名：${userInfo.username}
-- 真实姓名：${userInfo.realName || '未提供'}
-- 邮箱：${userInfo.email || '未提供'}
-- 申请时间：${new Date().toLocaleString('zh-CN')}
-
-**申请原因：**
-申请成为Zela-Foundation组织的成员，以便参与项目开发和CLA签署流程。
-
-**CLA签署状态：**
-${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
-
----
-*此申请由SPCP系统自动生成*`;
-	}
-
-	/**
-	 * 生成仓库协作者申请内容
-	 * @param {Object} userInfo - 用户信息
-	 * @param {Object} targetRepo - 目标仓库信息
-	 * @returns {string} 申请内容
-	 */
-	generateCollaboratorApplicationBody(userInfo, targetRepo) {
-		return `# 仓库协作者申请
-
-**申请人信息：**
-- GitHub用户名：${userInfo.username}
-- 真实姓名：${userInfo.realName || '未提供'}
-- 邮箱：${userInfo.email || '未提供'}
-- 申请时间：${new Date().toLocaleString('zh-CN')}
-
-**目标仓库：**
-- 仓库：${targetRepo.owner}/${targetRepo.repo}
-- 仓库描述：${targetRepo.description || '未提供'}
-
-**申请原因：**
-申请成为目标仓库的协作者，以便参与项目开发和贡献。
-
-**CLA签署状态：**
-${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
-
----
-*此申请由SPCP系统自动生成*`;
-	}
-
-	/**
-	 * 轮询协作者邀请
-	 * @param {Object} user - 用户信息
-	 * @param {Object} repoInfo - 仓库信息（可选）
-	 * @returns {Promise<void>}
-	 */
-	async pollCollaboratorInvitation(user, repoInfo = null) {
-		const octokit = new window.Octokit({ auth: user.token });
-		const maxAttempts = 60; // 最多轮询60次，每次间隔5秒，总共5分钟
-		let attempts = 0;
-		const headers = {
-			'X-GitHub-Api-Version': '2022-11-28'
-		}
-
-		let acceptResult;
-		let firstAccept = false;
-
-		while (attempts < maxAttempts) {
-			try {
-				attempts++;
-				console.log(`第 ${attempts} 次检查协作者邀请...`);
-
-				// 使用 octokit.request 获取特定仓库的邀请列表
-				const response = await octokit.request('GET /user/repository_invitations', {
-					headers: headers
-				});
-
-				const invitations = response.data;
-
-				// 由于查询时已经限定了特定仓库，直接获取最新的邀请
-				const repoInvitation = invitations && invitations.length > 0 ? invitations[invitations.length - 1] : null;
-
-				if (repoInvitation) {
-					// 接受邀请 
-					console.log(`正在接受邀请 ID: ${repoInvitation.id}`);
-
-					try {
-						// 使用官方推荐的 octokit.request 方法
-						acceptResult = await octokit.request('PATCH /user/repository_invitations/{invitation_id}', {
-							invitation_id: repoInvitation.id,
-							headers: headers
-						});
-						if (acceptResult.status === 204) {
-							console.log('接受邀请成功，状态码:', acceptResult.status);
-							if (!firstAccept) {
-								// 不知道为什么第一次接受邀请后，需要再次提交申请，这里绝对是github的一个bug
-								firstAccept = true;
-								await new Promise(resolve => setTimeout(resolve, 60000));
-								await this.applyMembership(user, 'member');
-							} else {
-								// 开始轮询检查用户权限
-								if (repoInfo) {
-									// 如果有仓库信息，检查仓库协作者权限
-									await this.pollUserPermissions(user, 'repository', repoInfo);
-								} else {
-									// 否则检查组织成员权限
-									await this.pollUserPermissions(user, 'organization');
-								}
-								return;
-							}
-						}
-					} catch (acceptError) {
-						console.log('接受邀请失败:', acceptError.message);
-						throw acceptError;
-					}
-				} else {
-					console.log('暂无协作者邀请，继续等待...');
-				}
-
-				// 等待5秒后再次检查（除了最后一次）
-				if (attempts < maxAttempts) {
-					console.log('等待5秒后再次检查...');
-					await new Promise(resolve => setTimeout(resolve, 5000));
-				}
-
-			} catch (error) {
-				console.error('轮询协作者邀请时出错:', error);
-			}
-		}
-	}
-
-	/**
-	 * 轮询检查用户权限
-	 * @param {Object} user - 用户信息
-	 * @param {string} checkType - 检查类型 ('organization' 或 'repository')
-	 * @param {Object} repoInfo - 仓库信息（当checkType为'repository'时需要）
-	 * @returns {Promise<void>}
-	 */
-	async pollUserPermissions(user, checkType = 'organization', repoInfo = null) {
-		const octokit = new window.Octokit({ auth: user.token });
-		const maxAttempts = 30; // 最多轮询30次，每次间隔1秒，总共30秒
-		let attempts = 0;
-
-		console.log(`开始轮询检查用户权限 (${checkType})...`);
-
-		while (attempts < maxAttempts) {
-			try {
-				attempts++;
-
-				if (checkType === 'organization') {
-					// 检查用户是否已经是Zela-Foundation组织的成员
-					const orgResult = await octokit.rest.orgs.checkMembershipForUser({
-						org: 'Zela-Foundation',
-						username: user.username
-					});
-
-					console.log('用户组织成员状态:', orgResult.status);
-
-					if (orgResult.status === 204) {
-						// 用户已经是组织成员
-						this.onMembershipSuccess && this.onMembershipSuccess();
-						return;
-					}
-				} else if (checkType === 'repository' && repoInfo) {
-					// 检查用户是否已经是仓库协作者且有写入权限
-					const repoResult = await octokit.rest.repos.get({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo
-					});
-
-					const permissions = repoResult.data.permissions;
-					console.log('用户仓库权限:', permissions);
-
-					if (permissions && permissions.push) {
-						// 用户已经是仓库协作者且有写入权限
-						this.onMembershipSuccess && this.onMembershipSuccess();
-						return;
-					}
-				}
-
-				// 等待1秒后再次检查（除了最后一次）
-				if (attempts < maxAttempts) {
-					await new Promise(resolve => setTimeout(resolve, 1000));
-				}
-
-			} catch (error) {
-				console.log('检查权限时出错:', error.message);
-				// 继续轮询，不中断
-			}
-		}
-	}
-
-	/**
 	 * 显示CLA协议
 	 * @async
 	 * @param {Object} repoInfo - 仓库信息
@@ -351,7 +90,7 @@ ${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
 				show: true,
 				type: 'cla',
 				title: this.t('cla.title', '贡献者许可协议'),
-				message: this.t('cla.content', '您需要签署贡献者许可协议，将知识产权所有权完全转让给基金会。'),
+				message: this.t('cla.content', '作为SPCP平台的贡献者，您需要签署贡献者许可协议，将知识产权所有权完全转让给DIPCF基金会。由由基金会统一管理，并负责知识产权的维护和运营。请完整阅读后签署协议。'),
 				claContent: claContent,
 				inputLabel: this.t('cla.realNameLabel', '请输入您的真实姓名'),
 				inputPlaceholder: this.t('cla.realNamePlaceholder', '请输入您的真实姓名（用于法律文件）'),
@@ -379,6 +118,7 @@ ${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
 						}
 						resolve();
 					} catch (error) {
+						console.error('❌ [showCLAAgreement] onConfirm 内部错误:', error);
 						reject(error);
 					}
 				};
@@ -389,47 +129,6 @@ ${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
 			});
 		} catch (error) {
 			console.error('加载CLA协议内容失败:', error);
-			// 如果加载失败，使用默认内容
-			const modal = new window.Modal();
-			modal.setState({
-				show: true,
-				type: 'cla',
-				title: this.t('cla.title', '贡献者许可协议'),
-				message: this.t('cla.content', '您需要签署贡献者许可协议，将知识产权所有权完全转让给基金会。'),
-				claContent: this.t('cla.content', '您需要签署贡献者许可协议，将知识产权所有权完全转让给基金会。'),
-				inputLabel: this.t('cla.realNameLabel', '请输入您的真实姓名'),
-				inputPlaceholder: this.t('cla.realNamePlaceholder', '请输入您的真实姓名（用于法律文件）'),
-				confirmText: this.t('cla.agree', '同意并签署'),
-				cancelText: this.t('cla.disagree', '不同意')
-			});
-
-			const modalElement = modal.render();
-			modal.element = modalElement;
-			document.body.appendChild(modalElement);
-			modal.bindEvents();
-
-			return new Promise((resolve, reject) => {
-				modal.onConfirm = async (realName) => {
-					if (!realName || realName.trim() === '') {
-						alert(this.t('cla.errors.noRealName', '请输入您的真实姓名'));
-						return;
-					}
-
-					try {
-						await this.signCLA(repoInfo, realName.trim(), userInfo);
-						if (onSuccess) {
-							await onSuccess();
-						}
-						resolve();
-					} catch (error) {
-						reject(error);
-					}
-				};
-
-				modal.onCancel = () => {
-					reject(new Error(this.t('cla.rejected', '用户拒绝签署CLA协议')));
-				};
-			});
 		}
 	}
 
@@ -480,7 +179,7 @@ ${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
 	}
 
 	/**
-	 * 签署CLA协议
+	 * 签署CLA协议（通过Issue提交）
 	 * @async
 	 * @param {Object} repoInfo - 仓库信息
 	 * @param {string} realName - 用户真实姓名
@@ -489,104 +188,110 @@ ${userInfo.claSigned ? '✅ 已签署CLA协议' : '❌ 未签署CLA协议'}
 	 */
 	async signCLA(repoInfo, realName, userInfo) {
 		try {
-			console.log('开始签署CLA协议:', repoInfo, '真实姓名:', realName);
+			console.log('🔵 [signCLA] 开始签署CLA协议:', { repoInfo, realName, user: userInfo && userInfo.username });
 
 			// 获取当前语言和CLA内容
 			const currentLanguage = this.state.language || 'zh-CN';
 			const claContent = await this.loadCLAContent();
+			console.log('🔵 [signCLA] 已加载CLA内容，长度:', claContent && claContent.length);
 
-			// 创建CLA签署文件内容
+			// 生成完整的CLA文件内容（客户端生成，工作流只负责转存）
 			const signTime = new Date().toISOString();
-			const fileName = `CLA_${userInfo.username}_${signTime.replace(/[:.]/g, '-')}.md`;
+			const timestamp = signTime.replace(/[:.]/g, '-');
+			const fileName = `CLA_${userInfo.username}_${timestamp}.md`;
+			console.log('🔵 [signCLA] 生成文件名:', fileName);
 
-			// 创建签署文件内容
-			const signedCLAContent = `# CLA签署记录
+			// 获取仓库描述（如果 repoInfo 中没有，尝试从GitHub API获取）
+			let repoDescription = repoInfo.description || '';
+			if (!repoDescription && repoInfo.owner && repoInfo.repo) {
+				try {
+					const octokitPublic = new window.Octokit();
+					const { data: repoData } = await octokitPublic.rest.repos.get({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo
+					});
+					repoDescription = repoData.description || '';
+				} catch (e) {
+					console.warn('无法获取仓库描述:', e.message);
+				}
+			}
 
-**签署者：** ${realName} (GitHub: ${userInfo.username})  
-**签署时间：** ${new Date(signTime).toLocaleString('zh-CN')}  
-**仓库：** ${repoInfo.owner}/${repoInfo.repo}  
-**语言：** ${currentLanguage}
+			// 创建完整的CLA文件内容（使用i18n）
+			const completeCLAContent = `# ${this.t('cla.signingRecord', 'CLA签署记录')}
+
+**${this.t('cla.signer', '签署者')}：** ${realName} (GitHub: ${userInfo.username})  
+**${this.t('cla.signingTime', '签署时间')}：** ${new Date(signTime).toLocaleString(currentLanguage === 'zh-CN' ? 'zh-CN' : 'en-US')}  
+**${this.t('cla.repository', '仓库')}：** ${repoInfo.owner}/${repoInfo.repo}  
+**${this.t('cla.description', '描述')}：** ${repoDescription || this.t('cla.noDescription', '无描述')}
 
 ---
+
+## ${this.t('cla.agreementContent', 'CLA协议内容')}
 
 ${claContent}
 
 ---
 
-## 签署确认
+## ${this.t('cla.signingConfirmation', '签署确认')}
 
-我，**${realName}** (GitHub用户名: ${userInfo.username})，确认已阅读并同意上述贡献者许可协议的所有条款。
+${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {username})，确认已阅读并同意上述贡献者许可协议的所有条款。', { realName, username: userInfo.username })}
 
-**签署者真实姓名：** ${realName}  
-**GitHub用户名：** ${userInfo.username}  
-**签署时间：** ${new Date(signTime).toLocaleString('zh-CN')}  
-**邮箱：** ${userInfo.email || '未提供'}
+**${this.t('cla.signerRealName', '签署者真实姓名')}：** ${realName}  
+**${this.t('cla.githubUsername', 'GitHub用户名')}：** ${userInfo.username}  
+**${this.t('cla.signingTime', '签署时间')}：** ${new Date(signTime).toLocaleString(currentLanguage === 'zh-CN' ? 'zh-CN' : 'en-US')}  
+**${this.t('cla.email', '邮箱')}：** ${userInfo.email || this.t('cla.notProvided', '未提供')}
 
 ---
 
-*此文件由SPCP系统自动生成*
-`;
+*${this.t('cla.autoGenerated', '此文件由SPCP系统自动生成')}*
+			`;
+			console.log('🔵 [signCLA] 生成CLA完整内容，长度:', completeCLAContent.length);
 
-			// 使用GitHub API创建CLA签署文件
+			// 创建CLA提交Issue内容，需要添加工作流提取所需的字段
+			const issueTitle = `CLA Submission - ${userInfo.username}`;
+			const issueBody = `${completeCLAContent}
+
+---
+
+**仓库：** ${repoInfo.owner}/${repoInfo.repo}
+**描述：** ${repoDescription || ''}
+			`;
+
+			// 使用GitHub API创建CLA提交Issue
 			const octokit = new window.Octokit({ auth: userInfo.token });
 
-			// 创建CLA目录（如果不存在）
-			try {
-				await octokit.rest.repos.createOrUpdateFileContents({
-					owner: repoInfo.owner,
-					repo: repoInfo.repo,
-					path: 'CLA/.gitkeep',
-					message: 'Create CLA directory',
-					content: btoa(unescape(encodeURIComponent(''))),
-					sha: await this.getFileSha(octokit, repoInfo.owner, repoInfo.repo, 'CLA/.gitkeep')
-				});
-			} catch (error) {
-				// 如果文件已存在或创建失败，继续执行
-				console.log('CLA目录可能已存在或创建失败:', error.message);
-			}
-
-			// 创建CLA签署文件
-			await octokit.rest.repos.createOrUpdateFileContents({
-				owner: repoInfo.owner,
-				repo: repoInfo.repo,
-				path: `CLA/${fileName}`,
-				message: `CLA signed by ${realName} (${userInfo.username})`,
-				content: btoa(unescape(encodeURIComponent(signedCLAContent))),
-				sha: await this.getFileSha(octokit, repoInfo.owner, repoInfo.repo, `CLA/${fileName}`)
+			console.log('🔵 [signCLA] 创建CLA提交Issue...');
+			const { data: issue } = await octokit.rest.issues.create({
+				owner: 'Zela-Foundation',
+				repo: 'Projects',
+				title: issueTitle,
+				body: issueBody
+				// 不添加labels，因为用户可能没有权限创建标签
 			});
 
-			console.log(`CLA签署文件已创建: CLA/${fileName}`);
+			console.log(`CLA提交Issue已创建: #${issue.number}`);
 
-			// 更新用户信息，标记已签署CLA
+			// 更新用户信息，标记已提交CLA
 			const updatedUserInfo = {
 				...userInfo,
 				claSigned: true,
 				claSignedAt: signTime,
-				claSignedFile: fileName,
+				claSignedIssue: issue.number,
 				claSignedRepo: `${repoInfo.owner}/${repoInfo.repo}`,
-				realName: realName
+				realName: realName,
+				claFileName: fileName
 			};
 
 			// 保存更新后的用户信息
 			localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
 
-			console.log('CLA协议签署完成');
-
-			// CLA签署完成后，申请成为Zela-Foundation组织成员
-			try {
-				console.log('开始申请成为Zela-Foundation组织成员...');
-				await this.applyMembership(updatedUserInfo, 'member');
-				console.log('组织成员申请已提交');
-			} catch (membershipError) {
-				console.warn('组织成员申请失败，但CLA签署已完成:', membershipError.message);
-				// 不抛出错误，因为CLA签署已经成功
-			}
+			console.log('✅ [signCLA] CLA协议提交完成');
 
 			return updatedUserInfo;
 
 		} catch (error) {
-			console.error('CLA协议签署失败:', error);
-			throw new Error(`CLA协议签署失败: ${error.message}`);
+			console.error('❌ [signCLA] CLA协议提交失败:', error);
+			throw new Error(`CLA协议提交失败: ${error.message}`);
 		}
 	}
 

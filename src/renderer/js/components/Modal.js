@@ -120,6 +120,9 @@ class Modal extends Component {
 	handleConfirm() {
 		if (this.state.type === 'input' && this.state.callback) {
 			this.state.callback(this.state.inputValue);
+		} else if (this.state.type === 'cla' && this.onConfirm) {
+			console.log('🔵 [Modal] 调用 onConfirm 回调, inputValue:', this.state.inputValue);
+			this.onConfirm(this.state.inputValue);
 		} else if (this.state.type === 'cla' && this.state.callback) {
 			this.state.callback(this.state.inputValue);
 		} else if (this.state.type === 'confirm' && this.state.callback) {
@@ -207,8 +210,11 @@ class Modal extends Component {
 	renderMarkdown(markdown) {
 		if (!markdown) return '';
 
-		// 简单的Markdown到HTML转换
-		let html = markdown
+		// 首先压缩多个连续的空行为最多两个空行
+		let processed = markdown.replace(/\n{3,}/g, '\n\n');
+
+		// 简单的Markdown到HTML转换，不使用<p>标签，只用<br>
+		let html = processed
 			// 标题
 			.replace(/^#### (.*$)/gim, '<h4>$1</h4>')
 			.replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -233,19 +239,16 @@ class Modal extends Component {
 			// 代码块
 			.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
 			.replace(/`([^`]+)`/g, '<code>$1</code>')
-			// 段落
-			.replace(/\n\n/g, '</p><p>')
+			// 将换行转换为<br>，多个空行转换为多个<br>
 			.replace(/\n/g, '<br>');
-
-		// 包装段落
-		html = '<p>' + html + '</p>';
 
 		// 处理列表
 		html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
 
-		// 清理空段落
-		html = html.replace(/<p><\/p>/g, '');
-		html = html.replace(/<p><br><\/p>/g, '');
+		// 合并多个连续的<br>标签为一个<br>
+		// 匹配：2个或更多连续的<br>标签（包括自闭合形式），标签之间可能有空白字符（包括换行符、制表符、空格等）
+		// 使用 (\s*<br\s*\/?>\s*)+ 匹配一个或多个"空白字符+<br>+空白字符"的组合，但只替换2个或更多的
+		html = html.replace(/(\s*<br\s*\/?>\s*){2,}/gi, '<br>');
 
 		return html;
 	}
@@ -273,7 +276,7 @@ class Modal extends Component {
 						<div class="cla-message">
 							<p>${this.state.message}</p>
 						</div>
-						<div class="cla-agreement">
+						<div class="cla-agreement" id="cla-agreement-container">
 							<div class="cla-text" id="cla-markdown-content">${this.renderMarkdown(this.state.claContent)}</div>
 						</div>
 						<div class="form-group">
@@ -330,7 +333,7 @@ class Modal extends Component {
 			case 'cla':
 				return `
 					<button class="btn btn-secondary" id="modal-cancel">${this.state.cancelText || t('common.cancel', '取消')}</button>
-					<button class="btn btn-primary" id="modal-confirm">${this.state.confirmText || t('common.confirm', '确认')}</button>
+					<button class="btn btn-primary" id="modal-confirm" disabled>${this.state.confirmText || t('common.confirm', '确认')}</button>
 				`;
 			case 'confirm':
 				return `
@@ -427,6 +430,32 @@ class Modal extends Component {
 			setTimeout(() => input.focus(), 100);
 		}
 
+		// CLA类型：添加滚动监听，检查是否滚动到底部
+		if (this.state.type === 'cla') {
+			const claContainer = this.element.querySelector('#cla-agreement-container');
+			if (claContainer) {
+				const checkScroll = () => {
+					const scrollTop = claContainer.scrollTop;
+					const scrollHeight = claContainer.scrollHeight;
+					const clientHeight = claContainer.clientHeight;
+					// 允许5px的误差
+					const isScrolledToBottom = scrollTop + clientHeight >= scrollHeight - 5;
+
+					if (confirmBtn) {
+						confirmBtn.disabled = !isScrolledToBottom;
+					}
+				};
+
+				// 绑定滚动事件
+				claContainer.addEventListener('scroll', checkScroll);
+				// 初始检查（如果内容很短，可能一开始就在底部）
+				setTimeout(checkScroll, 100);
+
+				// 保存事件处理器以便后续移除
+				this.eventHandlers.handleCLAScroll = checkScroll;
+			}
+		}
+
 		// 遮罩点击
 		this.element.addEventListener('click', this.eventHandlers.handleOverlayClick);
 
@@ -462,6 +491,15 @@ class Modal extends Component {
 		if (input) {
 			input.removeEventListener('input', this.eventHandlers.handleInputChange);
 			input.removeEventListener('keydown', this.eventHandlers.handleKeyDown);
+		}
+
+		// 移除CLA滚动事件监听器
+		if (this.eventHandlers.handleCLAScroll) {
+			const claContainer = this.element.querySelector('#cla-agreement-container');
+			if (claContainer) {
+				claContainer.removeEventListener('scroll', this.eventHandlers.handleCLAScroll);
+			}
+			delete this.eventHandlers.handleCLAScroll;
 		}
 
 		// 移除遮罩点击事件

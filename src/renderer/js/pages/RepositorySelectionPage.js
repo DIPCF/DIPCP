@@ -20,9 +20,12 @@ class RepositorySelectionPage extends BasePage {
 				newRepoDescription: ''
 			},
 			loading: false,
-			selectedTab: 'existing', // 'existing' 或 'create'
+			selectedTab: 'recent', // 'recent'、'existing' 或 'create'
 			repositoryHistory: [],
-			userInfo: null
+			userInfo: null,
+			projectsList: [], // 从 Projects.json 获取的仓库列表
+			projectsLoading: false, // 是否正在加载仓库列表
+			projectsError: null // 加载错误信息
 		};
 
 		// 确保主题在RepositorySelectionPage渲染时被应用
@@ -69,6 +72,79 @@ class RepositorySelectionPage extends BasePage {
 			}
 		} catch (error) {
 			console.warn('加载仓库历史记录失败:', error);
+		}
+	}
+
+	/**
+	 * 从 GitHub 获取 Projects.json 文件
+	 * @async
+	 * @param {boolean} forceReload - 是否强制重新加载
+	 */
+	async loadProjectsList(forceReload = false) {
+		// 如果正在加载中，不重复加载
+		if (this.state.projectsLoading) {
+			return;
+		}
+
+		// 如果已经有数据且不是强制重新加载，则不加载
+		if (!forceReload && this.state.projectsList.length > 0 && !this.state.projectsError) {
+			return;
+		}
+
+		this.setState({ projectsLoading: true, projectsError: null });
+
+		try {
+			// 从 GitHub raw 内容 URL 获取文件
+			const url = 'https://raw.githubusercontent.com/Zela-Foundation/Projects/main/Projects.json';
+			const response = await fetch(url);
+
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+
+			const data = await response.json();
+
+			// 验证数据格式
+			if (!Array.isArray(data)) {
+				throw new Error('Projects.json 格式错误：期望数组格式');
+			}
+
+			// 解析每个仓库的 owner 和 repo
+			const projectsList = data.map(item => {
+				const repoMatch = item.repository.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+				if (!repoMatch) {
+					return null;
+				}
+				return {
+					owner: repoMatch[1],
+					repo: repoMatch[2],
+					repository: item.repository,
+					description: item.description || '',
+					createdAt: item.createdAt || ''
+				};
+			}).filter(item => item !== null); // 过滤掉无效的条目
+
+			this.setState({
+				projectsList,
+				projectsLoading: false,
+				projectsError: null
+			});
+
+			// 如果当前选项卡是 existing，更新内容
+			if (this.element && this.state.selectedTab === 'existing') {
+				this.updateContent();
+			}
+		} catch (error) {
+			console.error('加载 Projects.json 失败:', error);
+			this.setState({
+				projectsLoading: false,
+				projectsError: error.message
+			});
+
+			// 如果当前选项卡是 existing，更新内容以显示错误
+			if (this.element && this.state.selectedTab === 'existing') {
+				this.updateContent();
+			}
 		}
 	}
 
@@ -128,7 +204,6 @@ class RepositorySelectionPage extends BasePage {
 		return `
             <div class="page-header">
                 <h1>${this.t('repositorySelection.title', '选择仓库')}</h1>
-                <p class="subtitle">${this.t('repositorySelection.subtitle', '选择现有仓库或创建新仓库')}</p>
             </div>
         `;
 	}
@@ -140,6 +215,10 @@ class RepositorySelectionPage extends BasePage {
 	renderTabs() {
 		return `
             <div class="tabs">
+                <button class="tab-button ${this.state.selectedTab === 'recent' ? 'active' : ''}" 
+                        data-tab="recent">
+                    ${this.t('repositorySelection.tabs.recent', '最近访问仓库')}
+                </button>
                 <button class="tab-button ${this.state.selectedTab === 'existing' ? 'active' : ''}" 
                         data-tab="existing">
                     ${this.t('repositorySelection.tabs.existing', '选择现有仓库')}
@@ -157,7 +236,9 @@ class RepositorySelectionPage extends BasePage {
 	 * @returns {string} 内容区域的HTML字符串
 	 */
 	renderContent() {
-		if (this.state.selectedTab === 'existing') {
+		if (this.state.selectedTab === 'recent') {
+			return this.renderRecentRepositoryTab();
+		} else if (this.state.selectedTab === 'existing') {
 			return this.renderExistingRepositoryTab();
 		} else {
 			return this.renderCreateRepositoryTab();
@@ -165,15 +246,91 @@ class RepositorySelectionPage extends BasePage {
 	}
 
 	/**
-	 * 渲染选择现有仓库标签页
-	 * @returns {string} 现有仓库标签页的HTML字符串
+	 * 渲染最近访问仓库标签页
+	 * @returns {string} 最近访问仓库标签页的HTML字符串
 	 */
-	renderExistingRepositoryTab() {
+	renderRecentRepositoryTab() {
 		return `
             <div class="tab-content">
                 ${this.renderRepositoryHistory()}
                 ${this.renderRepositoryUrlInput()}
                 ${this.renderContinueButton()}
+            </div>
+        `;
+	}
+
+	/**
+	 * 渲染选择现有仓库标签页
+	 * @returns {string} 现有仓库标签页的HTML字符串
+	 */
+	renderExistingRepositoryTab() {
+		// 触发加载 Projects.json（如果还未加载，或者之前加载失败）
+		if (!this.state.projectsLoading) {
+			if (this.state.projectsList.length === 0 || this.state.projectsError) {
+				this.loadProjectsList(!!this.state.projectsError); // 如果有错误，强制重新加载
+			}
+		}
+
+		return `
+            <div class="tab-content">
+                ${this.renderProjectsList()}
+                ${this.renderRepositoryUrlInput()}
+                ${this.renderContinueButton()}
+            </div>
+        `;
+	}
+
+	/**
+	 * 渲染项目列表（从 Projects.json 获取）
+	 * @returns {string} 项目列表的HTML字符串
+	 */
+	renderProjectsList() {
+		if (this.state.projectsLoading) {
+			return `
+                <div class="repository-history">
+                    <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                    <p class="no-history">${this.t('repositorySelection.existing.loading', '正在加载仓库列表...')}</p>
+                </div>
+            `;
+		}
+
+		if (this.state.projectsError) {
+			return `
+                <div class="repository-history">
+                    <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                    <div class="error-message">
+                        <p>${this.t('repositorySelection.existing.error', '加载失败')}: ${this.state.projectsError}</p>
+                        <button class="retry-btn" id="retry-load-projects">${this.t('repositorySelection.existing.retry', '重试')}</button>
+                    </div>
+                </div>
+            `;
+		}
+
+		if (this.state.projectsList.length === 0) {
+			return `
+                <div class="repository-history">
+                    <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                    <p class="no-history">${this.t('repositorySelection.existing.empty', '暂无可用仓库')}</p>
+                </div>
+            `;
+		}
+
+		const projectItems = this.state.projectsList.map((project, index) => `
+            <div class="history-item clickable" data-owner="${project.owner}" data-repo="${project.repo}" data-url="${project.repository}">
+                <div class="repo-info">
+                    <h4>${project.owner}/${project.repo}</h4>
+                    <p class="repo-description">${project.description || this.t('repositorySelection.existing.noDescription', '无描述')}</p>
+                    ${project.createdAt ? `<p class="last-accessed">${this.t('repositorySelection.existing.createdAt', '创建时间')}: ${this.formatDate(project.createdAt)}</p>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+		return `
+            <div class="repository-history">
+                <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
+                <div class="history-list">
+                    ${projectItems}
+                </div>
             </div>
         `;
 	}
@@ -193,15 +350,12 @@ class RepositorySelectionPage extends BasePage {
 		}
 
 		const historyItems = this.state.repositoryHistory.map(repo => `
-            <div class="history-item" data-owner="${repo.owner}" data-repo="${repo.repo}">
+            <div class="history-item clickable" data-owner="${repo.owner}" data-repo="${repo.repo}">
                 <div class="repo-info">
                     <h4>${repo.owner}/${repo.repo}</h4>
                     <p class="repo-description">${repo.description || this.t('repositorySelection.history.noDescription', '无描述')}</p>
                     <p class="last-accessed">${this.t('repositorySelection.history.lastAccessed', '最后访问')}: ${this.formatDate(repo.lastAccessed)}</p>
                 </div>
-                <button class="select-repo-btn" data-owner="${repo.owner}" data-repo="${repo.repo}">
-                    ${this.t('repositorySelection.history.select', '选择')}
-                </button>
             </div>
         `).join('');
 
@@ -244,15 +398,21 @@ class RepositorySelectionPage extends BasePage {
                 <div class="create-repository-form">
                     <h3>${this.t('repositorySelection.create.title', '创建新仓库')}</h3>
                     <div class="form-group">
+                        <label for="new-repo-owner">${this.t('repositorySelection.create.ownerLabel', '仓库所有者')}</label>
+                        <input type="text" id="new-repo-owner" 
+                            placeholder="${this.t('repositorySelection.create.ownerPlaceholder', '用户名或组织名，留空则在个人账户下创建')}" 
+                            value="${this.state.formData.newRepoOwner || ''}">
+                    </div>
+                    <div class="form-group">
                         <label for="new-repo-name">${this.t('repositorySelection.create.nameLabel', '仓库名称')}</label>
                         <input type="text" id="new-repo-name" 
-                            placeholder="${this.t('repositorySelection.create.namePlaceholder', 'my-new-repository')}" 
+                            placeholder="${this.t('repositorySelection.create.namePlaceholder', '英文数字，100字符以内')}" 
                             value="${this.state.formData.newRepoName}" required>
                     </div>
                     <div class="form-group">
                         <label for="new-repo-description">${this.t('repositorySelection.create.descriptionLabel', '仓库描述')}</label>
                         <textarea id="new-repo-description" 
-                            placeholder="${this.t('repositorySelection.create.descriptionPlaceholder', '仓库的简短描述...')}" 
+                            placeholder="${this.t('repositorySelection.create.descriptionPlaceholder', '仓库的简短描述，350字符以内')}" 
                             rows="3">${this.state.formData.newRepoDescription}</textarea>
                     </div>
                 </div>
@@ -297,21 +457,41 @@ class RepositorySelectionPage extends BasePage {
 		const tabButtons = this.element.querySelectorAll('.tab-button');
 		tabButtons.forEach(button => {
 			button.addEventListener('click', (e) => {
-				const tab = e.target.dataset.tab;
+				const tab = e.currentTarget.dataset.tab;
 				this.setState({ selectedTab: tab });
+				// 更新选项卡样式
+				this.updateTabsActiveState();
+				// 更新内容区域
 				this.updateContent();
 			});
 		});
 
-		// 历史记录选择
-		const selectRepoBtns = this.element.querySelectorAll('.select-repo-btn');
-		selectRepoBtns.forEach(button => {
-			button.addEventListener('click', (e) => {
-				const owner = e.target.dataset.owner;
-				const repo = e.target.dataset.repo;
-				this.selectRepositoryFromHistory(owner, repo);
+		// 历史记录和项目列表选择（整个区域可点击）
+		const historyItems = this.element.querySelectorAll('.history-item.clickable');
+		historyItems.forEach(item => {
+			item.addEventListener('click', (e) => {
+				const owner = item.dataset.owner;
+				const repo = item.dataset.repo;
+				const url = item.dataset.url; // 项目列表中的项有 data-url 属性
+
+				if (url) {
+					// 从项目列表选择，使用完整的 URL
+					this.selectRepositoryFromProjects(owner, repo, url);
+				} else {
+					// 从历史记录选择
+					this.selectRepositoryFromHistory(owner, repo);
+				}
 			});
 		});
+
+		// 重试加载 Projects.json 按钮
+		const retryBtn = this.element.querySelector('#retry-load-projects');
+		if (retryBtn) {
+			retryBtn.addEventListener('click', () => {
+				this.setState({ projectsList: [], projectsError: null });
+				this.loadProjectsList(true); // 强制重新加载
+			});
+		}
 
 		// 继续按钮
 		const continueBtn = this.element.querySelector('#continue-btn');
@@ -329,6 +509,7 @@ class RepositorySelectionPage extends BasePage {
 				if (fieldName === 'url') fieldName = 'repositoryUrl';
 				if (fieldName === 'name') fieldName = 'newRepoName';
 				if (fieldName === 'description') fieldName = 'newRepoDescription';
+				if (fieldName === 'owner') fieldName = 'newRepoOwner';
 				this.state.formData[fieldName] = e.target.value;
 			});
 		});
@@ -342,7 +523,21 @@ class RepositorySelectionPage extends BasePage {
 		if (contentContainer) {
 			contentContainer.innerHTML = this.renderContent();
 			this.bindEvents();
+			// 内容更新后也同步一次tab按钮的active状态
+			this.updateTabsActiveState();
 		}
+	}
+
+	/**
+	 * 更新选项卡按钮的激活样式
+	 */
+	updateTabsActiveState() {
+		if (!this.element) return;
+		const tabButtons = this.element.querySelectorAll('.tab-button');
+		tabButtons.forEach(btn => {
+			const isActive = btn.dataset.tab === this.state.selectedTab;
+			btn.classList.toggle('active', !!isActive);
+		});
 	}
 
 	/**
@@ -376,6 +571,36 @@ class RepositorySelectionPage extends BasePage {
 	}
 
 	/**
+	 * 从项目列表选择仓库
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @param {string} url - 仓库完整 URL
+	 */
+	selectRepositoryFromProjects(owner, repo, url) {
+		this.setState({
+			formData: {
+				...this.state.formData,
+				repositoryUrl: url
+			}
+		});
+
+		// 更新输入框值
+		const urlInput = this.element.querySelector('#repository-url');
+		if (urlInput) {
+			urlInput.value = url;
+		}
+
+		// 高亮选中的项目项
+		const projectItems = this.element.querySelectorAll('.history-item');
+		projectItems.forEach(item => {
+			item.classList.remove('selected');
+			if (item.dataset.owner === owner && item.dataset.repo === repo) {
+				item.classList.add('selected');
+			}
+		});
+	}
+
+	/**
 	 * 处理继续操作
 	 * @async
 	 */
@@ -386,7 +611,7 @@ class RepositorySelectionPage extends BasePage {
 			this.setState({ loading: true });
 			this.updateContinueButtonState('loading', this.t('repositorySelection.continue.loading', '处理中...'));
 
-			if (this.state.selectedTab === 'existing') {
+			if (this.state.selectedTab === 'existing' || this.state.selectedTab === 'recent') {
 				await this.handleExistingRepository();
 			} else {
 				await this.handleCreateRepository();
@@ -432,7 +657,21 @@ class RepositorySelectionPage extends BasePage {
 		if (permissionInfo.role === 'owner') {
 			await this.showCLAAgreement(repoInfo, this.state.userInfo, async () => {
 				// CLA签署成功后的回调：执行仓库设置
-				await this.setupRepository(repoInfo.owner, repoInfo.repo, this.state.userInfo.token);
+				// 从localStorage获取CLA签署时间
+				const userInfoStr = localStorage.getItem('spcp-user');
+				let claSignedTime = new Date().toISOString(); // 默认使用当前时间
+				if (userInfoStr) {
+					try {
+						const userInfo = JSON.parse(userInfoStr);
+						if (userInfo.claSignedAt) {
+							claSignedTime = userInfo.claSignedAt;
+							console.log('✅ [handleContinue] 使用CLA签署时间:', claSignedTime);
+						}
+					} catch (e) {
+						console.warn('解析用户信息失败，使用当前时间:', e);
+					}
+				}
+				await this.setupRepository(repoInfo.owner, repoInfo.repo, this.state.userInfo.token, claSignedTime);
 			});
 		}
 
@@ -445,23 +684,110 @@ class RepositorySelectionPage extends BasePage {
 	 * @async
 	 */
 	async handleCreateRepository() {
-		const { newRepoName, newRepoDescription } = this.state.formData;
+		console.log('🔵 [handleCreateRepository] 开始处理创建仓库请求');
+		const { newRepoName, newRepoDescription, newRepoOwner } = this.state.formData;
+		console.log('🔵 [handleCreateRepository] 表单数据:', { newRepoName, newRepoDescription, newRepoOwner });
 
 		if (!newRepoName) {
 			throw new Error(this.t('repositorySelection.errors.noRepoName', '请输入仓库名称'));
 		}
 
-		// 创建仓库（默认为公开仓库）
-		const repoInfo = await this.createRepository(newRepoName, newRepoDescription, 'public');
+		// 验证仓库名称
+		console.log('🔵 [handleCreateRepository] 验证仓库名称...');
+		this.validateRepositoryName(newRepoName);
 
-		// 更新用户信息
-		this.updateUserInfo(repoInfo, { role: 'owner', hasPermission: true });
+		// 组织名必填，且不支持个人仓库
+		if (!newRepoOwner || newRepoOwner.trim().length === 0) {
+			throw new Error(this.t('repositorySelection.errors.ownerRequired', '请输入组织名'));
+		}
 
-		// 创建者需要签署CLA和设置仓库
-		await this.showCLAAgreement(repoInfo, this.state.userInfo, async () => {
-			// CLA签署成功后的回调：执行仓库设置
-			await this.setupRepository(repoInfo.owner, repoInfo.repo, this.state.userInfo.token);
+		// 验证仓库描述
+		console.log('🔵 [handleCreateRepository] 验证仓库描述...');
+		this.validateRepositoryDescription(newRepoDescription);
+
+		// 先显示CLA，同意后才创建仓库
+		console.log('🔵 [handleCreateRepository] 准备显示CLA协议...');
+		// 构建临时的仓库信息对象用于CLA显示（此时仓库尚未创建）
+		const tempRepoInfo = {
+			owner: newRepoOwner,
+			repo: newRepoName,
+			description: newRepoDescription
+		};
+
+		await this.showCLAAgreement(tempRepoInfo, this.state.userInfo, async () => {
+			console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
+			try {
+				// 从localStorage获取CLA签署时间
+				const userInfoStr = localStorage.getItem('spcp-user');
+				let claSignedTime = new Date().toISOString(); // 默认使用当前时间
+				if (userInfoStr) {
+					try {
+						const userInfo = JSON.parse(userInfoStr);
+						if (userInfo.claSignedAt) {
+							claSignedTime = userInfo.claSignedAt;
+							console.log('✅ [CLA Callback] 使用CLA签署时间:', claSignedTime);
+						}
+					} catch (e) {
+						console.warn('解析用户信息失败，使用当前时间:', e);
+					}
+				}
+
+				// CLA签署成功后，现在才创建仓库
+				console.log('🔵 [CLA Callback] 调用createRepository创建仓库...');
+				const repoInfo = await this.createRepository(newRepoName, newRepoDescription, 'public', newRepoOwner);
+				console.log('✅ [CLA Callback] 仓库创建成功:', repoInfo);
+
+				// 更新用户信息
+				console.log('🔵 [CLA Callback] 更新用户信息...');
+				this.updateUserInfo(repoInfo, { role: 'owner', hasPermission: true });
+
+				// 执行仓库设置，传入CLA签署时间
+				await this.setupRepository(repoInfo.owner, repoInfo.repo, this.state.userInfo.token, claSignedTime);
+				console.log('✅ [CLA Callback] 仓库设置完成，准备跳转到项目页面...');
+				// 设置完成后跳转到项目页面
+				await this.proceedToProject(repoInfo);
+				console.log('✅ [CLA Callback] 已跳转到项目页面');
+			} catch (error) {
+				console.error('❌ [CLA Callback] 创建仓库、设置或跳转失败:', error);
+				throw error;
+			}
 		});
+		console.log('🔵 [handleCreateRepository] CLA流程已启动');
+	}
+
+	/**
+	 * 验证仓库名称
+	 * @param {string} name - 仓库名称
+	 * @throws {Error} 如果验证失败
+	 */
+	validateRepositoryName(name) {
+		// 检查长度
+		if (name.length > 100) {
+			throw new Error(this.t('repositorySelection.errors.repoNameTooLong', '仓库名称长度不能超过100个字符'));
+		}
+
+		// 检查是否只包含英文和数字
+		const validNameRegex = /^[a-zA-Z0-9]+$/;
+		if (!validNameRegex.test(name)) {
+			throw new Error(this.t('repositorySelection.errors.repoNameInvalid', '仓库名称只能包含英文字母和数字'));
+		}
+
+		// 检查是否为空
+		if (name.trim().length === 0) {
+			throw new Error(this.t('repositorySelection.errors.repoNameEmpty', '仓库名称不能为空'));
+		}
+	}
+
+	/**
+	 * 验证仓库描述
+	 * @param {string} description - 仓库描述
+	 * @throws {Error} 如果验证失败
+	 */
+	validateRepositoryDescription(description) {
+		// 检查长度
+		if (description && description.length > 350) {
+			throw new Error(this.t('repositorySelection.errors.repoDescriptionTooLong', '仓库描述长度不能超过350个字符'));
+		}
 	}
 
 	/**
@@ -556,14 +882,63 @@ class RepositorySelectionPage extends BasePage {
 	}
 
 	/**
+	 * 验证组织是否存在且为组织账户
+	 * @async
+	 * @param {string} owner - 组织名或用户名
+	 * @returns {Promise<Object>} 组织信息
+	 */
+	async validateOwner(owner) {
+		if (!owner || owner.trim() === '') {
+			throw new Error(this.t('repositorySelection.errors.ownerRequired', '请输入组织名'));
+		}
+
+		const octokit = new window.Octokit({ auth: this.state.userInfo.token });
+
+		try {
+			// 首先尝试获取用户信息
+			const { data: userData } = await octokit.rest.users.getByUsername({
+				username: owner
+			});
+
+			// 检查是否为组织
+			if (userData.type === 'Organization') {
+				// 检查用户是否有权限在该组织下创建仓库
+				const { data: membership } = await octokit.rest.orgs.checkMembershipForUser({
+					org: owner,
+					username: this.state.userInfo.username
+				});
+
+				return {
+					type: 'organization',
+					login: owner,
+					hasPermission: true
+				};
+			} else {
+				// 个人用户不支持
+				throw new Error(this.t('repositorySelection.errors.personalRepo', '此应用仅支持组织仓库'));
+			}
+		} catch (error) {
+			if (error.status === 404) {
+				throw new Error(this.t('repositorySelection.errors.ownerNotFound', '指定的用户或组织不存在'));
+			}
+			if (error.status === 403) {
+				throw new Error(this.t('repositorySelection.errors.noOrgPermission', '您没有权限在该组织下创建仓库'));
+			}
+			throw error;
+		}
+	}
+
+	/**
 	 * 创建仓库
 	 * @async
 	 * @param {string} name - 仓库名称
 	 * @param {string} description - 仓库描述
 	 * @param {string} visibility - 可见性
+	 * @param {string} owner - 仓库所有者
 	 * @returns {Promise<Object>} 仓库信息
 	 */
-	async createRepository(name, description, visibility) {
+	async createRepository(name, description, visibility, owner = null) {
+		console.log('🔵 [createRepository] 开始创建仓库:', { name, description, visibility, owner });
 		if (!this.state.userInfo || !this.state.userInfo.token) {
 			throw new Error(this.t('repositorySelection.errors.notLoggedIn', '请先登录'));
 		}
@@ -571,14 +946,36 @@ class RepositorySelectionPage extends BasePage {
 		const octokit = new window.Octokit({ auth: this.state.userInfo.token });
 
 		try {
-			// 在Zela-Foundation组织下创建仓库
-			const { data: repo } = await octokit.rest.repos.createInOrg({
-				org: 'Zela-Foundation',
-				name,
-				description,
-				private: visibility === 'private',
-				auto_init: true
-			});
+			// 验证所有者
+			console.log('🔵 [createRepository] 验证所有者:', owner);
+			const ownerInfo = await this.validateOwner(owner);
+			console.log('✅ [createRepository] 所有者验证完成:', ownerInfo);
+
+			let repo;
+
+			if (ownerInfo.type === 'organization') {
+				// 在组织下创建仓库
+				console.log('🔵 [createRepository] 在组织下创建仓库:', ownerInfo.login);
+				const { data } = await octokit.rest.repos.createInOrg({
+					org: ownerInfo.login,
+					name,
+					description,
+					private: visibility === 'private',
+					auto_init: true
+				});
+				repo = data;
+			} else {
+				// 在用户个人账户下创建仓库
+				console.log('🔵 [createRepository] 在用户账户下创建仓库');
+				const { data } = await octokit.rest.repos.createForAuthenticatedUser({
+					name,
+					description,
+					private: visibility === 'private',
+					auto_init: true
+				});
+				repo = data;
+			}
+			console.log('✅ [createRepository] 仓库创建成功:', { owner: repo.owner.login, repo: repo.name });
 
 			return {
 				owner: repo.owner.login,
@@ -589,7 +986,7 @@ class RepositorySelectionPage extends BasePage {
 				throw new Error(this.t('repositorySelection.errors.repoExists', '仓库名称已存在'));
 			}
 			if (error.status === 403) {
-				throw new Error('没有权限在Zela-Foundation组织下创建仓库，请确保您是该组织的成员');
+				throw new Error('没有权限创建仓库，请检查您的GitHub token权限');
 			}
 			throw error;
 		}
@@ -627,8 +1024,10 @@ class RepositorySelectionPage extends BasePage {
 	 * @param {Object} repoInfo - 仓库信息
 	 */
 	async proceedToProject(repoInfo) {
+		console.log('🔵 [proceedToProject] 开始跳转到项目页面:', repoInfo);
 		try {
 			// 开始同步文件
+			console.log('🔵 [proceedToProject] 开始同步文件...');
 			this.updateContinueButtonState('loading', this.t('repositorySelection.syncing', '正在同步文件...'));
 
 			// 使用StorageService同步仓库数据
@@ -640,9 +1039,10 @@ class RepositorySelectionPage extends BasePage {
 					(progress, processed, total, error) => {
 						// 更新同步进度
 						if (error) {
-							console.error('同步文件时出错:', error);
+							console.error('❌ [proceedToProject] 同步文件时出错:', error);
 							this.updateContinueButtonState('loading', `同步出错: ${error.message}`);
 						} else {
+							console.log(`🔵 [proceedToProject] 同步进度: ${progress}% (${processed}/${total})`);
 							const progressText = `正在同步文件... ${progress}% (${processed}/${total})`;
 							this.updateContinueButtonState('loading', progressText);
 						}
@@ -651,29 +1051,35 @@ class RepositorySelectionPage extends BasePage {
 			}
 
 			// 同步完成
+			console.log('✅ [proceedToProject] 文件同步完成');
 			this.updateContinueButtonState('success', this.t('repositorySelection.continue.success', '处理完成！'));
 
 			// 保存仓库信息到历史记录（只有在整个流程完成后才保存）
+			console.log('🔵 [proceedToProject] 保存历史记录...');
 			this.saveToHistory({
 				...repoInfo,
 				description: repoInfo.description || await this.getRepositoryDescription(repoInfo.owner, repoInfo.repo)
 			});
 
 			// 等待1秒让用户看到完成状态
+			console.log('🔵 [proceedToProject] 等待1秒后跳转...');
 			await new Promise(resolve => setTimeout(resolve, 1000));
 
 			// 跳转到项目详情页面
+			console.log('🔵 [proceedToProject] 正在跳转到项目详情页面...');
 			if (window.app && window.app.navigateTo) {
 				window.app.navigateTo('/project-detail');
+				console.log('✅ [proceedToProject] 已调用导航到项目详情页面');
 			}
 		} catch (error) {
-			console.error('同步文件失败:', error);
+			console.error('❌ [proceedToProject] 同步文件失败:', error);
 			this.updateContinueButtonState('error', `同步失败: ${error.message}`);
 
 			// 即使同步失败，也允许用户继续到项目页面
 			setTimeout(() => {
 				this.updateContinueButtonState('success', this.t('repositorySelection.continue.success', '处理完成！'));
 				setTimeout(() => {
+					console.log('🔵 [proceedToProject] 错误恢复：跳转到项目页面...');
 					if (window.app && window.app.navigateTo) {
 						window.app.navigateTo('/project-detail');
 					}
@@ -737,40 +1143,62 @@ class RepositorySelectionPage extends BasePage {
 	 * @param {string} repo - 仓库名称
 	 * @param {string} token - GitHub访问令牌
 	 */
-	async setupRepository(owner, repo, token) {
+	async setupRepository(owner, repo, token, repositoryCreationTime = null) {
+		console.log('🔵 [setupRepository] 开始设置仓库:', { owner, repo, repositoryCreationTime });
 		const octokit = new window.Octokit({ auth: token });
+		// 如果没有传入时间，使用当前时间（兼容旧代码）
+		if (!repositoryCreationTime) {
+			repositoryCreationTime = new Date().toISOString();
+			console.log('⚠️ [setupRepository] 未提供创建时间，使用当前时间:', repositoryCreationTime);
+		}
 
 		try {
 			// 1. 批量创建所有初始文件（工作流、CODEOWNERS、POINT系统、角色定义）
+			console.log('🔵 [setupRepository] 步骤1: 创建初始文件...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.initialFiles', '正在创建初始文件...'));
-			await this.setupInitialFiles(octokit, owner, repo, token);
+			await this.setupInitialFiles(octokit, owner, repo, token, repositoryCreationTime);
+			console.log('✅ [setupRepository] 步骤1完成');
 
 			// 2. 设置分支保护
+			console.log('🔵 [setupRepository] 步骤2: 设置分支保护...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.branchProtection', '正在设置分支保护...'));
 			await this.setupBranchProtection(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤2完成');
 
 			// 3. 设置Actions权限
+			console.log('🔵 [setupRepository] 步骤3: 设置Actions权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.actionsPermissions', '正在设置Actions权限...'));
 			await this.setupActionsPermissions(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤3完成');
 
 			// 4. 设置Workflow权限
+			console.log('🔵 [setupRepository] 步骤4: 设置Workflow权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.workflowPermissions', '正在设置Workflow权限...'));
 			await this.setupWorkflowPermissions(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤4完成');
 
 			// 5. 创建Secrets
+			console.log('🔵 [setupRepository] 步骤5: 创建Secrets...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.secrets', '正在创建Secrets...'));
 			await this.setupSecrets(octokit, owner, repo, token);
+			console.log('✅ [setupRepository] 步骤5完成');
 
 			// 6. 设置团队权限
+			console.log('🔵 [setupRepository] 步骤6: 设置团队权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.teamPermissions', '正在设置团队权限...'));
 			await this.setupTeamPermissions(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤6完成');
 
 			// 7. 启用Discussions功能
+			console.log('🔵 [setupRepository] 步骤7: 启用Discussions...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.discussions', '正在启用Discussions...'));
 			await this.setupDiscussions(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤7完成');
+
+			console.log('✅ [setupRepository] 所有设置完成！');
 
 		} catch (error) {
-			console.error('❌ 设置仓库权限失败:', error);
+			console.error('❌ [setupRepository] 设置仓库权限失败:', error);
 			throw error;
 		}
 	}
@@ -784,8 +1212,11 @@ class RepositorySelectionPage extends BasePage {
 	 * @param {string} repo - 仓库名称
 	 * @param {string} token - GitHub访问令牌
 	 */
-	async setupInitialFiles(octokit, owner, repo, token) {
+	async setupInitialFiles(octokit, owner, repo, token, repositoryCreationTime = null) {
 		console.log('正在准备批量创建初始文件...');
+		// 使用传入的仓库创建时间，如果没有则使用当前时间（兼容旧代码）
+		const time = repositoryCreationTime || new Date().toISOString();
+		console.log('📅 [setupInitialFiles] 使用仓库创建时间:', time);
 
 		// 1. CODEOWNERS文件
 		const codeOwners = `# ${this.t('login.files.codeowners.title')}
@@ -807,7 +1238,6 @@ class RepositorySelectionPage extends BasePage {
 `;
 
 		// 2. POINT系统文件
-		const time = new Date().toISOString();
 		const pointReadme = `# ${this.t('login.files.pointReadme.title')}
 
 ${this.t('login.files.pointReadme.description')}
@@ -1458,3 +1888,4 @@ ${this.state.userInfo.username}
 
 // 注册组件
 window.RepositorySelectionPage = RepositorySelectionPage;
+

@@ -174,6 +174,9 @@ class SettingsPage extends BasePage {
                 <div class="setting-item">
                     <button id="exit-project-btn" class="btn danger">${this.t('dashboard.exitProject', '退出项目')}</button>
                 </div>
+                <div class="setting-item">
+                    <button id="logout-user-btn" class="btn danger">${this.t('settings.logoutUser.button', '退出用户')}</button>
+                </div>
             </div>
         `;
 	}
@@ -354,6 +357,14 @@ class SettingsPage extends BasePage {
 				this.showLogoutModal();
 			});
 		}
+
+		// 退出用户按钮
+		const logoutUserBtn = this.element.querySelector('#logout-user-btn');
+		if (logoutUserBtn) {
+			logoutUserBtn.addEventListener('click', () => {
+				this.showLogoutUserModal();
+			});
+		}
 	}
 
 	/**
@@ -472,13 +483,8 @@ class SettingsPage extends BasePage {
 	 * 处理退出项目
 	 */
 	handleLogout() {
-		// 清除本地存储的用户数据（工作区和文件缓存）
-		if (window.StorageService) {
-			window.StorageService.clearUserData();
-		}
-
-		// 清除localStorage中的工作区相关数据，但保留登录凭据
-		localStorage.removeItem('spcp-config');
+		// 清除工作区相关的数据，但保留用户信息和设置
+		this.clearWorkspaceData();
 
 		// 更新用户信息，移除仓库相关信息但保留登录凭据
 		const userInfo = JSON.parse(localStorage.getItem('spcp-user') || '{}');
@@ -500,6 +506,136 @@ class SettingsPage extends BasePage {
 
 		// 导航到仓库选择页面
 		window.app.navigateTo('/repository-selection');
+	}
+
+	/**
+	 * 清除工作区数据，但保留用户信息和设置
+	 */
+	clearWorkspaceData() {
+		// 清除IndexedDB中的工作区数据（文件缓存等）
+		if (window.StorageService) {
+			window.StorageService.clearAllCache();
+		}
+
+		// 只清除工作区相关的localStorage数据，保留用户信息和设置
+		const keysToRemove = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key && key.startsWith('spcp-')) {
+				// 保留重要的用户数据和设置
+				if (key === 'spcp-user' ||
+					key === 'spcp-saved-credentials' ||
+					key === 'spcp-language' ||
+					key === 'spcp-theme' ||
+					key === 'spcp-sync-interval' ||
+					key === 'spcp-repository-history') {
+					continue; // 跳过这些重要的数据
+				}
+				keysToRemove.push(key);
+			}
+		}
+		keysToRemove.forEach(key => localStorage.removeItem(key));
+
+		console.log('工作区数据已清除，用户信息和设置已保留');
+	}
+
+	/**
+	 * 显示退出用户确认对话框
+	 */
+	showLogoutUserModal() {
+		// 创建模态框
+		const modal = document.createElement('div');
+		modal.className = 'modal-overlay';
+		modal.innerHTML = `
+			<div class="modal-content">
+				<div class="modal-header">
+					<h3>${this.t('settings.logoutUser.confirmTitle', '确认退出用户')}</h3>
+				</div>
+				<div class="modal-body">
+					<p>${this.t('settings.logoutUser.warningTitle', '重要提醒')}</p>
+					<p>${this.t('settings.logoutUser.warningMessage', '退出用户后，用户相关的数据将被永久删除，包括：')}</p>
+					<ul>
+						<li>${this.t('settings.logoutUser.warningItem1', '• 用户登录信息')}</li>
+						<li>${this.t('settings.logoutUser.warningItem2', '• 保存的登录凭据')}</li>
+						<li>${this.t('settings.logoutUser.warningItem3', '• 仓库访问历史')}</li>
+						<li>${this.t('settings.logoutUser.warningItem4', '• 所有本地工作区数据')}</li>
+					</ul>
+					<p><em>${this.t('settings.logoutUser.note', '注意：个人设置（语言、主题等）将被保留')}</em></p>
+					<p><strong>${this.t('settings.logoutUser.warningNote', '此操作不可撤销，请谨慎操作！')}</strong></p>
+				</div>
+				<div class="modal-footer">
+					<button id="cancel-logout-user" class="btn secondary">${this.t('common.cancel', '取消')}</button>
+					<button id="confirm-logout-user" class="btn danger">${this.t('settings.logoutUser.confirmTitle', '确认退出用户')}</button>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// 绑定事件
+		const cancelBtn = modal.querySelector('#cancel-logout-user');
+		const confirmBtn = modal.querySelector('#confirm-logout-user');
+
+		cancelBtn.addEventListener('click', () => {
+			document.body.removeChild(modal);
+		});
+
+		confirmBtn.addEventListener('click', () => {
+			document.body.removeChild(modal);
+			this.handleLogoutUser();
+		});
+
+		// 点击遮罩层关闭
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) {
+				document.body.removeChild(modal);
+			}
+		});
+	}
+
+	/**
+	 * 处理退出用户
+	 */
+	handleLogoutUser() {
+		// 清除所有SPCP相关的数据
+		this.clearAllUserData();
+
+		// 重置应用状态
+		window.app.state.user = null;
+		window.app.state.isAuthenticated = false;
+		window.app.state.userRole = null;
+		window.app.state.permissionInfo = null;
+
+		// 导航到登录页面
+		window.app.navigateTo('/login');
+	}
+
+	/**
+	 * 清除所有用户数据
+	 */
+	clearAllUserData() {
+		// 清除IndexedDB中的所有数据
+		if (window.StorageService) {
+			window.StorageService.clearAllCache();
+		}
+
+		// 清除用户相关的localStorage数据，但保留个人设置
+		const keysToRemove = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key && key.startsWith('spcp-')) {
+				// 保留个人设置相关的数据
+				if (key === 'spcp-language' ||
+					key === 'spcp-theme' ||
+					key === 'spcp-sync-interval') {
+					continue; // 跳过这些个人设置数据
+				}
+				keysToRemove.push(key);
+			}
+		}
+		keysToRemove.forEach(key => localStorage.removeItem(key));
+
+		console.log('用户数据已清除，个人设置已保留');
 	}
 }
 

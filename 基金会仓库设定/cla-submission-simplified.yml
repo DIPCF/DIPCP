@@ -1,0 +1,564 @@
+name: CLA Submission and Transfer
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  process-cla-submission:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.title, 'CLA Submission')
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout Projects repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Checkout CLA repository
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: Zela-Foundation/CLA
+          token: ${{ secrets.CLA_REPOSITORY_TOKEN }}
+          path: cla-repo
+          fetch-depth: 0
+      
+      - name: Setup Git for CLA repository
+        continue-on-error: false
+        run: |
+          cd cla-repo
+          
+          git config user.name "CLA Transfer Bot" || echo "⚠️  Warning: Failed to set user.name"
+          git config user.email "cla-transfer@zela-foundation.org" || echo "⚠️  Warning: Failed to set user.email"
+          
+          # Initialize remote if not exists
+          if ! git remote get-url origin >/dev/null 2>&1; then
+            echo "Adding origin remote..."
+            git remote add origin https://github.com/Zela-Foundation/CLA.git || echo "⚠️  Warning: Remote may already exist"
+          fi
+          
+          # Remove all invalid remote refs
+          echo "Cleaning invalid remote refs..."
+          git for-each-ref --format='%(refname)' refs/remotes/origin 2>/dev/null | while read ref; do
+            if [ ! -z "$ref" ] && ! git rev-parse --verify "$ref^{commit}" >/dev/null 2>&1; then
+              git update-ref -d "$ref" 2>/dev/null || true
+            fi
+          done || true
+          
+          # Remove invalid local refs
+          echo "Cleaning invalid local refs..."
+          git update-ref -d refs/heads/main 2>/dev/null || true
+          git update-ref -d refs/remotes/origin/main 2>/dev/null || true
+          git update-ref -d refs/remotes/origin/HEAD 2>/dev/null || true
+          
+          # Check if repository has any commits
+          if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+            echo "Repository is empty, creating orphan main branch"
+            if ! git checkout --orphan main 2>/dev/null; then
+              # If checkout fails, try to reset and create fresh
+              echo "Retrying orphan branch creation..."
+              rm -rf .git/refs/heads/main .git/refs/remotes/origin/main 2>/dev/null || true
+              git checkout --orphan main
+            fi
+            # Remove all files from staging area for orphan branch
+            git rm -rf . 2>/dev/null || true
+            echo "✅ Created orphan main branch"
+          elif git show-ref --verify --quiet refs/heads/main; then
+            echo "Checking out existing main branch"
+            git checkout main || { echo "❌ Failed to checkout main branch"; exit 1; }
+          else
+            echo "Creating main branch from HEAD"
+            git checkout -b main || { echo "❌ Failed to create main branch"; exit 1; }
+          fi
+          
+          echo "✅ Git setup completed successfully"
+      
+      - name: Extract CLA information from issue
+        id: extract_cla
+        run: |
+          # Extract username from issue title
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          
+          # Extract username (format: "CLA Submission - username")
+          if [[ "$ISSUE_TITLE" =~ CLA\ Submission\ -\ (.+) ]]; then
+            USERNAME="${BASH_REMATCH[1]}"
+            # Trim whitespace
+            USERNAME=$(echo "$USERNAME" | xargs)
+            if [ -z "$USERNAME" ]; then
+              echo "❌ Error: Username is empty after extraction from title: $ISSUE_TITLE"
+              exit 1
+            fi
+          else
+            echo "❌ Error: Could not extract username from issue title"
+            echo "   Expected format: 'CLA Submission - username'"
+            echo "   Actual title: $ISSUE_TITLE"
+            exit 1
+          fi
+          
+          # Extract repository information from issue body
+          REPO_OWNER=""
+          REPO_NAME=""
+          
+          # Look for repository info (format: **仓库：** owner/repo or **仓库：** owner/repo)
+          # Try multiple formats
+          if echo "$ISSUE_BODY" | grep -qE "^\*\*仓库[：:]\*\*|^\*\*.*仓库[：:]\*\*"; then
+            # Try to extract from markdown format first
+            REPO_INFO=$(echo "$ISSUE_BODY" | grep -E "^\*\*仓库[：:]\*\*" | head -1 | sed -E 's/^\*\*仓库[：:]\*\*[[:space:]]*//')
+            if [ -z "$REPO_INFO" ]; then
+              # Try format without markdown: **仓库：** owner/repo
+              REPO_INFO=$(echo "$ISSUE_BODY" | grep -E "\*\*仓库[：:]\*\*" | head -1 | sed -E 's/.*\*\*仓库[：:]\*\*[[:space:]]*//')
+            fi
+            # Trim whitespace from REPO_INFO
+            REPO_INFO=$(echo "$REPO_INFO" | xargs)
+            if [[ "$REPO_INFO" =~ (.+)/(.+) ]]; then
+              REPO_OWNER="${BASH_REMATCH[1]}"
+              REPO_NAME="${BASH_REMATCH[2]}"
+              # Trim whitespace from owner and name
+              REPO_OWNER=$(echo "$REPO_OWNER" | xargs)
+              REPO_NAME=$(echo "$REPO_NAME" | xargs)
+            fi
+          fi
+          
+          # Extract repository description from issue body
+          REPO_DESCRIPTION=""
+          if echo "$ISSUE_BODY" | grep -qE "\*\*描述[：:]\*\*|\*\*.*描述[：:]\*\*"; then
+            REPO_DESCRIPTION=$(echo "$ISSUE_BODY" | grep -E "\*\*描述[：:]\*\*" | head -1 | sed -E 's/.*\*\*描述[：:]\*\*[[:space:]]*//' | xargs)
+          fi
+          
+          # If repository info not found, use default
+          if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+            REPO_OWNER="Zela-Foundation"
+            REPO_NAME="Projects"
+          fi
+          
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "repo_owner=$REPO_OWNER" >> $GITHUB_OUTPUT
+          echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "repo_description=$REPO_DESCRIPTION" >> $GITHUB_OUTPUT
+          
+          # Generate filename
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%S-000Z")
+          CLA_FILENAME="${USERNAME}_${TIMESTAMP}.md"
+          echo "cla_filename=$CLA_FILENAME" >> $GITHUB_OUTPUT
+          
+          echo "Extracted information:"
+          echo "  Username: $USERNAME"
+          echo "  Repository: $REPO_OWNER/$REPO_NAME"
+          echo "  Filename: $CLA_FILENAME"
+      
+      - name: Create CLA file in CLA repository
+        run: |
+          # Create target directory (organized by repository structure)
+          TARGET_DIR="cla-repo/${{ steps.extract_cla.outputs.repo_owner }}/${{ steps.extract_cla.outputs.repo_name }}"
+          mkdir -p "$TARGET_DIR"
+          
+          CLA_FILE="$TARGET_DIR/${{ steps.extract_cla.outputs.cla_filename }}"
+          
+          # Copy CLA content directly from issue body
+          echo "${{ github.event.issue.body }}" > "$CLA_FILE"
+          
+          # Verify file was created
+          if [ ! -f "$CLA_FILE" ]; then
+            echo "❌ Error: CLA file was not created at $CLA_FILE"
+            exit 1
+          fi
+          
+          FILE_SIZE=$(stat -f%z "$CLA_FILE" 2>/dev/null || stat -c%s "$CLA_FILE" 2>/dev/null || echo "0")
+          if [ "$FILE_SIZE" -eq 0 ]; then
+            echo "⚠️  Warning: CLA file is empty"
+          fi
+          
+          echo "✅ Created CLA file: $CLA_FILE (size: ${FILE_SIZE} bytes)"
+      
+      - name: Commit to CLA repository
+        run: |
+          cd cla-repo
+          
+          # Remove any invalid remote refs before checking out
+          git update-ref -d refs/remotes/origin/main 2>/dev/null || true
+          
+          # Ensure we're on main branch
+          CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+          if [ -z "$CURRENT_BRANCH" ] || [ "$CURRENT_BRANCH" != "main" ]; then
+            if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+              # Repository is empty, ensure we're on orphan main branch
+              git update-ref -d refs/heads/main 2>/dev/null || true
+              git checkout --orphan main
+            elif git show-ref --verify --quiet refs/heads/main; then
+              git checkout main
+            else
+              # Create branch from current HEAD if it exists, otherwise orphan
+              if git rev-parse --verify HEAD >/dev/null 2>&1; then
+                git checkout -b main
+              else
+                git checkout --orphan main
+              fi
+            fi
+          fi
+          
+          # Verify CLA file exists before committing
+          CLA_FILE_PATH="${{ steps.extract_cla.outputs.repo_owner }}/${{ steps.extract_cla.outputs.repo_name }}/${{ steps.extract_cla.outputs.cla_filename }}"
+          if [ ! -f "$CLA_FILE_PATH" ]; then
+            echo "❌ Error: CLA file not found at $CLA_FILE_PATH"
+            echo "Files in repository:"
+            find . -type f | head -20
+            exit 1
+          fi
+          
+          echo "Adding CLA file to git: $CLA_FILE_PATH"
+          git add "$CLA_FILE_PATH" || {
+            echo "❌ Error: Failed to add CLA file to git"
+            git status
+            exit 1
+          }
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "⚠️  Warning: No changes to commit (file may already be committed)"
+          else
+            git commit -m "Add CLA file from Projects repository Issue #${{ github.event.issue.number }}
+
+          - User: ${{ steps.extract_cla.outputs.username }}
+          - File: ${{ steps.extract_cla.outputs.cla_filename }}
+          - Issue: #${{ github.event.issue.number }}" || {
+              echo "❌ Error: Failed to commit CLA file"
+              git status
+              exit 1
+            }
+            echo "✅ Successfully committed CLA file"
+          fi
+          
+          # Push to main branch (create if doesn't exist)
+          # Retry push in case of network issues or non-fast-forward errors
+          MAX_PUSH_RETRIES=5
+          PUSH_RETRY=0
+          PUSH_SUCCESS=false
+          PUSH_ERROR=""
+          
+          while [ $PUSH_RETRY -lt $MAX_PUSH_RETRIES ] && [ "$PUSH_SUCCESS" = false ]; do
+            echo "Attempting to push (attempt $((PUSH_RETRY + 1))/$MAX_PUSH_RETRIES)..."
+            PUSH_ERROR=$(git push -u origin main 2>&1) || {
+              # Check if it's a non-fast-forward error
+              if echo "$PUSH_ERROR" | grep -q "non-fast-forward\|Updates were rejected"; then
+                echo "⚠️  Remote branch has new commits, pulling and merging..."
+                
+                # Fetch the latest remote branch
+                git fetch origin main || {
+                  echo "❌ Failed to fetch from origin/main"
+                  PUSH_RETRY=$((PUSH_RETRY + 1))
+                  if [ $PUSH_RETRY -ge $MAX_PUSH_RETRIES ]; then
+                    echo "❌ Failed after $MAX_PUSH_RETRIES attempts"
+                    echo "   Last error: $PUSH_ERROR"
+                    exit 1
+                  fi
+                  continue
+                }
+                
+                # Merge remote changes (allow unrelated histories if needed)
+                MERGE_OUTPUT=$(git merge origin/main --no-edit --allow-unrelated-histories 2>&1)
+                MERGE_EXIT_CODE=$?
+                
+                if [ $MERGE_EXIT_CODE -eq 0 ]; then
+                  echo "✅ Successfully merged remote changes"
+                  # Try push again without incrementing retry counter (since merge succeeded)
+                  continue
+                else
+                  echo "⚠️  Merge encountered issues, trying to resolve..."
+                  echo "   Merge output: $MERGE_OUTPUT"
+                  
+                  # Check if there are merge conflicts
+                  MERGE_CONFLICTS=$(git status --porcelain 2>/dev/null | grep -E "^UU|^AA|^DD|^DU" | wc -l || echo "0")
+                  if [ "$MERGE_CONFLICTS" -gt 0 ]; then
+                    echo "   Detected $MERGE_CONFLICTS conflicted files, resolving..."
+                    # Add all files (including resolved conflicts)
+                    git add . || true
+                    # Complete the merge
+                    git commit --no-edit 2>&1 || git commit -m "Merge remote changes with CLA submission" 2>&1 || {
+                      echo "⚠️  Warning: Could not complete merge commit, but continuing..."
+                    }
+                  elif git status --porcelain 2>/dev/null | grep -q "^M\|^A"; then
+                    # Files were modified/added but no conflicts, just commit
+                    echo "   No conflicts detected, completing merge..."
+                    git add . || true
+                    git commit --no-edit 2>&1 || git commit -m "Merge remote changes with CLA submission" 2>&1 || true
+                  fi
+                  
+                  # Try push again
+                  continue
+                fi
+              else
+                # Other error (network, permission, etc.)
+                PUSH_RETRY=$((PUSH_RETRY + 1))
+                if [ $PUSH_RETRY -lt $MAX_PUSH_RETRIES ]; then
+                  BACKOFF_DELAY=$((PUSH_RETRY * 2))
+                  echo "⚠️  Push failed (non-merge error), retrying in ${BACKOFF_DELAY} seconds..."
+                  echo "   Error: $PUSH_ERROR"
+                  sleep $BACKOFF_DELAY
+                  
+                  # Fetch latest before retry
+                  git fetch origin main 2>&1 || true
+                else
+                  echo "❌ Failed to push after $MAX_PUSH_RETRIES attempts"
+                  echo "   Last error: $PUSH_ERROR"
+                  echo "   This may be due to permission issues or network problems"
+                  echo "   Please check CLA_REPOSITORY_TOKEN permissions"
+                  exit 1
+                fi
+                continue
+              fi
+            }
+            # If we get here, push was successful
+            PUSH_SUCCESS=true
+            echo "✅ Successfully pushed to origin/main"
+          done
+          
+          if [ "$PUSH_SUCCESS" = true ]; then
+            echo "✅ Successfully transferred CLA file to Zela-Foundation/CLA"
+          else
+            echo "❌ CLA file was created locally but push to remote failed"
+            exit 1
+          fi
+
+      - name: Update Projects.json in Projects repository
+        id: update_projects
+        continue-on-error: false
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CLA_REPOSITORY_TOKEN }}
+          script: |
+            // Always update Projects.json in Zela-Foundation/Projects
+            const projectsOwner = 'Zela-Foundation';
+            const projectsRepo = 'Projects';
+            const targetOwner = '${{ steps.extract_cla.outputs.repo_owner }}';
+            const targetRepo = '${{ steps.extract_cla.outputs.repo_name }}';
+
+            try {
+              console.log(`📋 Updating Projects.json in ${projectsOwner}/${projectsRepo}`);
+              console.log(`🎯 Adding repository entry: ${targetOwner}/${targetRepo}`);
+              
+              // Verify token is available (in github-script, token is automatically available via github)
+              console.log(`🔑 Using GitHub token for authentication`);
+              
+              // Extract repository description from step output
+              const targetDescription = '${{ steps.extract_cla.outputs.repo_description }}' || '';
+              
+              // Simply construct the repository entry from extracted info
+              // No need to verify repository exists - just add the URL
+            const entry = {
+                repository: `https://github.com/${targetOwner}/${targetRepo}`,
+                description: targetDescription,
+                createdAt: new Date().toISOString()
+              };
+              
+              console.log(`📝 Entry to add:`, JSON.stringify(entry, null, 2));
+
+            const path = 'Projects.json';
+            let contentArray = [];
+            let sha = undefined;
+              
+              // Always use 'main' branch for Zela-Foundation/Projects
+              const branch = 'main';
+              
+              // Read existing Projects.json from main branch
+              // If file doesn't exist (404), we'll create it
+              try {
+                const file = await github.rest.repos.getContent({ 
+                  owner: projectsOwner, 
+                  repo: projectsRepo, 
+                  path,
+                  ref: branch
+                });
+              const decoded = Buffer.from(file.data.content, 'base64').toString();
+              contentArray = JSON.parse(decoded);
+              sha = file.data.sha;
+                console.log(`📖 Read existing Projects.json with ${contentArray.length} entries`);
+            } catch (e) {
+                if (e.status === 404) {
+                  console.log('📄 Projects.json does not exist, will create new file');
+                  contentArray = [];
+                  sha = undefined;
+                } else {
+                  console.error(`❌ Error reading Projects.json: ${e.message}`);
+                  console.error(`   Status: ${e.status}`);
+                  console.error(`   This might be a permission issue`);
+                  // For non-404 errors, try to continue anyway (file might be inaccessible but we can try to create)
+              contentArray = [];
+                  sha = undefined;
+                }
+              }
+
+              // Check if entry already exists to avoid duplicates
+              const exists = contentArray.some(item => item.repository === entry.repository);
+              if (!exists) {
+                console.log(`📝 Adding new entry to Projects.json on ${branch} branch`);
+                
+                // Retry mechanism for concurrent writes
+                const maxRetries = 5;
+                let retryCount = 0;
+                let success = false;
+                let currentSha = sha;
+                let currentContentArray = [...contentArray];
+                
+                while (retryCount < maxRetries && !success) {
+                  try {
+                    // Add entry if not exists
+                    const newArray = [...currentContentArray];
+                    if (!newArray.some(item => item.repository === entry.repository)) {
+                      newArray.push(entry);
+                    }
+                    
+                    const newContent = Buffer.from(JSON.stringify(newArray, null, 2)).toString('base64');
+
+                    console.log(`📤 Attempting to write Projects.json to ${projectsOwner}/${projectsRepo} on ${branch} branch`);
+                    console.log(`   Content size: ${newContent.length} bytes`);
+                    console.log(`   SHA: ${currentSha || 'undefined (new file)'}`);
+                    
+                    const result = await github.rest.repos.createOrUpdateFileContents({
+              owner: projectsOwner,
+              repo: projectsRepo,
+              path,
+              message: `chore: add project ${targetOwner}/${targetRepo} to Projects.json`,
+              content: newContent,
+                      branch: branch,
+                      sha: currentSha || undefined
+                    });
+                    
+                    console.log(`✅ Successfully added ${targetOwner}/${targetRepo} to Projects.json (attempt ${retryCount + 1})`);
+                    console.log(`   Commit SHA: ${result.data.commit.sha}`);
+                    console.log(`   File URL: ${result.data.content.html_url}`);
+                    success = true;
+                  } catch (error) {
+                    if (error.status === 409 && retryCount < maxRetries - 1) {
+                      // Conflict - file was modified by another process
+                      retryCount++;
+                      const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Exponential backoff, max 10s
+                      console.log(`⚠️  Conflict detected (409), retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})...`);
+                      
+                      // Wait before retry
+                      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                      
+                      // Re-read the file to get latest version
+                      try {
+                        const file = await github.rest.repos.getContent({
+                          owner: projectsOwner,
+                          repo: projectsRepo,
+                          path,
+                          ref: branch
+                        });
+                        const decoded = Buffer.from(file.data.content, 'base64').toString();
+                        currentContentArray = JSON.parse(decoded);
+                        currentSha = file.data.sha;
+                        console.log(`📖 Re-read Projects.json, now has ${currentContentArray.length} entries`);
+                      } catch (e) {
+                        if (e.status === 404) {
+                          // File was deleted or doesn't exist, start fresh
+                          console.log(`⚠️  File not found during retry, creating new file`);
+                          currentContentArray = [];
+                          currentSha = undefined;
+                        } else {
+                          console.error(`❌ Failed to re-read file: ${e.message}`);
+                          throw e;
+                        }
+                      }
+                    } else {
+                      // Not a conflict or max retries reached
+                      throw error;
+                    }
+                  }
+                }
+                
+                if (!success) {
+                  throw new Error(`Failed to update Projects.json after ${maxRetries} attempts`);
+                }
+                
+                core.setOutput('needMerge', 'false');
+              } else {
+                console.log(`ℹ️  Project ${targetOwner}/${targetRepo} already exists in Projects.json`);
+                core.setOutput('needMerge', 'false');
+              }
+            } catch (error) {
+              console.error(`❌ Failed to update Projects.json: ${error.message}`);
+              console.error(`   Status: ${error.status}`);
+              console.error(`   Target repository: ${targetOwner}/${targetRepo}`);
+              console.error(`   Target file location: ${projectsOwner}/${projectsRepo}/Projects.json`);
+              console.error(`   Error details:`, JSON.stringify(error.response?.data || error, null, 2));
+              
+              if (error.status === 404) {
+                console.error(`   ⚠️  404 Error - Repository ${projectsOwner}/${projectsRepo} not found or not accessible`);
+                console.error(`   Please check if the repository exists and CLA_REPOSITORY_TOKEN has access`);
+              } else if (error.status === 403) {
+                console.error(`   ⚠️  403 Error - Permission denied`);
+                console.error(`   CLA_REPOSITORY_TOKEN may not have write access to ${projectsOwner}/${projectsRepo}`);
+                console.error(`   Please check repository permissions and token scopes`);
+              } else if (error.status === 422) {
+                console.error(`   ⚠️  422 Error - Validation failed`);
+                console.error(`   This might be due to invalid file path or branch name`);
+              } else {
+                console.error(`   ⚠️  Unexpected error occurred`);
+              }
+              
+              // For permission and access errors, throw to make them visible
+              // For other errors (like repo not found), we can allow workflow to continue
+              if (error.status === 403 || error.status === 404) {
+                // These are critical - throw to show the error
+                throw error;
+              } else {
+                // For other errors, log but don't throw
+                core.setOutput('needMerge', 'false');
+                console.error(`⚠️  Non-critical error - workflow will continue`);
+              }
+            }
+      
+      - name: Add success comment to original issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ **CLA Processing Complete**
+
+              **Processing Results:**
+              - ✅ CLA file created and transferred to Zela-Foundation/CLA repository
+              
+              **File Information:**
+              - Filename: \`${{ steps.extract_cla.outputs.cla_filename }}\`
+              - Location: \`Zela-Foundation/CLA/${{ steps.extract_cla.outputs.repo_owner }}/${{ steps.extract_cla.outputs.repo_name }}/\`
+              - User: ${{ steps.extract_cla.outputs.username }}
+              
+              **Status:** Processing Complete ✅`
+            });
+            
+            // Add success labels
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['cla-processed', 'success']
+            });
+            
+            // Close issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+      
+      - name: Create summary
+        run: |
+          echo "## CLA Submission and Transfer Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📝 **Source Issue:** #${{ github.event.issue.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "👤 **User:** ${{ steps.extract_cla.outputs.username }}" >> $GITHUB_STEP_SUMMARY
+          echo "📁 **CLA File:** ${{ steps.extract_cla.outputs.cla_filename }}" >> $GITHUB_STEP_SUMMARY
+          echo "🏢 **Target:** Zela-Foundation/CLA/${{ steps.extract_cla.outputs.repo_owner }}/${{ steps.extract_cla.outputs.repo_name }}/" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Status:** Successfully processed CLA submission" >> $GITHUB_STEP_SUMMARY

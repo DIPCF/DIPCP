@@ -197,9 +197,15 @@ class SPCPApp {
 		// 处理根路径重定向
 		if (path === '/' || path === '') {
 			if (this.state.user && this.state.user.token) {
-				// 已登录用户重定向到仓库选择页面
-				this.navigateTo('/repository-selection');
-				return;
+				// 已登录用户：检查是否有仓库信息
+				if (this.state.user.repositoryInfo || this.state.user.repositoryUrl) {
+					// 有仓库信息，显示仪表盘（继续后面的逻辑来渲染）
+					// 不需要重定向，让路由正常处理
+				} else {
+					// 没有仓库信息，重定向到仓库选择页面
+					this.navigateTo('/repository-selection');
+					return;
+				}
 			} else {
 				// 未登录用户重定向到登录页面
 				this.navigateTo('/login');

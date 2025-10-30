@@ -160,8 +160,8 @@ class LoginPage extends BasePage {
 		return `
             <div class="login-button-container">
                 <button id="login-btn" class="btn btn-primary ${loadingClass}" ${disabledAttr}>
-                    <span class="btn-text">${this.state.loading ? '登录中...' : '登录'}</span>
-                    <span class="btn-loading" style="display: none;">登录中...</span>
+                    <span class="btn-text">${this.state.loading ? this.t('login.loggingIn', '登录中...') : this.t('login.loginButton', '登录')}</span>
+                    <span class="btn-loading" style="display: none;">${this.t('login.loggingIn', '登录中...')}</span>
                 </button>
             </div>
         `;
@@ -445,6 +445,13 @@ class LoginPage extends BasePage {
 		localStorage.setItem('spcp-user', JSON.stringify(userInfoToSave));
 		console.log('用户信息已保存');
 
+		// 更新app状态
+		if (window.app) {
+			window.app.state.user = userInfoToSave;
+			window.app.state.isAuthenticated = true;
+			console.log('App状态已更新');
+		}
+
 		// 保存凭据（总是保存）
 		this.saveCredentials(formData);
 
@@ -490,7 +497,7 @@ class LoginPage extends BasePage {
 				break;
 			default:
 				loginBtn.disabled = false;
-				loginBtn.innerHTML = `<span class="btn-text">登录</span>`;
+				loginBtn.innerHTML = `<span class="btn-text">${this.t('login.loginButton', '登录')}</span>`;
 		}
 	}
 

@@ -88,16 +88,23 @@ class IssuesPage extends BasePage {
 		// 检查用户是否登录
 		const userInfo = window.app.getUserFromStorage();
 		if (!userInfo.user) {
-			return '<div class="page-container"><p>请先登录</p></div>';
+			const container = document.createElement('div');
+			container.className = 'dashboard';
+			container.innerHTML = `
+				${this.renderHeader()}
+				<div class="content">
+					<p>请先登录</p>
+				</div>
+			`;
+			return container;
 		}
 
-		// 创建页面容器
-		const pageDiv = document.createElement('div');
-		pageDiv.className = 'page-container';
-		pageDiv.innerHTML = `
-			${this.renderHeader('issues', true, userInfo.user)}
-			
-			<div class="issues-page">
+		// 创建页面容器，使用标准的 dashboard 布局
+		const container = document.createElement('div');
+		container.className = 'dashboard';
+		container.innerHTML = `
+			${this.renderHeader()}
+			<div class="content">
 				<div class="issues-container">
 					${this.renderIssuesHeader()}
 					${this.renderIssuesContent()}
@@ -105,7 +112,17 @@ class IssuesPage extends BasePage {
 			</div>
 		`;
 
-		return pageDiv;
+		return container;
+	}
+
+	/**
+	 * 渲染页面头部
+	 * @returns {string} 头部HTML字符串
+	 */
+	renderHeader() {
+		// 使用BasePage的renderHeader方法，保持与其他页面一致
+		const userInfo = window.app.getUserFromStorage();
+		return super.renderHeader('issues', true, userInfo.user);
 	}
 
 	/**

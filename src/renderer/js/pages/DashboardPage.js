@@ -363,67 +363,214 @@ class DashboardPage extends BasePage {
 	 * @returns {Promise<void>}
 	 */
 	async handleApplicationSubmit() {
+		const user = this.state.user;
+		const repoInfo = this.parseGitHubUrl(user.repositoryUrl);
+		await this.showCLAAgreement(repoInfo, user, async () => {
+			console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
+			try {
+				// 1. 显示正在申请·状态
+				this.showReviewingStatus();
+				// 2. 提交申请
+				await this.applyContribution();
+				// 3. 开始轮询工作流状态
+				await this.pollCollaboratorInvitation();
+			} catch (error) {
+				// 根据错误类型显示不同的消息
+				if (error.message.includes('403')) {
+					this.showError(this.t('dashboard.application.error.insufficientPermissions', '申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。'));
+				} else if (error.message.includes('401')) {
+					this.showError(this.t('dashboard.application.error.authenticationFailed', '申请提交失败：认证失败。请检查您的GitHub Token是否有效。'));
+				} else {
+					this.showError(this.t('dashboard.application.error.general', '申请提交失败：{errorMessage}').replace('{errorMessage}', error.message));
+				}
+			}
+		});
+	}
+
+	/**
+	 * 申请贡献
+	 */
+	async applyContribution() {
 		try {
-			// 1. 显示正在申请状态
-			this.showReviewingStatus();
+			const user = this.state.user;
 
-			// 2. 从localStorage获取用户信息
-			const userData = localStorage.getItem('spcp-user');
-			const user = JSON.parse(userData);
+			// 解析仓库信息
+			let repoInfo;
+			if (user.repositoryUrl) {
+				repoInfo = this.parseGitHubUrl(user.repositoryUrl);
+			} else if (user.repositoryInfo) {
+				repoInfo = user.repositoryInfo;
+			}
 
-			// 3. 获取当前仓库信息
-			const repoInfo = this.getRepositoryInfo();
 			if (!repoInfo) {
 				throw new Error(this.t('dashboard.errors.invalidRepositoryUrl', '无效的仓库地址'));
 			}
 
-			// 4. 检查用户是否已签署CLA，如果没有则先签署CLA
-			if (!user.claSigned) {
-				await this.showCLAAgreement(repoInfo, user, async () => {
-					// CLA签署成功后的回调：继续申请流程
-					await this.continueApplicationProcess(user, repoInfo);
-				});
-			} else {
-				// 如果已签署CLA，直接继续申请流程
-				await this.continueApplicationProcess(user, repoInfo);
-			}
+			// 调用createContributionApplication方法
+			const application = await this.createContributionApplication(
+				repoInfo.owner,
+				repoInfo.repo,
+				user.username,
+				user.email,
+				user.token
+			);
 
+			return application;
 		} catch (error) {
-			// 根据错误类型显示不同的消息
-			if (error.message.includes('403')) {
-				this.showError(this.t('dashboard.application.error.insufficientPermissions', '申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。'));
-			} else if (error.message.includes('401')) {
-				this.showError(this.t('dashboard.application.error.authenticationFailed', '申请提交失败：认证失败。请检查您的GitHub Token是否有效。'));
-			} else {
-				this.showError(this.t('dashboard.application.error.general', '申请提交失败：{errorMessage}').replace('{errorMessage}', error.message));
-			}
-		}
-	}
-
-	/**
-	 * 继续申请流程（CLA签署完成后）
-	 * @param {Object} user - 用户信息
-	 * @param {Object} repoInfo - 仓库信息
-	 * @returns {Promise<void>}
-	 */
-	async continueApplicationProcess(user, repoInfo) {
-		try {
-			// 1. 同时申请成为仓库协作者和组织成员
-			await this.applyMembership(user, 'collaborator', repoInfo);
-			await this.applyMembership(user, 'member');
-
-			// 2. 开始轮询工作流状态（检查仓库协作者权限）
-			await this.pollCollaboratorInvitation(user, repoInfo);
-		} catch (error) {
+			console.error('Error creating contribution application:', error);
 			throw error;
 		}
 	}
 
 	/**
-	 * 成员申请成功回调
+	 * 创建贡献申请
 	 */
-	onMembershipSuccess() {
-		this.showCollaboratorSuccessStatus();
+	async createContributionApplication(owner, repo, username, email, token) {
+		try {
+			const octokit = new window.Octokit({ auth: token });
+
+			// 创建issue作为贡献申请
+			const issueTitle = `Become a collaborator - ${username}`;
+
+			// 创建issue
+			const { data } = await octokit.rest.issues.create({
+				owner, repo,
+				title: issueTitle,
+				body: ''
+			});
+			const issue = data;
+
+			return {
+				success: true,
+				applicationId: issue.id,
+				issueNumber: issue.number,
+				issueUrl: issue.html_url
+			};
+		} catch (error) {
+			console.error('创建贡献申请失败:', error);
+			return {
+				success: false,
+				error: error.message
+			};
+		}
+	}
+
+	/**
+	 * 轮询协作者邀请
+	 */
+	async pollCollaboratorInvitation() {
+		const user = this.state.user;
+
+		const octokit = new window.Octokit({ auth: user.token });
+		const maxAttempts = 60; // 最多轮询60次，每次间隔5秒，总共5分钟
+		let attempts = 0;
+		const headers = {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
+
+		let acceptResult;
+		let firstAccept = false;
+
+		while (attempts < maxAttempts) {
+			try {
+				attempts++;
+				console.log(`第 ${attempts} 次检查协作者邀请...`);
+
+				// 使用 octokit.request 获取特定仓库的邀请列表
+				const response = await octokit.request('GET /user/repository_invitations', {
+					headers: headers
+				});
+				const invitations = response.data;
+
+				// 由于查询时已经限定了特定仓库，直接获取最新的邀请
+				const repoInvitation = invitations && invitations.length > 0 ? invitations[invitations.length - 1] : null;
+
+				if (repoInvitation) {
+					// 接受邀请 
+					console.log(`正在接受邀请 ID: ${repoInvitation.id}`);
+
+					try {
+						// 使用官方推荐的 octokit.request 方法
+						acceptResult = await octokit.request('PATCH /user/repository_invitations/{invitation_id}', {
+							invitation_id: repoInvitation.id,
+							headers: headers
+						});
+						if (acceptResult.status === 204) {
+							console.log('接受邀请成功，状态码:', acceptResult.status);
+							await this.pollUserPermissions();
+							return;
+							//之前的处理流程有BUG需要提交两次，后来莫名其妙好了，所以代码暂时保留
+							if (!firstAccept) {
+								firstAccept = true;
+								await new Promise(resolve => setTimeout(resolve, 60000));
+								await this.applyContribution();
+							} else {
+								// 开始轮询检查用户权限
+								await this.pollUserPermissions();
+								return;
+							}
+						}
+					} catch (acceptError) {
+						console.log('接受邀请失败:', acceptError.message);
+						throw acceptError;
+					}
+				} else {
+					console.log('暂无协作者邀请，继续等待...');
+				}
+
+				// 等待5秒后再次检查（除了最后一次）
+				if (attempts < maxAttempts) {
+					console.log('等待5秒后再次检查...');
+					await new Promise(resolve => setTimeout(resolve, 5000));
+				}
+
+			} catch (error) {
+				console.error('轮询协作者邀请时出错:', error);
+			}
+		}
+	}
+
+	/**
+	 * 轮询检查用户权限
+	 */
+	async pollUserPermissions() {
+		const user = this.state.user;
+		const repoInfo = this.getRepositoryInfo();
+
+		const octokit = new window.Octokit({ auth: user.token });
+		const maxAttempts = 30; // 最多轮询30次，每次间隔1秒，总共30秒
+		let attempts = 0;
+
+		console.log('开始轮询检查用户权限...');
+
+		while (attempts < maxAttempts) {
+			try {
+				attempts++;
+
+				// 检查用户是否已经是协作者且有写入权限
+				const repoResult = await octokit.rest.repos.get({
+					owner: repoInfo.owner,
+					repo: repoInfo.repo
+				});
+
+				const permissions = repoResult.data.permissions;
+				console.log('用户权限:', permissions);
+
+				if (permissions && permissions.push) {
+					this.showCollaboratorSuccessStatus();
+					return;
+				}
+
+				// 等待1秒后再次检查（除了最后一次）
+				if (attempts < maxAttempts) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+
+			} catch (error) {
+				console.log('检查权限时出错:', error.message);
+				// 继续轮询，不中断
+			}
+		}
 	}
 
 	/**
@@ -602,6 +749,19 @@ class DashboardPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 解析GitHub URL
+	 */
+	parseGitHubUrl(url) {
+		const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+		if (match) {
+			return {
+				owner: match[1],
+				repo: match[2].replace(/\.git$/, '')
+			};
+		}
+		return null;
+	}
 }
 
 /**
