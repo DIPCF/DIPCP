@@ -1,8 +1,8 @@
-# SPCP - Serverless Project Contribution Platform
+# DIPCP - Serverless Project Contribution Platform
 
 ## 项目简介
 
-SPCP（无服务器项目贡献平台）是一个基于GitHub的无服务器协作平台，旨在为开源项目提供内容管理和协作功能。
+DIPCP（无服务器项目贡献平台）是一个基于GitHub的无服务器协作平台，旨在为开源项目提供内容管理和协作功能。
 
 ## 核心特性
 

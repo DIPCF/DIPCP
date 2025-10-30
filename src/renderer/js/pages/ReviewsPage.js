@@ -33,7 +33,7 @@ class ReviewsPage extends BasePage {
 		return `
             <header class="header">
                 <div class="header-left">
-                    <h1>SPCP</h1>
+                    <h1>DIPCP</h1>
                     <nav class="nav-menu">
                         <a href="#" class="nav-item" data-i18n="navigation.dashboard">仪表盘</a>
                         <a href="#" class="nav-item" data-i18n="navigation.projectDetail">项目详情</a>

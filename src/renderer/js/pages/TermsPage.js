@@ -48,7 +48,7 @@ class TermsPage extends BasePage {
 		return `
             <div class="legal-header">
                 <h1 class="legal-title">${this.t('terms.title', '服务条款')}</h1>
-                <p class="legal-subtitle">${this.t('terms.subtitle', 'SPCP (Serverless Project Contribution Platform) 使用协议')}</p>
+                <p class="legal-subtitle">${this.t('terms.subtitle', 'DIPCP (Serverless Project Contribution Platform) 使用协议')}</p>
                 <p class="legal-subtitle">${this.t('terms.lastUpdated', '最后更新：2025年10月22日')}</p>
             </div>
         `;
@@ -82,7 +82,7 @@ class TermsPage extends BasePage {
             <div class="highlight">
                 <p>
                     <strong>${this.t('terms.importantNoticeTitle', '重要提示：')}</strong>
-                    <span>${this.t('terms.importantNoticeContent', 'SPCP是一个完全透明的无服务器协作平台。所有数据都公开存储在GitHub仓库中，请仔细阅读本使用协议。')}</span>
+                    <span>${this.t('terms.importantNoticeContent', 'DIPCP是一个完全透明的无服务器协作平台。所有数据都公开存储在GitHub仓库中，请仔细阅读本使用协议。')}</span>
                 </p>
             </div>
         `;
@@ -93,7 +93,7 @@ class TermsPage extends BasePage {
             <div class="transparency">
                 <p>
                     <strong>${this.t('terms.transparencyPrincipleTitle', '透明度原则：')}</strong>
-                    <span>${this.t('terms.transparencyPrincipleContent', 'SPCP遵循完全透明的设计原则，所有参与者、参与过程、获得的好处全部明文公开，全程可追溯。')}</span>
+                    <span>${this.t('terms.transparencyPrincipleContent', 'DIPCP遵循完全透明的设计原则，所有参与者、参与过程、获得的好处全部明文公开，全程可追溯。')}</span>
                 </p>
             </div>
         `;
@@ -102,8 +102,8 @@ class TermsPage extends BasePage {
 	renderSection1() {
 		return `
             <h2>${this.t('terms.section1.title', '1. 平台概述')}</h2>
-            <p>${this.t('terms.section1.content1', 'SPCP（无服务器项目贡献平台）是一个基于GitHub的协作平台，专门用于去中心化的世界构建、内容创作和协作项目。本平台采用完全透明的设计理念，所有数据公开存储。')}</p>
-            <p><strong>${this.t('terms.section1.content2', '重要说明：SPCP本身不提供任何服务，所有服务均由GitHub提供。我们仅提供一个客户端应用程序，帮助用户更好地使用GitHub的协作功能。')}</strong></p>
+            <p>${this.t('terms.section1.content1', 'DIPCP（无服务器项目贡献平台）是一个基于GitHub的协作平台，专门用于去中心化的世界构建、内容创作和协作项目。本平台采用完全透明的设计理念，所有数据公开存储。')}</p>
+            <p><strong>${this.t('terms.section1.content2', '重要说明：DIPCP本身不提供任何服务，所有服务均由GitHub提供。我们仅提供一个客户端应用程序，帮助用户更好地使用GitHub的协作功能。')}</strong></p>
         `;
 	}
 
@@ -122,7 +122,7 @@ class TermsPage extends BasePage {
 
             <h3>${this.t('terms.section2.subtitle2', '2.2 不适合的项目类型')}</h3>
             <div class="warning">
-                <p><strong>${this.t('terms.section2.warningTitle', '重要提醒：')}</strong>${this.t('terms.section2.warningContent', '以下类型的项目不适合使用SPCP：')}</p>
+                <p><strong>${this.t('terms.section2.warningTitle', '重要提醒：')}</strong>${this.t('terms.section2.warningContent', '以下类型的项目不适合使用DIPCP：')}</p>
                 <ul>
                     <li>${this.t('terms.section2.warning1', '商业机密项目：涉及商业机密的内部项目')}</li>
                     <li>${this.t('terms.section2.warning2', '个人隐私内容：涉及个人隐私的敏感信息')}</li>
@@ -138,7 +138,7 @@ class TermsPage extends BasePage {
 	renderSection3() {
 		return `
             <h2>${this.t('terms.section3.title', '3. 平台功能')}</h2>
-            <p>${this.t('terms.section3.content1', 'SPCP客户端应用程序提供以下功能：')}</p>
+            <p>${this.t('terms.section3.content1', 'DIPCP客户端应用程序提供以下功能：')}</p>
             <ul>
                 <li>${this.t('terms.section3.feature1', '基于GitHub的版本控制和协作功能')}</li>
                 <li>${this.t('terms.section3.feature2', '文件编辑和管理工具（支持Markdown、文本、图片等）')}</li>
@@ -201,7 +201,7 @@ class TermsPage extends BasePage {
 	renderSection6() {
 		return `
             <h2>${this.t('terms.section6.title', '6. 知识产权')}</h2>
-            <p>${this.t('terms.section6.content1', '用户保留其创建内容的所有知识产权。通过使用SPCP平台，用户授予我们必要的许可来提供和改善平台功能。所有内容将按照开源协议进行管理。')}</p>
+            <p>${this.t('terms.section6.content1', '用户保留其创建内容的所有知识产权。通过使用DIPCP平台，用户授予我们必要的许可来提供和改善平台功能。所有内容将按照开源协议进行管理。')}</p>
         `;
 	}
 
@@ -234,7 +234,7 @@ class TermsPage extends BasePage {
 	renderSection8() {
 		return `
             <h2>${this.t('terms.section8.title', '8. 服务依赖')}</h2>
-            <p>${this.t('terms.section8.content1', 'SPCP平台依赖以下第三方服务：')}</p>
+            <p>${this.t('terms.section8.content1', 'DIPCP平台依赖以下第三方服务：')}</p>
             <ul>
                 <li><strong>${this.t('terms.section8.dependency1', 'GitHub服务：所有数据存储、版本控制、协作功能均由GitHub提供')}</strong></li>
                 <li><strong>${this.t('terms.section8.dependency2', '网络连接：需要稳定的网络连接访问GitHub')}</strong></li>
@@ -247,7 +247,7 @@ class TermsPage extends BasePage {
 	renderSection9() {
 		return `
             <h2>${this.t('terms.section9.title', '9. 平台可用性')}</h2>
-            <p>${this.t('terms.section9.content1', '我们努力保持SPCP客户端应用程序的可用性，但不保证应用程序不会出现故障。应用程序可能因以下原因暂时不可用：')}</p>
+            <p>${this.t('terms.section9.content1', '我们努力保持DIPCP客户端应用程序的可用性，但不保证应用程序不会出现故障。应用程序可能因以下原因暂时不可用：')}</p>
             <ul>
                 <li>${this.t('terms.section9.reason1', '应用程序更新和维护')}</li>
                 <li>${this.t('terms.section9.reason2', '技术故障或错误')}</li>
@@ -261,7 +261,7 @@ class TermsPage extends BasePage {
 		return `
             <div class="warning">
                 <h2>${this.t('terms.section10.title', '10. 免责声明')}</h2>
-                <p><strong>${this.t('terms.section10.disclaimerTitle', '免责声明：')}</strong>${this.t('terms.section10.disclaimerContent', 'SPCP客户端应用程序按"现状"提供，不提供任何明示或暗示的保证。我们不承担因使用本应用程序而产生的任何直接或间接损失。由于数据完全公开存储，用户应自行评估隐私风险。')}</p>
+                <p><strong>${this.t('terms.section10.disclaimerTitle', '免责声明：')}</strong>${this.t('terms.section10.disclaimerContent', 'DIPCP客户端应用程序按"现状"提供，不提供任何明示或暗示的保证。我们不承担因使用本应用程序而产生的任何直接或间接损失。由于数据完全公开存储，用户应自行评估隐私风险。')}</p>
             </div>
         `;
 	}
@@ -269,14 +269,14 @@ class TermsPage extends BasePage {
 	renderSection11() {
 		return `
             <h2>${this.t('terms.section11.title', '11. 平台变更')}</h2>
-            <p>${this.t('terms.section11.content1', '我们保留随时修改、暂停或终止SPCP客户端应用程序的权利。重大变更将提前通知用户。所有变更记录将公开存储，确保透明度。')}</p>
+            <p>${this.t('terms.section11.content1', '我们保留随时修改、暂停或终止DIPCP客户端应用程序的权利。重大变更将提前通知用户。所有变更记录将公开存储，确保透明度。')}</p>
         `;
 	}
 
 	renderSection12() {
 		return `
             <h2>${this.t('terms.section12.title', '12. 争议解决')}</h2>
-            <p>${this.t('terms.section12.content1', '因使用SPCP平台产生的争议，应通过友好协商解决。协商不成的，可向有管辖权的人民法院提起诉讼。所有争议解决过程将保持透明。')}</p>
+            <p>${this.t('terms.section12.content1', '因使用DIPCP平台产生的争议，应通过友好协商解决。协商不成的，可向有管辖权的人民法院提起诉讼。所有争议解决过程将保持透明。')}</p>
         `;
 	}
 
@@ -303,7 +303,7 @@ class TermsPage extends BasePage {
 	renderFooter() {
 		return `
             <div class="legal-footer">
-                <p>${this.t('terms.footer.copyright', '© 2025 SPCP Platform. 保留所有权利。')}</p>
+                <p>${this.t('terms.footer.copyright', '© 2025 DIPCP Platform. 保留所有权利。')}</p>
                 <a href="#" class="back-link">${this.t('terms.footer.backLink', '返回登录页面')}</a>
             </div>
         `;

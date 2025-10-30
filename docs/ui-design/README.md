@@ -1,8 +1,8 @@
-# SPCP UI设计文档
+# DIPCP UI设计文档
 
 ## 📋 文档信息
 
-- **项目名称**: SPCP - UI设计文档
+- **项目名称**: DIPCP - UI设计文档
 - **版本**: v1.0
 - **创建日期**: 2025年10月21日
 - **最后更新**: 2025年10月21日
@@ -354,8 +354,8 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <img src="/logo.svg" alt="SPCP" class="login-logo">
-        <h1 class="login-title">欢迎使用 SPCP</h1>
+        <img src="/logo.svg" alt="DIPCP" class="login-logo">
+        <h1 class="login-title">欢迎使用 DIPCP</h1>
         <p class="login-subtitle">无服务器项目贡献平台</p>
       </div>
       
@@ -366,7 +366,7 @@
         </button>
         
         <div class="login-features">
-          <h3>为什么选择 SPCP？</h3>
+          <h3>为什么选择 DIPCP？</h3>
           <ul>
             <li>✅ 零运维成本，完全无服务器</li>
             <li>✅ 零学习成本，下载即用</li>

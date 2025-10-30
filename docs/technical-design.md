@@ -1,8 +1,8 @@
-# SPCP 技术设计文档
+# DIPCP 技术设计文档
 
 ## 📋 文档信息
 
-- **项目名称**: SPCP - Serverless Project Contribution Platform
+- **项目名称**: DIPCP - Decentralized Intellectual Property Collaboration Platform
 - **版本**: v1.1
 - **创建日期**: 2025年10月21日
 - **最后更新**: 2025年10月26日
@@ -353,7 +353,7 @@ spcp/
 
 #### 3.1.1 资源加载策略
 
-SPCP采用动态加载策略，在index.html中按需加载资源，避免阻塞页面渲染。
+DIPCP采用一次性加载策略，在index.html中集中加载资源。
 
 **核心原则**：
 - **渐进式加载**: 先加载i18n服务，再加载其他依赖
@@ -428,7 +428,7 @@ graph TD
 
 #### 3.2.1 路由管理器
 
-SPCP采用原生JavaScript实现客户端路由，支持路径匹配、查询参数解析和自动重定向。
+DIPCP采用原生JavaScript实现客户端路由，支持路径匹配、查询参数解析和自动重定向。
 
 **核心功能**：
 - **路由注册**: 定义路径与页面类的映射关系
@@ -543,7 +543,7 @@ class MyPage extends BasePage {
 
 #### 3.3.2 通用模态框组件设计
 
-SPCP提供完全可复用的通用模态框组件，支持三种类型：输入、确认、信息。
+DIPCP提供完全可复用的通用模态框组件，支持三种类型：输入、确认、信息。
 
 **组件特性**：
 - **三种类型**: `input`（输入）、`confirm`（确认）、`info`（信息）
@@ -598,11 +598,11 @@ await Modal.show({
 
 #### 3.4.1 全局状态管理
 
-SPCP采用发布-订阅模式实现全局状态管理，支持状态持久化和监听器通知。
+DIPCP采用发布-订阅模式实现全局状态管理，支持状态持久化和监听器通知。
 
 **状态结构**：
 ```javascript
-class SPCPApp {
+class DIPCPApp {
     constructor() {
         this.state = {
             // 用户相关
@@ -998,7 +998,7 @@ sequenceDiagram
     GitHub->>User: 发送通知（邮件+推送）
     
     Note over User: 2. 接收通知
-    User->>UI: 登录SPCP
+    User->>UI: 登录DIPCP
     UI->>GitHub: 查询Issues列表
     GitHub-->>UI: 返回包含@mention的Issue
     UI->>UI: 显示红色圆点提示
@@ -1101,7 +1101,7 @@ sequenceDiagram
 
 ### 8.1 设计理念
 
-SPCP采用模板文件系统来管理外部配置文件，避免在JavaScript代码中硬编码复杂内容，提高代码的可维护性和可读性。
+DIPCP采用模板文件系统来管理外部配置文件，避免在JavaScript代码中硬编码复杂内容，提高代码的可维护性和可读性。
 
 **核心设计原则：**
 - **分离关注点**: 将配置文件与业务逻辑完全分离

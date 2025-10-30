@@ -188,7 +188,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	loadProjectDataFromStorage() {
 		try {
-			const cached = localStorage.getItem('spcp-project-data');
+			const cached = localStorage.getItem('dipcp-project-data');
 			if (cached) {
 				const projectData = JSON.parse(cached);
 				return projectData;
@@ -205,7 +205,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	loadFilesDataFromStorage() {
 		try {
-			const cached = localStorage.getItem('spcp-files-data');
+			const cached = localStorage.getItem('dipcp-files-data');
 			if (cached) {
 				const filesData = JSON.parse(cached);
 				return filesData || [];
@@ -222,7 +222,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	loadModuleStates() {
 		try {
-			const cached = localStorage.getItem('spcp-project-module-states');
+			const cached = localStorage.getItem('dipcp-project-module-states');
 			const states = cached ? JSON.parse(cached) : {
 				projectInfo: false,
 				members: false,
@@ -248,7 +248,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	saveProjectDataToStorage(project) {
 		try {
-			localStorage.setItem('spcp-project-data', JSON.stringify(project));
+			localStorage.setItem('dipcp-project-data', JSON.stringify(project));
 		} catch (error) {
 			console.error('保存项目数据失败:', error);
 		}
@@ -261,7 +261,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	saveFilesDataToStorage(files) {
 		try {
-			localStorage.setItem('spcp-files-data', JSON.stringify(files));
+			localStorage.setItem('dipcp-files-data', JSON.stringify(files));
 		} catch (error) {
 			console.error('保存文件数据失败:', error);
 		}
@@ -273,7 +273,7 @@ class ProjectDetailPage extends BasePage {
 	 */
 	saveModuleStates() {
 		try {
-			localStorage.setItem('spcp-project-module-states', JSON.stringify(this.state.moduleStates));
+			localStorage.setItem('dipcp-project-module-states', JSON.stringify(this.state.moduleStates));
 		} catch (error) {
 			console.error('保存模块状态缓存失败:', error);
 		}
@@ -286,7 +286,7 @@ class ProjectDetailPage extends BasePage {
 	async loadMembersCache() {
 		try {
 			// 从用户数据中获取仓库信息
-			const userData = localStorage.getItem('spcp-user');
+			const userData = localStorage.getItem('dipcp-user');
 			if (!userData) return null;
 
 			const user = JSON.parse(userData);
@@ -312,7 +312,7 @@ class ProjectDetailPage extends BasePage {
 	async saveMembersCache(membersData) {
 		try {
 			// 从用户数据中获取仓库信息
-			const userData = localStorage.getItem('spcp-user');
+			const userData = localStorage.getItem('dipcp-user');
 			if (!userData) return;
 
 			const user = JSON.parse(userData);
@@ -2102,7 +2102,7 @@ class ProjectDetailPage extends BasePage {
 			const commitDate = latestCommit.commit?.author?.date || latestCommit.commit?.committer?.date || new Date().toISOString();
 
 			// 获取本地同步信息
-			const syncInfo = localStorage.getItem(`spcp-sync-${repoInfo.repo}`);
+			const syncInfo = localStorage.getItem(`dipcp-sync-${repoInfo.repo}`);
 			const lastSyncCommit = syncInfo ? JSON.parse(syncInfo).lastCommit : null;
 
 			// 比较提交SHA
@@ -2180,7 +2180,7 @@ class ProjectDetailPage extends BasePage {
 				lastCommit: commitSha,
 				repo: `${owner}/${repo}`
 			};
-			localStorage.setItem(`spcp-sync-${repo}`, JSON.stringify(syncInfo));
+			localStorage.setItem(`dipcp-sync-${repo}`, JSON.stringify(syncInfo));
 
 			// 同步成功，无需显示对话框
 		} catch (error) {

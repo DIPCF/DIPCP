@@ -126,7 +126,7 @@ function createMenu() {
 			label: '帮助',
 			submenu: [
 				{
-					label: '关于SPCP',
+					label: '关于DIPCP',
 					click: () => {
 						mainWindow.webContents.send('menu-about')
 					}
@@ -193,7 +193,7 @@ ipcMain.handle('clone-repository', async (event, repositoryUrl) => {
 		await execAsync(`git clone ${repositoryUrl} "${clonePath}"`)
 
 		// 配置Git用户信息（如果还没有配置）
-		await execAsync(`git config user.name "SPCP User"`, { cwd: clonePath })
+		await execAsync(`git config user.name "DIPCP User"`, { cwd: clonePath })
 		await execAsync(`git config user.email "spcp@example.com"`, { cwd: clonePath })
 
 		return {

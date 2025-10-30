@@ -15,14 +15,14 @@ class SettingsPage extends BasePage {
 	constructor(props = {}) {
 		super(props);
 		// 从localStorage读取当前语言和主题设置
-		const currentLanguage = localStorage.getItem('spcp-language') || 'zh-CN';
-		const currentTheme = localStorage.getItem('spcp-theme') || 'light';
+		const currentLanguage = localStorage.getItem('dipcp-language') || 'zh-CN';
+		const currentTheme = localStorage.getItem('dipcp-theme') || 'light';
 
 		// 从 localStorage 获取用户信息
 		const userInfo = window.app.getUserFromStorage();
 
 		// 从localStorage读取同步时间间隔（默认30秒）
-		const syncInterval = parseInt(localStorage.getItem('spcp-sync-interval')) || 30;
+		const syncInterval = parseInt(localStorage.getItem('dipcp-sync-interval')) || 30;
 
 		this.state = {
 			user: userInfo.user,
@@ -337,7 +337,7 @@ class SettingsPage extends BasePage {
 				}
 
 				// 保存到localStorage
-				localStorage.setItem('spcp-sync-interval', interval.toString());
+				localStorage.setItem('dipcp-sync-interval', interval.toString());
 			});
 
 			// 只有在用户释放滑块时才保存（避免频繁更新）
@@ -345,7 +345,7 @@ class SettingsPage extends BasePage {
 				const interval = parseInt(e.target.value);
 
 				// 保存到localStorage
-				localStorage.setItem('spcp-sync-interval', interval.toString());
+				localStorage.setItem('dipcp-sync-interval', interval.toString());
 
 			});
 		}
@@ -373,7 +373,7 @@ class SettingsPage extends BasePage {
 	 */
 	rerender() {
 		// 更新语言状态从localStorage
-		const currentLanguage = localStorage.getItem('spcp-language') || 'zh-CN';
+		const currentLanguage = localStorage.getItem('dipcp-language') || 'zh-CN';
 
 		if (this.state.language !== currentLanguage) {
 			this.state.language = currentLanguage; // 直接更新状态，不触发setState
@@ -487,7 +487,7 @@ class SettingsPage extends BasePage {
 		this.clearWorkspaceData();
 
 		// 更新用户信息，移除仓库相关信息但保留登录凭据
-		const userInfo = JSON.parse(localStorage.getItem('spcp-user') || '{}');
+		const userInfo = JSON.parse(localStorage.getItem('dipcp-user') || '{}');
 		const updatedUserInfo = {
 			username: userInfo.username,
 			email: userInfo.email,
@@ -496,7 +496,7 @@ class SettingsPage extends BasePage {
 			token: userInfo.token,
 			loginTime: userInfo.loginTime
 		};
-		localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
+		localStorage.setItem('dipcp-user', JSON.stringify(updatedUserInfo));
 
 		// 重置应用状态，保留用户信息但不保留仓库信息
 		window.app.state.user = updatedUserInfo;
@@ -521,14 +521,14 @@ class SettingsPage extends BasePage {
 		const keysToRemove = [];
 		for (let i = 0; i < localStorage.length; i++) {
 			const key = localStorage.key(i);
-			if (key && key.startsWith('spcp-')) {
+			if (key && key.startsWith('dipcp-')) {
 				// 保留重要的用户数据和设置
-				if (key === 'spcp-user' ||
-					key === 'spcp-saved-credentials' ||
-					key === 'spcp-language' ||
-					key === 'spcp-theme' ||
-					key === 'spcp-sync-interval' ||
-					key === 'spcp-repository-history') {
+				if (key === 'dipcp-user' ||
+					key === 'dipcp-saved-credentials' ||
+					key === 'dipcp-language' ||
+					key === 'dipcp-theme' ||
+					key === 'dipcp-sync-interval' ||
+					key === 'dipcp-repository-history') {
 					continue; // 跳过这些重要的数据
 				}
 				keysToRemove.push(key);
@@ -597,7 +597,7 @@ class SettingsPage extends BasePage {
 	 * 处理退出用户
 	 */
 	handleLogoutUser() {
-		// 清除所有SPCP相关的数据
+		// 清除所有DIPCP相关的数据
 		this.clearAllUserData();
 
 		// 重置应用状态
@@ -623,11 +623,11 @@ class SettingsPage extends BasePage {
 		const keysToRemove = [];
 		for (let i = 0; i < localStorage.length; i++) {
 			const key = localStorage.key(i);
-			if (key && key.startsWith('spcp-')) {
+			if (key && key.startsWith('dipcp-')) {
 				// 保留个人设置相关的数据
-				if (key === 'spcp-language' ||
-					key === 'spcp-theme' ||
-					key === 'spcp-sync-interval') {
+				if (key === 'dipcp-language' ||
+					key === 'dipcp-theme' ||
+					key === 'dipcp-sync-interval') {
 					continue; // 跳过这些个人设置数据
 				}
 				keysToRemove.push(key);

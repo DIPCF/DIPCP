@@ -38,6 +38,11 @@
 	animation: modalSlideIn 0.3s ease-out;
 }
 
+/* CLA类型的模态框更高 */
+.modal-content:has(.cla-content) {
+	max-height: 85vh;
+}
+
 @keyframes modalSlideIn {
 	from {
 		opacity: 0;

@@ -26,7 +26,7 @@ window.I18nService = {
 	async init() {
 		try {
 			// 获取用户设置的语言
-			const savedLanguage = localStorage.getItem('spcp-language');
+			const savedLanguage = localStorage.getItem('dipcp-language');
 			if (savedLanguage && this.supportedLanguages.includes(savedLanguage)) {
 				this.currentLanguage = savedLanguage;
 			} else {
@@ -81,7 +81,7 @@ window.I18nService = {
 			this.currentLanguage = language;
 
 			// 保存用户语言选择
-			localStorage.setItem('spcp-language', language);
+			localStorage.setItem('dipcp-language', language);
 
 			// 自动翻译页面（延迟执行确保DOM已准备好）
 			setTimeout(() => {

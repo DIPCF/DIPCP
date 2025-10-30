@@ -11,7 +11,7 @@ window.ThemeService = {
 	 */
 	init() {
 		// 从本地存储读取用户设置
-		const savedTheme = localStorage.getItem('spcp-theme');
+		const savedTheme = localStorage.getItem('dipcp-theme');
 		if (savedTheme && ['light', 'dark'].includes(savedTheme)) {
 			this.currentTheme = savedTheme;
 		}
@@ -44,7 +44,7 @@ window.ThemeService = {
 		}
 
 		this.currentTheme = theme;
-		localStorage.setItem('spcp-theme', theme);
+		localStorage.setItem('dipcp-theme', theme);
 		this.applyTheme();
 		this.notifyListeners();
 	},

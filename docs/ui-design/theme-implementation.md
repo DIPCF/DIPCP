@@ -1,8 +1,8 @@
-# SPCP 主题切换实现指南
+# DIPCP 主题切换实现指南
 
 ## 📋 文档信息
 
-- **项目名称**: SPCP - 主题切换实现指南
+- **项目名称**: DIPCP - 主题切换实现指南
 - **版本**: v1.0
 - **创建日期**: 2025年10月21日
 - **最后更新**: 2025年10月21日
@@ -156,7 +156,7 @@ class ThemeManager {
   
   init() {
     // 从本地存储获取主题设置
-    this.currentTheme = localStorage.getItem('spcp-theme') || 'auto';
+    this.currentTheme = localStorage.getItem('dipcp-theme') || 'auto';
     
     // 监听系统主题变化
     themeDetector.onThemeChange((theme) => {
@@ -183,7 +183,7 @@ class ThemeManager {
     if (this.currentTheme === theme) return;
     
     this.currentTheme = theme;
-    localStorage.setItem('spcp-theme', theme);
+    localStorage.setItem('dipcp-theme', theme);
     
     this.applyTheme(this.getEffectiveTheme());
     this.notifyListeners();
@@ -776,7 +776,7 @@ app.init();
   <div class="app">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="navbar-brand">SPCP</div>
+      <div class="navbar-brand">DIPCP</div>
       <div class="navbar-menu">
         <a href="/dashboard">仪表盘</a>
         <a href="/projects">项目</a>

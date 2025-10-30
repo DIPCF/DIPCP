@@ -61,7 +61,7 @@ class LoginPage extends BasePage {
 	renderLogo() {
 		return `
             <div class="logo">
-                <h1>SPCP</h1>
+                <h1>DIPCP</h1>
                 <p class="subtitle">${this.t('login.subtitle')}</p>
             </div>
         `;
@@ -345,7 +345,7 @@ class LoginPage extends BasePage {
 		this.setState({ language });
 
 		// 保存语言设置到 localStorage
-		localStorage.setItem('spcp-language', language);
+		localStorage.setItem('dipcp-language', language);
 
 		// 通知 i18n 服务切换语言
 		if (window.I18nService) {
@@ -439,7 +439,7 @@ class LoginPage extends BasePage {
 			token: formData.accessToken,
 			loginTime: new Date().toISOString()
 		};
-		localStorage.setItem('spcp-user', JSON.stringify(userInfoToSave));
+		localStorage.setItem('dipcp-user', JSON.stringify(userInfoToSave));
 		console.log('用户信息已保存');
 
 		// 更新app状态
@@ -508,7 +508,7 @@ class LoginPage extends BasePage {
 			accessToken: formData.accessToken,
 			savedAt: new Date().toISOString()
 		};
-		localStorage.setItem('spcp-saved-credentials', JSON.stringify(credentials));
+		localStorage.setItem('dipcp-saved-credentials', JSON.stringify(credentials));
 		console.log('用户凭据已保存');
 	}
 
@@ -518,7 +518,7 @@ class LoginPage extends BasePage {
 	 */
 	loadSavedCredentials() {
 		try {
-			const savedCredentials = localStorage.getItem('spcp-saved-credentials');
+			const savedCredentials = localStorage.getItem('dipcp-saved-credentials');
 			if (savedCredentials) {
 				const credentials = JSON.parse(savedCredentials);
 				this.setState({

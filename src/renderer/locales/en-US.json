@@ -62,9 +62,9 @@
 	},
 	"login": {
 		"title": "Login",
-		"pageTitle": "Login - SPCP",
+		"pageTitle": "Login - DIPCP",
 		"subtitle": "Serverless Project Contribution Platform",
-		"whyChoose": "Why Choose SPCP?",
+		"whyChoose": "Why Choose DIPCP?",
 		"feature1": "✅ Zero Ops Cost, Completely Serverless",
 		"feature2": "✅ Zero Learning Cost, Download and Use",
 		"feature3": "✅ Zero Barrier, Only GitHub Account Required",
@@ -81,7 +81,7 @@
 		"registerHelpTitle": "How to Register a GitHub Account",
 		"registerHelpContent": "<h3>Step 1: Visit GitHub</h3><p>Open your browser and go to <a href='https://github.com' target='_blank'>https://github.com</a></p><br><h3>Step 2: Click Sign Up</h3><p>Click the <strong>Sign up</strong> button in the top right corner of GitHub homepage</p><br><h3>Step 3: Fill Registration Info</h3><p>• Enter username<br>• Enter email address<br>• Set password<br>• Verify you're not a robot</p><br><h3>Step 4: Verify Email</h3><p>Check your email and click the verification link sent by GitHub</p><br><h3>Step 5: Complete Registration</h3><p>After verification, you can start using your GitHub account!</p>",
 		"tokenHelpTitle": "How to Get GitHub Personal Access Token",
-		"tokenHelpContent": "<h3>Quick Token Access</h3><p>Go directly to: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>Generate Steps</h3><p>• Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• Fill Note: SPCP Application<br>• Select Expiration: <strong>Recommend 'Never' (no expiration)</strong><br>• <strong>Important: Check ALL permission options (select all)</strong><br>• Click <strong>Generate token</strong></p><br><h3>Copy Token</h3><p>• <strong>Copy and save the token immediately</strong> (only shown once)<br>• Paste the token into the Token field on login page</p><br><p><strong>Note:</strong> Token is only shown once, please save it carefully!</p>",
+		"tokenHelpContent": "<h3>Quick Token Access</h3><p>Go directly to: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>Generate Steps</h3><p>• Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• Fill Note: DIPCP Application<br>• Select Expiration: <strong>Recommend 'Never' (no expiration)</strong><br>• <strong>Important: Check ALL permission options (select all)</strong><br>• Click <strong>Generate token</strong></p><br><h3>Copy Token</h3><p>• <strong>Copy and save the token immediately</strong> (only shown once)<br>• Paste the token into the Token field on login page</p><br><p><strong>Note:</strong> Token is only shown once, please save it carefully!</p>",
 		"terms": "By logging in, you agree to our",
 		"termsLink": "Terms of Service",
 		"and": "and",
@@ -426,7 +426,7 @@
 		"submitSuccess": "Review submitted successfully",
 		"submitFailed": "Failed to submit review",
 		"submitting": "Submitting...",
-		"commitMessage": "Update file via SPCP: ",
+		"commitMessage": "Update file via DIPCP: ",
 		"submitNotImplemented": "Submit review feature not implemented",
 		"saveNotImplemented": "Save file feature not implemented",
 		"image": {
@@ -582,7 +582,7 @@
 	},
 	"dashboard": {
 		"title": "Dashboard",
-		"welcome": "Welcome to SPCP!",
+		"welcome": "Welcome to DIPCP!",
 		"subtitle": "Serverless Project Contribution Platform",
 		"exitProject": "Exit Project",
 		"totalPoints": "Total Points",
@@ -595,7 +595,7 @@
 		"viewReviews": "View Reviews",
 		"settings": "Settings",
 		"recentActivity": "Recent Activity",
-		"activity1": "You submitted a new document: SPCP Technical Design Document v1.1",
+		"activity1": "You submitted a new document: DIPCP Technical Design Document v1.1",
 		"activity2": "Your contribution 'Fix login page' has been merged, earned 10 points",
 		"activity3": "Reviewer 'reviewer-1' commented on your contribution 'Optimize theme switching'",
 		"time1": "2 hours ago",
@@ -715,16 +715,16 @@
 	},
 	"terms": {
 		"title": "Terms of Service",
-		"subtitle": "SPCP (Serverless Project Contribution Platform) Usage Agreement",
+		"subtitle": "DIPCP (Serverless Project Contribution Platform) Usage Agreement",
 		"lastUpdated": "Last Updated: October 22, 2025",
 		"importantNoticeTitle": "Important Notice:",
-		"importantNoticeContent": "SPCP is a completely transparent serverless collaboration platform. All data is publicly stored in GitHub repositories. Please read this usage agreement carefully.",
+		"importantNoticeContent": "DIPCP is a completely transparent serverless collaboration platform. All data is publicly stored in GitHub repositories. Please read this usage agreement carefully.",
 		"transparencyPrincipleTitle": "Transparency Principle:",
-		"transparencyPrincipleContent": "SPCP follows a completely transparent design principle. All participants, participation processes, and benefits are publicly disclosed in plain text and fully traceable.",
+		"transparencyPrincipleContent": "DIPCP follows a completely transparent design principle. All participants, participation processes, and benefits are publicly disclosed in plain text and fully traceable.",
 		"section1": {
 			"title": "1. Platform Overview",
-			"content1": "SPCP (Serverless Project Contribution Platform) is a GitHub-based collaboration platform specifically designed for decentralized world building, content creation, and collaborative projects. The platform adopts a completely transparent design philosophy with all data publicly stored.",
-			"content2": "Important Note: SPCP itself does not provide any services. All services are provided by GitHub. We only provide a client application to help users better utilize GitHub's collaboration features."
+			"content1": "DIPCP (Serverless Project Contribution Platform) is a GitHub-based collaboration platform specifically designed for decentralized world building, content creation, and collaborative projects. The platform adopts a completely transparent design philosophy with all data publicly stored.",
+			"content2": "Important Note: DIPCP itself does not provide any services. All services are provided by GitHub. We only provide a client application to help users better utilize GitHub's collaboration features."
 		},
 		"section2": {
 			"title": "2. Applicable Scenarios",
@@ -737,7 +737,7 @@
 			"content6": "World building projects: game settings, novel worldviews, and other creative content",
 			"subtitle2": "2.2 Unsuitable Project Types",
 			"warningTitle": "Important Reminder:",
-			"warningContent": "The following types of projects are not suitable for SPCP:",
+			"warningContent": "The following types of projects are not suitable for DIPCP:",
 			"warning1": "Commercial confidential projects: internal projects involving commercial secrets",
 			"warning2": "Personal privacy content: sensitive information involving personal privacy",
 			"warning3": "Confidential projects: projects requiring confidentiality agreements",
@@ -747,7 +747,7 @@
 		},
 		"section3": {
 			"title": "3. Platform Features",
-			"content1": "The SPCP client application provides the following features:",
+			"content1": "The DIPCP client application provides the following features:",
 			"feature1": "GitHub-based version control and collaboration features",
 			"feature2": "File editing and management tools (supporting Markdown, text, images, etc.)",
 			"feature3": "Automatic branch management and submission review processes",
@@ -789,7 +789,7 @@
 		},
 		"section6": {
 			"title": "6. Intellectual Property",
-			"content1": "Users retain all intellectual property rights to their created content. By using the SPCP platform, users grant us necessary licenses to provide and improve platform functionality. All content will be managed according to open source agreements."
+			"content1": "Users retain all intellectual property rights to their created content. By using the DIPCP platform, users grant us necessary licenses to provide and improve platform functionality. All content will be managed according to open source agreements."
 		},
 		"section7": {
 			"title": "7. Data Storage and Transparency",
@@ -809,7 +809,7 @@
 		},
 		"section8": {
 			"title": "8. Service Dependencies",
-			"content1": "The SPCP platform depends on the following third-party services:",
+			"content1": "The DIPCP platform depends on the following third-party services:",
 			"dependency1": "GitHub services: all data storage, version control, and collaboration features are provided by GitHub",
 			"dependency2": "Network connection: requires stable network connection to access GitHub",
 			"dependency3": "Browser support: web version requires modern browser support",
@@ -817,7 +817,7 @@
 		},
 		"section9": {
 			"title": "9. Platform Availability",
-			"content1": "We strive to maintain the availability of the SPCP client application, but do not guarantee that the application will not experience failures. The application may be temporarily unavailable due to the following reasons:",
+			"content1": "We strive to maintain the availability of the DIPCP client application, but do not guarantee that the application will not experience failures. The application may be temporarily unavailable due to the following reasons:",
 			"reason1": "Application updates and maintenance",
 			"reason2": "Technical failures or errors",
 			"reason3": "Unavailability of dependent third-party services",
@@ -826,15 +826,15 @@
 		"section10": {
 			"title": "10. Disclaimer",
 			"disclaimerTitle": "Disclaimer:",
-			"disclaimerContent": "The SPCP client application is provided 'as is' without any express or implied warranties. We are not liable for any direct or indirect losses arising from the use of this application. Since data is completely publicly stored, users should assess privacy risks themselves."
+			"disclaimerContent": "The DIPCP client application is provided 'as is' without any express or implied warranties. We are not liable for any direct or indirect losses arising from the use of this application. Since data is completely publicly stored, users should assess privacy risks themselves."
 		},
 		"section11": {
 			"title": "11. Platform Changes",
-			"content1": "We reserve the right to modify, suspend, or terminate the SPCP client application at any time. Major changes will be notified to users in advance. All change records will be publicly stored to ensure transparency."
+			"content1": "We reserve the right to modify, suspend, or terminate the DIPCP client application at any time. Major changes will be notified to users in advance. All change records will be publicly stored to ensure transparency."
 		},
 		"section12": {
 			"title": "12. Dispute Resolution",
-			"content1": "Disputes arising from the use of the SPCP platform should be resolved through friendly consultation. If consultation fails, disputes may be brought to a court of competent jurisdiction. All dispute resolution processes will remain transparent."
+			"content1": "Disputes arising from the use of the DIPCP platform should be resolved through friendly consultation. If consultation fails, disputes may be brought to a court of competent jurisdiction. All dispute resolution processes will remain transparent."
 		},
 		"section13": {
 			"title": "13. Terms Modification",
@@ -850,41 +850,41 @@
 			"noteContent": "All communication records will be publicly stored to ensure transparency."
 		},
 		"footer": {
-			"copyright": "© 2025 SPCP Platform. All rights reserved.",
+			"copyright": "© 2025 DIPCP Platform. All rights reserved.",
 			"backLink": "Back to Login Page"
 		}
 	},
 	"privacy": {
 		"title": "Privacy Policy",
-		"subtitle": "SPCP (Serverless Project Contribution Platform) Privacy Protection Statement",
+		"subtitle": "DIPCP (Serverless Project Contribution Platform) Privacy Protection Statement",
 		"lastUpdated": "Last Updated: October 22, 2025",
 		"importantNoticeTitle": "Important Notice:",
-		"importantNoticeContent": "SPCP is a completely transparent serverless collaboration platform. This privacy policy explains how we handle your information and your privacy rights when using the platform.",
+		"importantNoticeContent": "DIPCP is a completely transparent serverless collaboration platform. This privacy policy explains how we handle your information and your privacy rights when using the platform.",
 		"transparencyPrincipleTitle": "Transparency Principle:",
-		"transparencyPrincipleContent": "SPCP follows a completely transparent design principle. All data is publicly stored in GitHub repositories, which means your information will be visible to everyone.",
+		"transparencyPrincipleContent": "DIPCP follows a completely transparent design principle. All data is publicly stored in GitHub repositories, which means your information will be visible to everyone.",
 		"section1": {
 			"title": "1. Information Processing",
 			"subtitle1": "1.1 We Do Not Collect Information",
-			"content1": "SPCP is a pure client application. We do not collect, store, or process any of your personal information. All data is processed locally on your device.",
+			"content1": "DIPCP is a pure client application. We do not collect, store, or process any of your personal information. All data is processed locally on your device.",
 			"subtitle2": "1.2 Local Data Processing",
 			"content2": "The application only processes the following data on your device:",
 			"dataType1": "Local cache: editing content, setting preferences, and other temporary data",
 			"dataType2": "GitHub data: public information obtained through GitHub API (not stored)",
 			"dataType3": "User operations: editing, saving, and other operation records (local only)",
 			"importantNoteTitle": "Important Note:",
-			"importantNoteContent": "The SPCP client does not send your personal information to any server. All data interacts directly with GitHub services through the GitHub API."
+			"importantNoteContent": "The DIPCP client does not send your personal information to any server. All data interacts directly with GitHub services through the GitHub API."
 		},
 		"section2": {
 			"title": "2. Data Flow",
 			"subtitle1": "2.1 Data Flow Description",
-			"content1": "The data flow of the SPCP client application is as follows:",
+			"content1": "The data flow of the DIPCP client application is as follows:",
 			"flow1": "User → Local Device: editing content, setting preferences, and other data stored on your device",
 			"flow2": "Local Device → GitHub: direct interaction with GitHub services through GitHub API",
 			"flow3": "GitHub → Local Device: obtaining project data, user information, and other public information",
 			"flow4": "Us: we do not receive, store, or process any user data",
 			"subtitle2": "2.2 Transparency Guarantee",
 			"importantNoteTitle": "Important Note:",
-			"importantNoteContent": "Due to SPCP's transparent design principle, the following information will be publicly stored:",
+			"importantNoteContent": "Due to DIPCP's transparent design principle, the following information will be publicly stored:",
 			"publicInfo1": "Your contribution records and operation history",
 			"publicInfo2": "Point changes and reward records",
 			"publicInfo3": "Application and review process records",
@@ -906,10 +906,10 @@
 		"section4": {
 			"title": "4. Data Sharing",
 			"subtitle1": "4.1 We Do Not Share Your Data",
-			"content1": "The SPCP client application does not share your data with any third parties because we do not collect, store, or process any user data.",
+			"content1": "The DIPCP client application does not share your data with any third parties because we do not collect, store, or process any user data.",
 			"subtitle2": "4.2 Data Disclosure Statement",
 			"warningTitle": "Important Reminder:",
-			"warningContent": "Due to SPCP's transparent design, the following information will be publicly stored:",
+			"warningContent": "Due to DIPCP's transparent design, the following information will be publicly stored:",
 			"publicData1": "All project content and collaboration records (stored in GitHub repositories)",
 			"publicData2": "User contribution history and point records (stored in GitHub repositories)",
 			"publicData3": "Review processes and decision records (stored in GitHub repositories)",
@@ -918,7 +918,7 @@
 		"section5": {
 			"title": "5. Data Security",
 			"subtitle1": "5.1 Client Security",
-			"content1": "Security measures of the SPCP client application:",
+			"content1": "Security measures of the DIPCP client application:",
 			"security1": "Using HTTPS encryption to communicate with GitHub API",
 			"security2": "Local data stored on your device, controlled by you",
 			"security3": "Regular application security patch updates",
@@ -954,7 +954,7 @@
 		},
 		"section7": {
 			"title": "7. Children's Privacy",
-			"content1": "SPCP is not specifically designed for children under 13. If you are a child under 13, please use this platform under the guidance of parents or guardians."
+			"content1": "DIPCP is not specifically designed for children under 13. If you are a child under 13, please use this platform under the guidance of parents or guardians."
 		},
 		"section8": {
 			"title": "8. International Transfer",
@@ -979,7 +979,7 @@
 			"content1": "This privacy policy is governed by the laws of the People's Republic of China. If you are in the European Union, this policy also complies with GDPR regulations."
 		},
 		"footer": {
-			"copyright": "© 2025 SPCP Platform. All rights reserved.",
+			"copyright": "© 2025 DIPCP Platform. All rights reserved.",
 			"backLink": "Back to Login Page"
 		}
 	},
@@ -1275,7 +1275,7 @@
 	},
 	"cla": {
 		"title": "Contributor License Agreement",
-		"content": "As a contributor to the SPCP platform, you need to sign a Contributor License Agreement to transfer intellectual property ownership completely to the DIPCF Foundation. The foundation will uniformly manage and be responsible for the maintenance and operation of intellectual property. Please read through before signing the agreement.",
+		"content": "As a contributor to the DIPCP platform, you need to sign a Contributor License Agreement to transfer intellectual property ownership completely to the DIPCF Foundation. The foundation will uniformly manage and be responsible for the maintenance and operation of intellectual property. Please read through before signing the agreement.",
 		"realNameLabel": "Please enter your real name",
 		"realNamePlaceholder": "Please enter your real name (for legal documents)",
 		"agree": "Agree and Sign",
@@ -1292,7 +1292,7 @@
 		"githubUsername": "GitHub Username",
 		"email": "Email",
 		"notProvided": "Not provided",
-		"autoGenerated": "This file is automatically generated by SPCP system",
+		"autoGenerated": "This file is automatically generated by DIPCP system",
 		"errors": {
 			"noRealName": "Please enter your real name"
 		}

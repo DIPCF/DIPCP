@@ -15,7 +15,7 @@ class RepositorySelectionPage extends BasePage {
 		this.state = {
 			language: window.I18nService ? window.I18nService.currentLanguage : 'zh-CN',
 			formData: {
-				repositoryUrl: 'https://github.com/DIPCF/SPCP',
+				repositoryUrl: 'https://github.com/DIPCF/DIPCP',
 				newRepoName: '',
 				newRepoDescription: ''
 			},
@@ -51,7 +51,7 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	loadUserInfo() {
 		try {
-			const userInfo = localStorage.getItem('spcp-user');
+			const userInfo = localStorage.getItem('dipcp-user');
 			if (userInfo) {
 				this.state.userInfo = JSON.parse(userInfo);
 			}
@@ -65,7 +65,7 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	loadRepositoryHistory() {
 		try {
-			const history = localStorage.getItem('spcp-repository-history');
+			const history = localStorage.getItem('dipcp-repository-history');
 			if (history) {
 				this.state.repositoryHistory = JSON.parse(history);
 				console.log('已加载仓库历史记录:', this.state.repositoryHistory.length, '个仓库');
@@ -178,7 +178,7 @@ class RepositorySelectionPage extends BasePage {
 		}
 
 		this.state.repositoryHistory = history;
-		localStorage.setItem('spcp-repository-history', JSON.stringify(history));
+		localStorage.setItem('dipcp-repository-history', JSON.stringify(history));
 	}
 
 	/**
@@ -658,7 +658,7 @@ class RepositorySelectionPage extends BasePage {
 			await this.showCLAAgreement(repoInfo, this.state.userInfo, async () => {
 				// CLA签署成功后的回调：执行仓库设置
 				// 从localStorage获取CLA签署时间
-				const userInfoStr = localStorage.getItem('spcp-user');
+				const userInfoStr = localStorage.getItem('dipcp-user');
 				let claSignedTime = new Date().toISOString(); // 默认使用当前时间
 				if (userInfoStr) {
 					try {
@@ -718,7 +718,7 @@ class RepositorySelectionPage extends BasePage {
 			console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
 			try {
 				// 从localStorage获取CLA签署时间
-				const userInfoStr = localStorage.getItem('spcp-user');
+				const userInfoStr = localStorage.getItem('dipcp-user');
 				let claSignedTime = new Date().toISOString(); // 默认使用当前时间
 				if (userInfoStr) {
 					try {
@@ -1006,7 +1006,7 @@ class RepositorySelectionPage extends BasePage {
 		};
 
 		this.state.userInfo = updatedUserInfo;
-		localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
+		localStorage.setItem('dipcp-user', JSON.stringify(updatedUserInfo));
 
 		// 更新app.js的状态
 		if (window.app) {

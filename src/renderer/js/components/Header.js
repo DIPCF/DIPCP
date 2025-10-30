@@ -6,7 +6,7 @@ class Header extends Component {
 	constructor(props = {}) {
 		super(props);
 		this.state = {
-			title: props.title || 'SPCP',
+			title: props.title || 'DIPCP',
 			currentPage: props.currentPage || '',
 			navigationItems: props.navigationItems || [],
 		};
@@ -142,7 +142,7 @@ class Header extends Component {
 	 */
 	scheduleNextCheck() {
 		// 获取同步时间间隔（从localStorage读取，默认30秒）
-		const syncInterval = parseInt(localStorage.getItem('spcp-sync-interval')) || 30;
+		const syncInterval = parseInt(localStorage.getItem('dipcp-sync-interval')) || 30;
 
 		// 设置下一次检查
 		this.checkInterval = setTimeout(() => {
@@ -184,7 +184,7 @@ class Header extends Component {
 			const latestCommitSha = branchData.commit.sha;
 
 			// 检查本地同步信息
-			const syncInfo = localStorage.getItem(`spcp-sync-${repoInfo.repo}`);
+			const syncInfo = localStorage.getItem(`dipcp-sync-${repoInfo.repo}`);
 			const lastSyncCommit = syncInfo ? JSON.parse(syncInfo).lastCommit : null;
 
 			// 如果没有上次同步记录，说明是第一次，保存当前提交并跳过
@@ -194,7 +194,7 @@ class Header extends Component {
 					lastCommit: latestCommitSha,
 					repo: `${repoInfo.owner}/${repoInfo.repo}`
 				};
-				localStorage.setItem(`spcp-sync-${repoInfo.repo}`, JSON.stringify(newSyncInfo));
+				localStorage.setItem(`dipcp-sync-${repoInfo.repo}`, JSON.stringify(newSyncInfo));
 				return;
 			}
 
@@ -218,7 +218,7 @@ class Header extends Component {
 					lastCommit: latestCommitSha,
 					repo: `${repoInfo.owner}/${repoInfo.repo}`
 				};
-				localStorage.setItem(`spcp-sync-${repoInfo.repo}`, JSON.stringify(newSyncInfo));
+				localStorage.setItem(`dipcp-sync-${repoInfo.repo}`, JSON.stringify(newSyncInfo));
 			}
 
 		} catch (error) {
@@ -284,7 +284,7 @@ class Header extends Component {
 				};
 
 				// 更新localStorage
-				localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
+				localStorage.setItem('dipcp-user', JSON.stringify(updatedUserInfo));
 
 				// 更新app.js状态
 				if (window.app) {

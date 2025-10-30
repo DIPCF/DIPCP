@@ -2,7 +2,7 @@
 
 ## **0. Introduction: Core Philosophy & Legal Foundation**
 
-This system is designed as a principled framework to incentivize global contributors to participate in the construction of "Software (Open Source)" and "Core Worldview (IP Exclusive)" using SPCP (Serverless Project Contribution Platform). Users can adjust the specific settings and values according to their own needs.
+This system is designed as a principled framework to incentivize global contributors to participate in the construction of "Software (Open Source)" and "Core Worldview (IP Exclusive)" using DIPCP (Serverless Project Contribution Platform). Users can adjust the specific settings and values according to their own needs.
 
 This system does not require the issuance of any virtual currency. Points are stored in plain text within the public Github organization repository, accessible for anyone to view at any time.
 
@@ -119,7 +119,7 @@ After assigning the "Base Points," the CRC selects a multiplier based on the con
 ## **3. System Operation & Processes**
 
 ### **3.1 Contribution Workflow**
-1.  **Submit:** Contributors submit contributions via official channels like GitHub or SPCP.
+1.  **Submit:** Contributors submit contributions via official channels like GitHub or DIPCP.
 2.  **Accept:** Contributions are accepted/merged by project Maintainers or IP Editors.
 3.  **Review:** The CRC reviews all "Accepted" contributions weekly.
 4.  **Assign Points:** The CRC assigns points (HP and RP) based on the "Valuation Guide".

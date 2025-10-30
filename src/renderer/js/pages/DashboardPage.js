@@ -28,7 +28,7 @@ class DashboardPage extends BasePage {
 			activities: [
 				{
 					icon: '📝',
-					text: '您提交了一个新的文档：SPCP 技术设计文档 v1.1',
+					text: '您提交了一个新的文档：DIPCP 技术设计文档 v1.1',
 					time: '2小时前',
 					textKey: 'dashboard.activity1',
 					timeKey: 'dashboard.time1'
@@ -89,7 +89,7 @@ class DashboardPage extends BasePage {
 	renderWelcome() {
 		return `
             <div class="welcome">
-                <h2>${this.t('dashboard.welcome', '欢迎使用 SPCP！')}</h2>
+                <h2>${this.t('dashboard.welcome', '欢迎使用 DIPCP！')}</h2>
                 <p>${this.t('dashboard.subtitle', '无服务器项目贡献平台')}</p>
             </div>
         `;
@@ -245,7 +245,7 @@ class DashboardPage extends BasePage {
 		}
 
 		// 从localStorage获取缓存的用户信息
-		const userData = localStorage.getItem('spcp-user');
+		const userData = localStorage.getItem('dipcp-user');
 		if (userData) {
 			try {
 				const user = JSON.parse(userData);
@@ -616,12 +616,12 @@ class DashboardPage extends BasePage {
 		});
 
 		// 更新localStorage中的用户信息
-		const userData = localStorage.getItem('spcp-user');
+		const userData = localStorage.getItem('dipcp-user');
 		if (userData) {
 			const user = JSON.parse(userData);
 			user.permissionInfo = user.permissionInfo || {};
 			user.permissionInfo.role = 'collaborator';
-			localStorage.setItem('spcp-user', JSON.stringify(user));
+			localStorage.setItem('dipcp-user', JSON.stringify(user));
 		}
 		this.updateUserRoleDisplay();
 	}
@@ -631,7 +631,7 @@ class DashboardPage extends BasePage {
 	 */
 	getRepositoryInfo() {
 		// 从用户信息中获取仓库信息
-		const userData = localStorage.getItem('spcp-user');
+		const userData = localStorage.getItem('dipcp-user');
 		if (userData) {
 			const user = JSON.parse(userData);
 			if (user.repositoryInfo) {
@@ -701,12 +701,12 @@ class DashboardPage extends BasePage {
 		this.setState({ user });
 		// 如果用户信息包含新的头像，更新localStorage缓存
 		if (user && user.avatarUrl) {
-			const userData = localStorage.getItem('spcp-user');
+			const userData = localStorage.getItem('dipcp-user');
 			if (userData) {
 				try {
 					const cachedUser = JSON.parse(userData);
 					cachedUser.avatarUrl = user.avatarUrl;
-					localStorage.setItem('spcp-user', JSON.stringify(cachedUser));
+					localStorage.setItem('dipcp-user', JSON.stringify(cachedUser));
 				} catch (error) {
 					console.error('更新用户头像缓存失败:', error);
 				}
@@ -737,12 +737,12 @@ class DashboardPage extends BasePage {
 	 * @returns {void}
 	 */
 	clearAvatarCache() {
-		const userData = localStorage.getItem('spcp-user');
+		const userData = localStorage.getItem('dipcp-user');
 		if (userData) {
 			try {
 				const user = JSON.parse(userData);
 				delete user.avatarUrl;
-				localStorage.setItem('spcp-user', JSON.stringify(user));
+				localStorage.setItem('dipcp-user', JSON.stringify(user));
 			} catch (error) {
 				console.error('清理头像缓存失败:', error);
 			}

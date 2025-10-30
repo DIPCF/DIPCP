@@ -1,6 +1,6 @@
 // 存储服务 - 真正的实现
 window.StorageService = {
-	dbName: 'SPCP_Database',
+	dbName: 'DIPCP_Database',
 	dbVersion: 4,
 
 	// 初始化IndexedDB
@@ -57,12 +57,12 @@ window.StorageService = {
 
 	// 用户配置相关
 	getUserConfig() {
-		const config = localStorage.getItem('spcp-config');
+		const config = localStorage.getItem('dipcp-config');
 		return config ? JSON.parse(config) : null;
 	},
 
 	saveUserConfig(config) {
-		localStorage.setItem('spcp-config', JSON.stringify(config));
+		localStorage.setItem('dipcp-config', JSON.stringify(config));
 	},
 
 	// 项目数据相关 - 真正的实现
@@ -209,7 +209,7 @@ window.StorageService = {
 			const keysToRemove = [];
 			for (let i = 0; i < localStorage.length; i++) {
 				const key = localStorage.key(i);
-				if (key && key.startsWith('spcp-')) {
+				if (key && key.startsWith('dipcp-')) {
 					keysToRemove.push(key);
 				}
 			}
@@ -224,16 +224,16 @@ window.StorageService = {
 
 	// 同步信息管理
 	getLastSyncInfo(projectId) {
-		const syncInfo = localStorage.getItem(`spcp-sync-${projectId}`);
+		const syncInfo = localStorage.getItem(`dipcp-sync-${projectId}`);
 		return syncInfo ? JSON.parse(syncInfo) : null;
 	},
 
 	setLastSyncInfo(projectId, syncInfo) {
-		localStorage.setItem(`spcp-sync-${projectId}`, JSON.stringify(syncInfo));
+		localStorage.setItem(`dipcp-sync-${projectId}`, JSON.stringify(syncInfo));
 	},
 
 	clearSyncInfo(projectId) {
-		localStorage.removeItem(`spcp-sync-${projectId}`);
+		localStorage.removeItem(`dipcp-sync-${projectId}`);
 	},
 
 	// 文件内容相关方法
@@ -443,7 +443,7 @@ window.StorageService = {
 				repo: `${owner}/${repo}`,
 				fileCount: downloadedCount
 			};
-			localStorage.setItem(`spcp-sync-${repo}`, JSON.stringify(syncInfo));
+			localStorage.setItem(`dipcp-sync-${repo}`, JSON.stringify(syncInfo));
 
 			console.log(`仓库数据同步完成，共下载 ${downloadedCount} 个文件`);
 			return syncInfo;

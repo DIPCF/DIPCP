@@ -864,7 +864,7 @@ class IssuesPage extends BasePage {
 										...user,
 										permissionInfo: updatedPermissionInfo
 									};
-									localStorage.setItem('spcp-user', JSON.stringify(updatedUserInfo));
+									localStorage.setItem('dipcp-user', JSON.stringify(updatedUserInfo));
 
 									// 更新app.js的状态
 									if (window.app) {

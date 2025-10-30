@@ -1,8 +1,8 @@
 /**
- * SPCP应用主入口
+ * DIPCP应用主入口
  * 管理整个应用的状态和生命周期
  */
-class SPCPApp {
+class DIPCPApp {
 	constructor() {
 		// 路由相关属性
 		this.routes = new Map();
@@ -29,7 +29,7 @@ class SPCPApp {
 	 * @returns {Promise<void>}
 	 */
 	async init() {
-		console.log('SPCP App initializing...');
+		console.log('DIPCP App initializing...');
 
 		// 1. 等待所有服务加载完成
 		await this.waitForServices();
@@ -46,7 +46,7 @@ class SPCPApp {
 		// 5. 渲染初始页面
 		await this.handleRouteChange();
 
-		console.log('SPCP App initialized successfully');
+		console.log('DIPCP App initialized successfully');
 	}
 
 	/**
@@ -81,7 +81,7 @@ class SPCPApp {
 	 */
 	getUserFromStorage() {
 		try {
-			const userData = localStorage.getItem('spcp-user');
+			const userData = localStorage.getItem('dipcp-user');
 			if (userData) {
 				const user = JSON.parse(userData);
 				return {
@@ -420,7 +420,7 @@ class SPCPApp {
 			user: this.state.user
 		};
 
-		localStorage.setItem('spcp-app-state', JSON.stringify(persistentState));
+		localStorage.setItem('dipcp-app-state', JSON.stringify(persistentState));
 	}
 
 	/**
@@ -430,7 +430,7 @@ class SPCPApp {
 	 */
 	restoreState() {
 		// 从localStorage恢复状态
-		const savedState = localStorage.getItem('spcp-app-state');
+		const savedState = localStorage.getItem('dipcp-app-state');
 		if (savedState) {
 			const persistentState = JSON.parse(savedState);
 			this.setState(persistentState);
@@ -481,4 +481,4 @@ class SPCPApp {
 }
 
 // 创建全局应用实例
-window.app = new SPCPApp();
+window.app = new DIPCPApp();

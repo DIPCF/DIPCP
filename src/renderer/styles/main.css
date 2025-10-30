@@ -1,4 +1,4 @@
-/* SPCP 主样式文件 */
+/* DIPCP 主样式文件 */
 
 /* CSS 变量定义 - 按照设计系统标准 */
 :root {
@@ -768,7 +768,7 @@ body {
 	padding: 0.75rem;
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius);
-	font-size: 0.875rem;
+	font-size: 1rem;
 	background: var(--background-color);
 	color: var(--text-primary);
 	transition: border-color 0.2s ease;
@@ -818,7 +818,7 @@ body {
 	text-align: left;
 }
 
-.login-form .form-group {
+.form-group {
 	margin-bottom: var(--spacing-6);
 }
 
@@ -841,7 +841,7 @@ body {
 	border-radius: var(--radius-md);
 	background: var(--bg-primary);
 	color: var(--text-primary);
-	font-size: 0.875rem !important;
+	font-size: var(--font-size-base);
 	transition: border-color 0.2s ease;
 	box-sizing: border-box;
 }
@@ -868,7 +868,7 @@ body {
 /* 输入框与帮助按钮组合样式 */
 .input-with-help {
 	display: flex;
-	gap: var(--spacing-5);
+	gap: var(--spacing-2);
 	align-items: center;
 }
 

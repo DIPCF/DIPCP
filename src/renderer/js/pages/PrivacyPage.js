@@ -48,7 +48,7 @@ class PrivacyPage extends BasePage {
 		return `
             <div class="legal-header">
                 <h1 class="legal-title">${this.t('privacy.title', '隐私政策')}</h1>
-                <p class="legal-subtitle">${this.t('privacy.subtitle', 'SPCP (Serverless Project Contribution Platform) 隐私保护说明')}</p>
+                <p class="legal-subtitle">${this.t('privacy.subtitle', 'DIPCP (Serverless Project Contribution Platform) 隐私保护说明')}</p>
                 <p class="legal-subtitle">${this.t('privacy.lastUpdated', '最后更新：2025年10月22日')}</p>
             </div>
         `;
@@ -79,7 +79,7 @@ class PrivacyPage extends BasePage {
             <div class="highlight">
                 <p>
                     <strong>${this.t('privacy.importantNoticeTitle', '重要提示：')}</strong>
-                    <span>${this.t('privacy.importantNoticeContent', 'SPCP是一个完全透明的无服务器协作平台。本隐私政策说明了我们如何处理您的信息，以及您在使用平台时的隐私权利。')}</span>
+                    <span>${this.t('privacy.importantNoticeContent', 'DIPCP是一个完全透明的无服务器协作平台。本隐私政策说明了我们如何处理您的信息，以及您在使用平台时的隐私权利。')}</span>
                 </p>
             </div>
         `;
@@ -90,7 +90,7 @@ class PrivacyPage extends BasePage {
             <div class="transparency">
                 <p>
                     <strong>${this.t('privacy.transparencyPrincipleTitle', '透明度原则：')}</strong>
-                    <span>${this.t('privacy.transparencyPrincipleContent', 'SPCP遵循完全透明的设计原则。所有数据都公开存储在GitHub仓库中，这意味着您的信息将对所有人可见。')}</span>
+                    <span>${this.t('privacy.transparencyPrincipleContent', 'DIPCP遵循完全透明的设计原则。所有数据都公开存储在GitHub仓库中，这意味着您的信息将对所有人可见。')}</span>
                 </p>
             </div>
         `;
@@ -100,7 +100,7 @@ class PrivacyPage extends BasePage {
 		return `
             <h2>${this.t('privacy.section1.title', '1. 信息处理')}</h2>
             <h3>${this.t('privacy.section1.subtitle1', '1.1 我们不收集信息')}</h3>
-            <p>${this.t('privacy.section1.content1', 'SPCP是一个纯客户端应用程序，我们不会收集、存储或处理您的任何个人信息。所有数据都在您的设备上本地处理。')}</p>
+            <p>${this.t('privacy.section1.content1', 'DIPCP是一个纯客户端应用程序，我们不会收集、存储或处理您的任何个人信息。所有数据都在您的设备上本地处理。')}</p>
 
             <h3>${this.t('privacy.section1.subtitle2', '1.2 本地数据处理')}</h3>
             <p>${this.t('privacy.section1.content2', '应用程序仅在您的设备上处理以下数据：')}</p>
@@ -111,7 +111,7 @@ class PrivacyPage extends BasePage {
             </ul>
 
             <div class="transparency">
-                <p><strong>${this.t('privacy.section1.importantNoteTitle', '重要说明：')}</strong>${this.t('privacy.section1.importantNoteContent', 'SPCP客户端不会向任何服务器发送您的个人信息。所有数据都通过GitHub API直接与GitHub服务交互。')}</p>
+                <p><strong>${this.t('privacy.section1.importantNoteTitle', '重要说明：')}</strong>${this.t('privacy.section1.importantNoteContent', 'DIPCP客户端不会向任何服务器发送您的个人信息。所有数据都通过GitHub API直接与GitHub服务交互。')}</p>
             </div>
         `;
 	}
@@ -120,7 +120,7 @@ class PrivacyPage extends BasePage {
 		return `
             <h2>${this.t('privacy.section2.title', '2. 数据流向')}</h2>
             <h3>${this.t('privacy.section2.subtitle1', '2.1 数据流向说明')}</h3>
-            <p>${this.t('privacy.section2.content1', 'SPCP客户端应用程序的数据流向如下：')}</p>
+            <p>${this.t('privacy.section2.content1', 'DIPCP客户端应用程序的数据流向如下：')}</p>
             <ul>
                 <li><strong>${this.t('privacy.section2.flow1', '用户 → 本地设备：编辑内容、设置偏好等数据存储在您的设备上')}</strong></li>
                 <li><strong>${this.t('privacy.section2.flow2', '本地设备 → GitHub：通过GitHub API直接与GitHub服务交互')}</strong></li>
@@ -130,7 +130,7 @@ class PrivacyPage extends BasePage {
 
             <h3>${this.t('privacy.section2.subtitle2', '2.2 透明度保证')}</h3>
             <div class="transparency">
-                <p><strong>${this.t('privacy.section2.importantNoteTitle', '重要说明：')}</strong>${this.t('privacy.section2.importantNoteContent', '由于SPCP的透明设计原则，以下信息将公开存储：')}</p>
+                <p><strong>${this.t('privacy.section2.importantNoteTitle', '重要说明：')}</strong>${this.t('privacy.section2.importantNoteContent', '由于DIPCP的透明设计原则，以下信息将公开存储：')}</p>
                 <ul>
                     <li>${this.t('privacy.section2.publicInfo1', '您的贡献记录和操作历史')}</li>
                     <li>${this.t('privacy.section2.publicInfo2', '积分变化和奖励记录')}</li>
@@ -166,11 +166,11 @@ class PrivacyPage extends BasePage {
 		return `
             <h2>${this.t('privacy.section4.title', '4. 数据共享')}</h2>
             <h3>${this.t('privacy.section4.subtitle1', '4.1 我们不会共享您的数据')}</h3>
-            <p>${this.t('privacy.section4.content1', 'SPCP客户端应用程序不会与任何第三方共享您的数据，因为我们不收集、不存储、不处理任何用户数据。')}</p>
+            <p>${this.t('privacy.section4.content1', 'DIPCP客户端应用程序不会与任何第三方共享您的数据，因为我们不收集、不存储、不处理任何用户数据。')}</p>
 
             <h3>${this.t('privacy.section4.subtitle2', '4.2 数据公开说明')}</h3>
             <div class="warning">
-                <p><strong>${this.t('privacy.section4.warningTitle', '重要提醒：')}</strong>${this.t('privacy.section4.warningContent', '由于SPCP的透明设计，以下信息将公开存储：')}</p>
+                <p><strong>${this.t('privacy.section4.warningTitle', '重要提醒：')}</strong>${this.t('privacy.section4.warningContent', '由于DIPCP的透明设计，以下信息将公开存储：')}</p>
                 <ul>
                     <li>${this.t('privacy.section4.publicData1', '所有项目内容和协作记录（存储在GitHub仓库中）')}</li>
                     <li>${this.t('privacy.section4.publicData2', '用户贡献历史和积分记录（存储在GitHub仓库中）')}</li>
@@ -185,7 +185,7 @@ class PrivacyPage extends BasePage {
 		return `
             <h2>${this.t('privacy.section5.title', '5. 数据安全')}</h2>
             <h3>${this.t('privacy.section5.subtitle1', '5.1 客户端安全')}</h3>
-            <p>${this.t('privacy.section5.content1', 'SPCP客户端应用程序的安全措施：')}</p>
+            <p>${this.t('privacy.section5.content1', 'DIPCP客户端应用程序的安全措施：')}</p>
             <ul>
                 <li>${this.t('privacy.section5.security1', '使用HTTPS加密与GitHub API通信')}</li>
                 <li>${this.t('privacy.section5.security2', '本地数据存储在您的设备上，由您控制')}</li>
@@ -242,7 +242,7 @@ class PrivacyPage extends BasePage {
 	renderSection7() {
 		return `
             <h2>${this.t('privacy.section7.title', '7. 儿童隐私')}</h2>
-            <p>${this.t('privacy.section7.content1', 'SPCP不专门针对13岁以下的儿童设计。如果您是13岁以下的儿童，请在家长或监护人的指导下使用本平台。')}</p>
+            <p>${this.t('privacy.section7.content1', 'DIPCP不专门针对13岁以下的儿童设计。如果您是13岁以下的儿童，请在家长或监护人的指导下使用本平台。')}</p>
         `;
 	}
 
@@ -287,7 +287,7 @@ class PrivacyPage extends BasePage {
 	renderFooter() {
 		return `
             <div class="legal-footer">
-                <p>${this.t('privacy.footer.copyright', '© 2025 SPCP Platform. 保留所有权利。')}</p>
+                <p>${this.t('privacy.footer.copyright', '© 2025 DIPCP Platform. 保留所有权利。')}</p>
                 <a href="#" class="back-link">${this.t('privacy.footer.backLink', '返回登录页面')}</a>
             </div>
         `;

@@ -34,7 +34,7 @@ class EditorPage extends BasePage {
 			viewMode: viewMode, // 'edit' 或 'view'
 			showInfoPanel: false,
 			infoPanelContent: null,
-			projectName: props.projectName || 'SPCP',
+			projectName: props.projectName || 'DIPCP',
 			repoInfo: userInfo.user.repositoryInfo,
 			user: userInfo.user,
 			userRole: userInfo.userRole,
@@ -50,7 +50,7 @@ class EditorPage extends BasePage {
 	 */
 	loadModuleStates() {
 		try {
-			const cached = localStorage.getItem('spcp-editor-module-states');
+			const cached = localStorage.getItem('dipcp-editor-module-states');
 			const states = cached ? JSON.parse(cached) : {
 				fileInfo: false,
 				editHistory: false,
@@ -74,7 +74,7 @@ class EditorPage extends BasePage {
 	 */
 	saveModuleStates() {
 		try {
-			localStorage.setItem('spcp-editor-module-states', JSON.stringify(this.state.moduleStates));
+			localStorage.setItem('dipcp-editor-module-states', JSON.stringify(this.state.moduleStates));
 		} catch (error) {
 			console.error('保存编辑器模块状态缓存失败:', error);
 		}
@@ -705,7 +705,7 @@ class EditorPage extends BasePage {
 				// 将当前内容以 Base64 提交
 				const content = this.state.content || '';
 				const base64Content = btoa(unescape(encodeURIComponent(content)));
-				const commitMessage = this.t('editor.commitMessage', '通过SPCP更新文件：') + (this.state.fileName || this.state.filePath || '文件');
+				const commitMessage = this.t('editor.commitMessage', '通过DIPCP更新文件：') + (this.state.fileName || this.state.filePath || '文件');
 
 				await octokit.rest.repos.createOrUpdateFileContents({
 					owner: repoInfo.owner,
