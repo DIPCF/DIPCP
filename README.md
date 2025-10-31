@@ -46,11 +46,10 @@ However, the value of this platform goes far beyond this. It has successfully ex
 
 ### Essential Reading for Project Owners
 
-- **Access to GitHub**: This is a necessary condition, as GitHub cannot be stably accessed from China now
+- **Access to GitHub**: This is a necessary condition
 - **Register Account**: Register a GitHub account using email or Google/Apple accounts
-- **Upgrade Account to Organization**: You must use an organization's repository to use the permission grouping feature, this is very important
-- **Enable Two-Factor Authentication**: Organization accounts must use two-factor authentication. Since Chinese phone numbers cannot be used for authentication, you must download the GitHub APP and another identity authentication APP, such as Microsoft Authenticator
-- **Huawei Android Phones**: Since Huawei and Android phones in China cannot directly download apps from the Google Play Store, you also need to install an app called ApkPure first, through which to install the above two apps and complete two-factor authentication
+- **Create Organization**: In Settings, go to Organization options, create a new organization. You must use an organization's repository to use the permission grouping feature, this is very important
+- **Enable Two-Factor Authentication**: Organization accounts must use two-factor authentication. You can download the GitHub APP and another identity authentication APP, such as Microsoft Authenticator
 - **Generate Personal Access Token**: Visit (https://github.com/settings/tokens), generate a "Generate new token (classic)" token, set the expiration to never, select all permissions, and save it after generation
 
 ## Contributing
