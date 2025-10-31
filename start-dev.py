@@ -41,7 +41,7 @@ if __name__ == "__main__":
     PORT = 8000
     
     # 切换到renderer目录
-    os.chdir(os.path.join(os.path.dirname(__file__), 'src', 'renderer'))
+    os.chdir(os.path.join(os.path.dirname(__file__)))
     
     with socketserver.ThreadingTCPServer(("", PORT), NoCacheHTTPRequestHandler) as httpd:
         print(f"开发服务器启动在 http://localhost:{PORT}")
