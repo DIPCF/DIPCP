@@ -329,6 +329,16 @@ body {
 	flex-direction: column;
 }
 
+/* #app 容器样式 - 登录页面居中 */
+#app {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	box-sizing: border-box;
+}
+
 /* 通用样式 */
 .hidden {
 	display: none;
@@ -842,6 +852,7 @@ body {
 	padding: 40px;
 	width: 100%;
 	max-width: 500px;
+	margin: 0 auto;
 	text-align: center;
 	transition: background 0.3s ease, box-shadow 0.3s ease;
 }
