@@ -1,86 +1,62 @@
-# DIPCP - Serverless Project Contribution Platform
+# DIPCP - Decentralized Intellectual Property Collaboration Platform
 
-## 项目简介
+[中文说明](README_zh-CN.md)
 
-DIPCP（无服务器项目贡献平台）是一个基于GitHub的无服务器协作平台，旨在为开源项目提供内容管理和协作功能。
+## Project Introduction
 
-## 核心特性
+DIPCP is a decentralized IP collaboration platform operated by the DIPCF Foundation and based on GitHub. It aims to provide content management and collaboration features for IP creators worldwide.
+However, the value of this platform goes far beyond this. It has successfully explored a viable path for operating network projects with zero cost without the need to set up your own server. Those in need can modify it on this basis to create applications suitable for themselves.
 
-- 🏠 **无服务器**: 用户本机运行的桌面应用程序，无需部署服务器
-- 🔄 **GitHub集成**: 基于GitHub的无服务器存储和版本管理
-- 📁 **文件树管理**: 内容以文件树形式组织，支持相互链接
-- ✏️ **离线编辑**: 支持离线编辑和创建新页面
-- 🌿 **自动分支**: 自动创建分支、本地缓存、提交审核
-- 👥 **审核机制**: 专业内容审核团队负责合并决策
-- 🏆 **积分系统**: 基于贡献的积分奖励机制
-- 👤 **用户管理**: 分组授权和权限控制
-- ⚡ **原生JavaScript**: 使用原生JS开发，简单易调试
+## Core Features
 
-## 项目结构
+- 🏠 **No Server Required**: Fully static JS pages, directly deployed on GitHub Pages, with zero operational costs
+- 🔄 **GitHub Integration**: Based on GitHub's plain text storage and version management
+- ✏️ **Offline Editing**: Supports offline editing and creating new pages
+- 🌿 **Auto Branching**: Automatic branch creation, local caching, and submission review
+- 👥 **Review Mechanism**: Professional content review team responsible for merge decisions
+- 🏆 **Points System**: Contribution-based points reward mechanism
+- 👤 **User Management**: Group authorization and permission control
+- ⚡ **Native JavaScript**: Developed with native JS, simple and easy to debug
 
-```
-spcp/
-├── README.md                 # 项目说明
-├── start-dev.bat            # Windows开发服务器启动脚本
-├── docs/                     # 文档目录
-│   ├── prd.md               # 产品需求文档
-│   ├── technical-design.md  # 技术设计文档
-│   └── ui-design/           # UI设计文档
-├── src/                     # 源代码目录
-│   ├── main/                # Electron主进程
-│   └── renderer/            # 渲染进程（原生JavaScript）
-│       ├── pages/           # 页面HTML文件
-│       ├── js/              # JavaScript模块
-│       └── styles/          # 统一CSS样式
-└── assets/                  # 资源文件
-```
+## Quick Start
 
-## 快速开始
+### Requirements
 
-### 环境要求
-- Python 3.6+ （用于开发服务器）
-- 现代浏览器（Chrome、Firefox、Edge等）
-- Git（用于版本控制）
+- Python 3.6+ (for development server)
+- Modern browser (Chrome, Firefox, Edge, etc.)
+- Git (for version control)
 
-### 启动开发环境
+### Start Development Environment
 
-1. **Windows用户**：
+1. **Windows Users**:
    ```
-   双击 start-dev.bat
+   Double-click start-dev.bat
    ```
 
-2. **Linux/macOS用户**：
-   ```bash
-   cd src/renderer
-   python3 -m http.server 8000
+2. **Access Application**:
+   ```
+   Open in browser: http://localhost:8000
    ```
 
-3. **访问应用**：
-   ```
-   浏览器打开：http://localhost:8000
-   ```
+### Development Notes
 
-### 开发说明
+- **No Node.js Required**: The project uses a single-page native JavaScript architecture, no npm or Node.js needed
+- **Easy Debugging**: Simply modify HTML/CSS/JS files, browser auto-refreshes
+- **Modular Design**: Each page is a functionally independent JS file, easy to maintain
 
-- **无需Node.js**：项目使用原生JavaScript，无需npm或Node.js
-- **简单调试**：直接修改HTML/CSS/JS文件即可，浏览器自动刷新
-- **模块化设计**：每个功能独立的HTML和JS文件，便于维护
+### Essential Reading for Project Owners
 
-### 项目所有者必读
+- **Access to GitHub**: This is a necessary condition, as GitHub cannot be stably accessed from China now
+- **Register Account**: Register a GitHub account using email or Google/Apple accounts
+- **Upgrade Account to Organization**: You must use an organization's repository to use the permission grouping feature, this is very important
+- **Enable Two-Factor Authentication**: Organization accounts must use two-factor authentication. Since Chinese phone numbers cannot be used for authentication, you must download the GitHub APP and another identity authentication APP, such as Microsoft Authenticator
+- **Huawei Android Phones**: Since Huawei and Android phones in China cannot directly download apps from the Google Play Store, you also need to install an app called ApkPure first, through which to install the above two apps and complete two-factor authentication
+- **Generate Personal Access Token**: Visit (https://github.com/settings/tokens), generate a "Generate new token (classic)" token, set the expiration to never, select all permissions, and save it after generation
 
-- **能够科学上网**：这是必要条件，在国内现在已经不能稳定访问github了
-- **注册账号**：注册一个github账号，用邮箱或者谷歌、苹果的账号都可以
-- **将账号升级为组织**：必须使用组织的仓库才能使用权限分组的功能，这很重要
-- **打开两步认证**：组织账号必须使用两步认真，由于国内的手机号不能用来认证，所以必须下载Github APP和另外一个身份认证APP，例如Microsoft Authenticator
-- **华为安卓手机**：鉴于国内的华为和安卓手机都无法直接从谷歌应用商店下载APP，所以还需要先安装一个叫做ApkPure的APP，通过它来安装以上两个APP，完成两步认证
-- **生成个人访问令牌**：访问 (https://github.com/settings/tokens)，生成一个Generate new token (classic)令牌，将有效期设为永远，所有的权限都选中，生成后保存好
-- **创建仓库**：创建一个公共仓库，注意必须要将仓库类型设置为公共，否则其他人无法访问。许可证不需要选择，在仓库所有者第一次登录时系统会自动生成
-- **登陆之后**：打开根目录中各种语言版本的CLA.md文件，将你组织的名字和您的姓名、职位、地址填入相应的位置
+## Contributing
 
-## 贡献指南
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to participate in project development.
 
-请参考 [CONTRIBUTING.md](CONTRIBUTING.md) 了解如何参与项目开发。
-
-## 许可证
+## License
 
 [MIT License](LICENSE)

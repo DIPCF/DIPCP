@@ -4,6 +4,11 @@
  * 从 GitHub 获取 Pull Requests 并显示
  */
 class MaintainersPage extends BasePage {
+	/**
+	 * 构造函数
+	 * @param {Object} props - 组件属性
+	 * @param {Array} [props.maintainers] - 初始维护者列表
+	 */
 	constructor(props = {}) {
 		super(props);
 
@@ -209,6 +214,10 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 渲染页面内容
+	 * @returns {HTMLElement} 包含页面内容的容器元素
+	 */
 	render() {
 		const container = document.createElement('div');
 		container.className = 'dashboard';
@@ -221,10 +230,19 @@ class MaintainersPage extends BasePage {
 		return container;
 	}
 
+	/**
+	 * 渲染页面头部
+	 * @returns {string} 头部HTML字符串
+	 */
 	renderHeader() {
 		return super.renderHeader('maintainers', false, null);
 	}
 
+	/**
+	 * 渲染维护者详情视图
+	 * 根据当前状态显示空状态、加载状态或维护者详情
+	 * @returns {string} 详情视图HTML字符串
+	 */
 	renderMaintainerDetail() {
 		// 如果没有选中的 PR，显示空状态
 		if (!this.state.selectedMaintainer) {
@@ -308,7 +326,12 @@ class MaintainersPage extends BasePage {
         `;
 	}
 
-
+	/**
+	 * 挂载页面组件到DOM容器
+	 * 初始化Octokit并加载Pull Requests
+	 * @param {HTMLElement} container - DOM容器元素
+	 * @async
+	 */
 	async mount(container) {
 		super.mount(container);
 
@@ -327,6 +350,10 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 绑定页面事件监听器
+	 * 包括操作按钮、刷新按钮、文件点击、评论输入等事件
+	 */
 	bindEvents() {
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
@@ -394,6 +421,12 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 处理用户操作
+	 * 根据操作类型调用相应的处理方法
+	 * @param {string} action - 操作类型（approve, reject, view, refresh等）
+	 * @param {string} [maintainerId] - 维护者ID（可选）
+	 */
 	handleAction(action, maintainerId) {
 		const maintainer = this.state.maintainers.find(m => m.id === maintainerId) || this.state.selectedMaintainer;
 
@@ -407,9 +440,6 @@ class MaintainersPage extends BasePage {
 			case 'reject':
 			case 'reject-detail':
 				this.handleReject(maintainer);
-				break;
-			case 'add-comment':
-				this.handleAddComment();
 				break;
 			case 'view':
 				this.setState({ selectedMaintainer: maintainer });
@@ -450,29 +480,12 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
-	handleAddComment() {
-		const commentText = this.element.querySelector('#commentText');
-		if (!commentText || !commentText.value.trim()) return;
-
-		// 获取当前用户名
-		const currentUser = this.state.user?.username || this.state.user?.login || '当前用户';
-
-		const comment = {
-			author: currentUser,
-			date: new Date().toLocaleString(),
-			content: commentText.value.trim()
-		};
-
-		this.handleComment(this.state.selectedMaintainer, comment);
-
-		commentText.value = '';
-	}
-
-	updateMaintainers(maintainers) {
-		this.setState({ maintainers });
-		this.update();
-	}
-
+	/**
+	 * 处理批准合并操作
+	 * 验证必填字段，合并PR，创建讨论主题
+	 * @param {Object} maintainer - 维护者对象
+	 * @async
+	 */
 	async handleApprove(maintainer) {
 		if (!this.state.apiConfigured || !this.state.octokit) {
 			this.showApproveError(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
@@ -550,6 +563,12 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 处理拒绝合并操作
+	 * 验证拒绝理由，关闭PR，创建讨论主题
+	 * @param {Object} maintainer - 维护者对象
+	 * @async
+	 */
 	async handleReject(maintainer) {
 		// 检查评论框中是否有内容
 		const commentText = this.element.querySelector('#commentText');
@@ -783,34 +802,6 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
-
-	async handleComment(maintainer, comment) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
-			alert(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
-			return;
-		}
-
-		try {
-			const user = this.state.user;
-			const owner = user.repositoryInfo.owner;
-			const repo = user.repositoryInfo.repo;
-			const prNumber = parseInt(maintainer.id);
-
-			// 在 PR 上添加评论
-			await this.state.octokit.rest.issues.createComment({
-				owner,
-				repo,
-				issue_number: prNumber,
-				body: comment.content
-			});
-
-			console.log(`评论已成功添加到 PR #${prNumber}`);
-		} catch (error) {
-			console.error('添加评论失败:', error);
-			alert(this.t('maintainers.errors.commentFailed', `添加评论失败: ${error.message}`));
-		}
-	}
-
 	/**
 	 * 处理文件点击事件，获取并显示文件内容
 	 * @param {string} filePath - 文件路径
@@ -938,15 +929,15 @@ class MaintainersPage extends BasePage {
 		}
 	}
 
+	/**
+	 * 设置加载状态
+	 * @param {boolean} loading - 是否加载中
+	 */
 	setLoading(loading) {
 		this.setState({ loading });
 		this.update();
 	}
 
-	selectMaintainer(maintainer) {
-		this.setState({ selectedMaintainer: maintainer });
-		this.update();
-	}
 }
 
 // 注册组件

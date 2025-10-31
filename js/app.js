@@ -10,6 +10,9 @@ class DIPCPApp {
 		this.currentPage = null;
 		this.lastParams = undefined;
 
+		// 检测并保存基础路径（支持子目录部署）
+		this.basePath = this.detectBasePath();
+
 		// 应用状态
 		this.state = {
 			user: null,
@@ -20,6 +23,83 @@ class DIPCPApp {
 			permissionInfo: null
 		};
 		this.listeners = new Map();
+	}
+
+	/**
+	 * 检测应用的基础路径
+	 * 如果部署在子目录（如 /DIPCP/），则返回该路径，否则返回 '/'
+	 * @returns {string} 基础路径
+	 */
+	detectBasePath() {
+		// 获取当前页面路径，移除文件名部分
+		const path = window.location.pathname;
+
+		// 如果路径以 index.html 结尾，移除它
+		let basePath = path.replace(/\/index\.html$/, '');
+
+		// 如果不是以 / 结尾，添加 /
+		if (basePath && !basePath.endsWith('/')) {
+			basePath += '/';
+		}
+
+		// 如果路径为空，使用 /
+		if (!basePath) {
+			basePath = '/';
+		}
+
+		// 如果路径不是 /，则需要确保格式正确（去除重复的斜杠）
+		if (basePath !== '/') {
+			basePath = basePath.replace(/\/+/g, '/');
+			if (!basePath.startsWith('/')) {
+				basePath = '/' + basePath;
+			}
+			if (!basePath.endsWith('/')) {
+				basePath += '/';
+			}
+		}
+
+		console.log('检测到基础路径:', basePath);
+		return basePath;
+	}
+
+	/**
+	 * 获取相对于基础路径的路径
+	 * @param {string} path - 完整路径
+	 * @returns {string} 相对于基础路径的路径
+	 */
+	getRelativePath(path) {
+		if (this.basePath === '/') {
+			return path;
+		}
+		// 规范化基础路径（去除末尾斜杠用于匹配）
+		const basePathForMatch = this.basePath.endsWith('/') ? this.basePath.slice(0, -1) : this.basePath;
+
+		// 移除基础路径前缀
+		if (path.startsWith(basePathForMatch)) {
+			const relative = path.slice(basePathForMatch.length);
+			// 如果移除后为空，返回 '/'，否则确保以 '/' 开头
+			return relative || '/';
+		}
+		// 如果不匹配基础路径，返回原路径
+		return path;
+	}
+
+	/**
+	 * 获取完整路径（包含基础路径）
+	 * @param {string} path - 相对路径
+	 * @returns {string} 完整路径
+	 */
+	getFullPath(path) {
+		if (this.basePath === '/') {
+			return path;
+		}
+		// 确保路径以 / 开头
+		if (!path.startsWith('/')) {
+			path = '/' + path;
+		}
+		// 移除基础路径末尾的 /，然后拼接
+		const base = this.basePath.endsWith('/') ? this.basePath.slice(0, -1) : this.basePath;
+		return base + path;
 	}
 
 	/**
@@ -338,11 +418,12 @@ class DIPCPApp {
 
 	/**
 	 * 导航到指定路径
-	 * @param {string} path - 目标路径
+	 * @param {string} path - 目标路径（相对于基础路径）
 	 * @returns {void}
 	 */
 	navigateTo(path) {
-		history.pushState(null, '', path);
+		const fullPath = this.getFullPath(path);
+		history.pushState(null, '', fullPath);
 		this.handleRouteChange();
 	}
 
@@ -355,7 +436,9 @@ class DIPCPApp {
 	async handleRouteChange() {
 		const fullPath = window.location.pathname + window.location.search;
 		const path = window.location.pathname;
-		const route = this.matchRoute(path);
+		// 获取相对于基础路径的路径
+		const relativePath = this.getRelativePath(path);
+		const route = this.matchRoute(relativePath);
 
 		// 检查用户和仓库信息状态
 		const hasUser = this.state.user && this.state.user.token;
@@ -383,8 +466,8 @@ class DIPCPApp {
 			}
 		}
 
-		// 处理根路径重定向
-		if (path === '/' || path === '') {
+		// 处理根路径重定向（考虑基础路径）
+		if (relativePath === '/' || relativePath === '') {
 			if (!hasUser) {
 				// 没有用户信息，重定向到登录页面
 				this.navigateTo('/login');
@@ -423,11 +506,16 @@ class DIPCPApp {
 
 	/**
 	 * 匹配路由
-	 * 根据路径匹配对应的页面类名
-	 * @param {string} path - 要匹配的路径
+	 * 根据路径匹配对应的页面类名（使用相对路径）
+	 * @param {string} path - 要匹配的路径（应该是相对路径）
 	 * @returns {string} 页面类名
 	 */
 	matchRoute(path) {
+		// 确保路径以 / 开头
+		if (!path.startsWith('/')) {
+			path = '/' + path;
+		}
+
 		// 精确匹配
 		if (this.routes.has(path)) {
 			return this.routes.get(path);

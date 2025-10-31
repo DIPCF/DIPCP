@@ -1511,7 +1511,7 @@ class ProjectDetailPage extends BasePage {
 			'director': '👑',
 			'maintainer': '📝',
 			'reviewer': '✨',
-			'collaborator': '🖋',
+			'collaborator': '✏️',
 			'visitor': '👤'
 		};
 		const icon = roleIcons[role] || '❓';

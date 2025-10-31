@@ -253,7 +253,7 @@ class DashboardPage extends BasePage {
 				className: 'role-maintainer'
 			},
 			'collaborator': {
-				displayName: '🖋' + this.t('dashboard.userRole.collaborator', '贡献者'),
+				displayName: '✏️' + this.t('dashboard.userRole.collaborator', '贡献者'),
 				className: 'role-collaborator'
 			},
 			'visitor': {
