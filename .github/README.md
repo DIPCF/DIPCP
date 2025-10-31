@@ -1,54 +1,61 @@
-# GitHub Actions 自动批准协作申请
+# DIPCP - Decentralized Intellectual Property Collaboration Platform
 
-这个目录包含了用于自动批准协作申请的GitHub Actions工作流。
+[中文说明](README_zh-CN.md)
 
-## 设置步骤
+## Project Introduction
 
-### 1. 确保标签存在
-在GitHub仓库中创建以下标签：
-- `contribution-application` - 用于标识协作申请
-- `approved` - 用于标识已批准的申请
-- `contribution-approved` - 用于标识已批准的协作申请
-- `error` - 用于标识处理错误的申请
-- `needs-manual-review` - 用于标识需要手动审核的申请
+DIPCP is a decentralized IP collaboration platform operated by the DIPCF Foundation and based on GitHub. It aims to provide content management and collaboration features for IP creators worldwide.
+However, the value of this platform goes far beyond this. It has successfully explored a viable path for operating network projects with zero cost without the need to set up your own server. Those in need can modify it on this basis to create applications suitable for themselves.
 
-### 2. 工作流说明
+## Core Features
 
-**文件位置**: `.github/workflows/auto-approve-collaborators.yml`
+- 🏠 **No Server Required**: Fully static JS pages, directly deployed on GitHub Pages, with zero operational costs
+- 🔄 **GitHub Integration**: Based on GitHub's plain text storage and version management
+- ✏️ **Offline Editing**: Supports offline editing and creating new pages
+- 🌿 **Auto Branching**: Automatic branch creation, local caching, and submission review
+- 👥 **Review Mechanism**: Professional content review team responsible for merge decisions
+- 🏆 **Points System**: Contribution-based points reward mechanism
+- 👤 **User Management**: Group authorization and permission control
+- ⚡ **Native JavaScript**: Developed with native JS, simple and easy to debug
 
-**触发条件**: 
-- 当有新的Issue被创建时
-- 且该Issue包含`contribution-application`标签
+## Quick Start
 
-**工作流程**:
-1. 从Issue标题中提取用户名（格式：`申请成为贡献者 - username`）
-2. 尝试将用户添加为仓库协作者（推送权限）
-3. 如果成功：
-   - 添加`approved`和`contribution-approved`标签
-   - 关闭Issue
-   - 添加成功评论
-4. 如果失败：
-   - 添加`error`和`needs-manual-review`标签
-   - 添加错误评论，需要手动处理
+### Requirements
 
-### 3. 权限要求
+- Python 3.6+ (for development server)
+- Modern browser (Chrome, Firefox, Edge, etc.)
+- Git (for version control)
 
-工作流使用`GITHUB_TOKEN`，需要以下权限：
-- `issues: write` - 修改Issue状态和标签
-- `pull: write` - 添加协作者
-- `contents: read` - 读取仓库内容
+### Start Development Environment
 
-### 4. 测试
+1. **Windows Users**:
+   ```
+   Double-click start-dev.bat
+   ```
 
-1. 通过DIPCP提交协作申请
-2. 检查GitHub Actions是否被触发
-3. 查看Issue是否被自动处理
-4. 确认用户是否被添加为协作者
+2. **Access Application**:
+   ```
+   Open in browser: http://localhost:8000
+   ```
 
-## 故障排除
+### Development Notes
 
-如果自动批准失败：
-1. 检查GitHub Actions日志
-2. 确认用户名是否正确
-3. 检查仓库权限设置
-4. 手动添加协作者并关闭Issue
+- **No Node.js Required**: The project uses a single-page native JavaScript architecture, no npm or Node.js needed
+- **Easy Debugging**: Simply modify HTML/CSS/JS files, browser auto-refreshes
+- **Modular Design**: Each page is a functionally independent JS file, easy to maintain
+
+### Essential Reading for Project Owners
+
+- **Access to GitHub**: This is a necessary condition
+- **Register Account**: Register a GitHub account using email or Google/Apple accounts
+- **Create Organization**: In Settings, go to Organization options, create a new organization. You must use an organization's repository to use the permission grouping feature, this is very important
+- **Enable Two-Factor Authentication**: Organization accounts must use two-factor authentication. You can download the GitHub APP and another identity authentication APP, such as Microsoft Authenticator
+- **Generate Personal Access Token**: Visit (https://github.com/settings/tokens), generate a "Generate new token (classic)" token, set the expiration to never, select all permissions, and save it after generation
+
+## Contributing
+
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to participate in project development.
+
+## License
+
+[MIT License](LICENSE)
