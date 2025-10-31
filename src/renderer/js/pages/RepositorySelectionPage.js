@@ -809,22 +809,6 @@ class RepositorySelectionPage extends BasePage {
 	}
 
 	/**
-	 * 解析GitHub URL
-	 * @param {string} url - GitHub仓库URL
-	 * @returns {Object|null} 包含owner和repo的对象，解析失败返回null
-	 */
-	parseGitHubUrl(url) {
-		const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-		if (match) {
-			return {
-				owner: match[1],
-				repo: match[2].replace('.git', '')
-			};
-		}
-		return null;
-	}
-
-	/**
 	 * 检查仓库类型（是否组织仓库）
 	 * @async
 	 * @param {string} owner - 仓库所有者
@@ -1108,6 +1092,19 @@ class RepositorySelectionPage extends BasePage {
 			console.log('✅ [proceedToProject] 文件同步完成');
 			this.updateContinueButtonState('success', this.t('repositorySelection.continue.success', '处理完成！'));
 
+			// 获取并缓存Discussions分类列表（访客也需要）
+			console.log('🔵 [proceedToProject] 缓存Discussions分类列表...');
+			try {
+				// 访客可以使用无auth的octokit查询公开仓库
+				const octokit = this.state.userInfo && this.state.userInfo.token
+					? new window.Octokit({ auth: this.state.userInfo.token })
+					: new window.Octokit();
+				await this.cacheDiscussionCategories(octokit, repoInfo.owner, repoInfo.repo);
+			} catch (error) {
+				console.warn('⚠️ [proceedToProject] 缓存分类列表失败:', error);
+				// 不阻止流程继续
+			}
+
 			// 保存仓库信息到历史记录（只有在整个流程完成后才保存）
 			console.log('🔵 [proceedToProject] 保存历史记录...');
 			this.saveToHistory({
@@ -1115,9 +1112,6 @@ class RepositorySelectionPage extends BasePage {
 				description: repoInfo.description || await this.getRepositoryDescription(repoInfo.owner, repoInfo.repo)
 			});
 
-			// 等待1秒让用户看到完成状态
-			console.log('🔵 [proceedToProject] 等待1秒后跳转...');
-			await new Promise(resolve => setTimeout(resolve, 1000));
 
 			// 跳转到项目详情页面
 			console.log('🔵 [proceedToProject] 正在跳转到项目详情页面...');
@@ -1248,6 +1242,12 @@ class RepositorySelectionPage extends BasePage {
 			this.updateContinueButtonState('loading', this.t('login.settingUp.discussions', '正在启用Discussions...'));
 			await this.setupDiscussions(octokit, owner, repo);
 			console.log('✅ [setupRepository] 步骤7完成');
+
+			// 8. 获取并缓存Discussions分类列表
+			console.log('🔵 [setupRepository] 步骤8: 缓存Discussions分类列表...');
+			this.updateContinueButtonState('loading', this.t('login.settingUp.cachingCategories', '正在缓存分类列表...'));
+			await this.cacheDiscussionCategories(octokit, owner, repo);
+			console.log('✅ [setupRepository] 步骤8完成');
 
 			console.log('✅ [setupRepository] 所有设置完成！');
 
@@ -1868,6 +1868,59 @@ ${this.state.userInfo.username},1000,1000
 		} catch (error) {
 			console.error('❌ 启用Discussions失败:', error);
 			// 不抛出错误，因为Discussions不是关键功能，不应该阻止其他设置
+			console.log('⚠️ 继续执行后续设置...');
+		}
+	}
+
+	/**
+	 * 获取并缓存Discussions分类列表
+	 * @async
+	 * @param {Object} octokit - GitHub API客户端
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 */
+	async cacheDiscussionCategories(octokit, owner, repo) {
+		try {
+			console.log('🔧 正在获取Discussions分类列表...');
+
+			// 获取Discussions分类列表
+			const categoriesResult = await octokit.graphql(`
+				query GetDiscussionCategories($owner: String!, $name: String!) {
+					repository(owner: $owner, name: $name) {
+						discussionCategories(first: 10) {
+							edges {
+								node {
+									id
+									name
+								}
+							}
+						}
+					}
+				}
+			`, {
+				owner: owner,
+				name: repo
+			});
+
+			const categories = categoriesResult.repository.discussionCategories.edges.map(edge => edge.node);
+
+			if (categories.length === 0) {
+				console.warn('⚠️ 未找到任何Discussions分类');
+				return;
+			}
+
+			// 保存到本地存储
+			const cacheKey = `dipcp-discussion-categories-${owner}-${repo}`;
+			try {
+				localStorage.setItem(cacheKey, JSON.stringify(categories));
+				console.log(`✅ 已缓存 ${categories.length} 个Discussions分类`);
+			} catch (error) {
+				console.warn('⚠️ 保存分类列表到缓存失败:', error);
+			}
+
+		} catch (error) {
+			console.error('❌ 获取Discussions分类列表失败:', error);
+			// 不抛出错误，因为分类列表缓存不是关键功能，不应该阻止其他设置
 			console.log('⚠️ 继续执行后续设置...');
 		}
 	}

@@ -1514,6 +1514,7 @@ class DiscussionsPage extends BasePage {
 
 	/**
 	 * 获取Discussions分类列表
+	 * 优先从本地缓存读取，缓存不存在时查询GitHub API
 	 */
 	async getDiscussionCategories() {
 		const user = this.state.user;
@@ -1524,29 +1525,58 @@ class DiscussionsPage extends BasePage {
 		const owner = user.repositoryInfo.owner;
 		const repo = user.repositoryInfo.repo;
 
-		// 使用GraphQL获取分类列表
-		const result = await this.state.octokit.graphql(`
-			query GetRepository($owner: String!, $name: String!) {
-				repository(owner: $owner, name: $name) {
-					id
-					discussionCategories(first: 10) {
-						edges {
-							node {
-								id
-								name
-								emoji
-								description
+		// 尝试从本地存储获取categories列表（全局共享的缓存）
+		const cacheKey = `dipcp-discussion-categories-${owner}-${repo}`;
+		let categories = null;
+
+		try {
+			const cached = localStorage.getItem(cacheKey);
+			if (cached) {
+				categories = JSON.parse(cached);
+				console.log('从缓存中获取Discussions分类列表');
+				return categories;
+			}
+		} catch (error) {
+			console.warn('读取分类列表缓存失败:', error);
+		}
+
+		// 如果缓存中没有，则查询GitHub API并保存
+		if (!categories) {
+			console.log('缓存中未找到分类列表，正在查询GitHub API...');
+			// 使用GraphQL获取分类列表
+			const result = await this.state.octokit.graphql(`
+				query GetRepository($owner: String!, $name: String!) {
+					repository(owner: $owner, name: $name) {
+						id
+						discussionCategories(first: 10) {
+							edges {
+								node {
+									id
+									name
+									emoji
+									description
+								}
 							}
 						}
 					}
 				}
-			}
-		`, {
-			owner: owner,
-			name: repo
-		});
+			`, {
+				owner: owner,
+				name: repo
+			});
 
-		return result.repository.discussionCategories.edges.map(edge => edge.node);
+			categories = result.repository.discussionCategories.edges.map(edge => edge.node);
+
+			// 保存到本地存储（供其他页面使用）
+			try {
+				localStorage.setItem(cacheKey, JSON.stringify(categories));
+				console.log('已保存Discussions分类列表到缓存');
+			} catch (error) {
+				console.warn('保存分类列表到缓存失败:', error);
+			}
+		}
+
+		return categories;
 	}
 
 

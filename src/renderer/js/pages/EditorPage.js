@@ -44,7 +44,9 @@ class EditorPage extends BasePage {
 			userRole: userInfo.userRole,
 			permissionInfo: userInfo.permissionInfo,
 			// 功能模块状态缓存
-			moduleStates: this.loadModuleStates()
+			moduleStates: this.loadModuleStates(),
+			// 模态框实例
+			modal: null
 		};
 	}
 
@@ -539,7 +541,7 @@ class EditorPage extends BasePage {
 		const submitBtn = this.element.querySelector('#submitBtn');
 		if (submitBtn) {
 			submitBtn.addEventListener('click', () => {
-				this.handleSubmitReview();
+				this.showSubmitModal();
 			});
 		}
 
@@ -631,10 +633,42 @@ class EditorPage extends BasePage {
 	}
 
 	/**
+	 * 显示提交审核模态框
+	 * @returns {Promise<void>}
+	 */
+	async showSubmitModal() {
+		// 显示输入模态框
+		if (!this.state.modal) {
+			this.state.modal = new window.Modal();
+		}
+
+		this.state.modal.showInput(
+			this.t('editor.submitModal.title', '提交审核'),
+			this.t('editor.submitModal.message', '请输入给维护者的留言（可选）:'),
+			this.t('editor.submitModal.placeholder', '请输入留言...'),
+			'',
+			(message) => {
+				// 用户确认后，执行提交
+				this.handleSubmitReview(message);
+			}
+		);
+
+		// 如果模态框元素不存在，创建并添加到 DOM
+		if (!this.state.modal.element) {
+			const modalElement = this.state.modal.render();
+			if (modalElement) {
+				document.body.appendChild(modalElement);
+				this.state.modal.element = modalElement;
+			}
+		}
+	}
+
+	/**
 	 * 处理提交审核操作
+	 * @param {string} userMessage - 用户输入的留言
 	 * @returns {void}
 	 */
-	handleSubmitReview() {
+	handleSubmitReview(userMessage = '') {
 		// 包一层立即执行的异步函数，避免更改对外API签名
 		(async () => {
 			try {
@@ -642,18 +676,6 @@ class EditorPage extends BasePage {
 				const user = this.state.user;
 				const repoInfo = this.state.repoInfo || (user && user.repositoryInfo);
 				const filePath = this.state.filePath;
-				if (!user || !user.token) {
-					alert(this.t('editor.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
-					return;
-				}
-				if (!repoInfo || !repoInfo.owner || !repoInfo.repo) {
-					alert(this.t('editor.errors.repositoryInfoUnavailable', '仓库信息不可用'));
-					return;
-				}
-				if (!filePath) {
-					alert(this.t('editor.errors.filePathMissing', '文件路径缺失'));
-					return;
-				}
 
 				// 禁用提交按钮，防止重复点击
 				const submitBtn = this.element && this.element.querySelector('#submitBtn');
@@ -669,18 +691,134 @@ class EditorPage extends BasePage {
 				const { data: repo } = await octokit.rest.repos.get({ owner: repoInfo.owner, repo: repoInfo.repo });
 				const defaultBranch = repo.default_branch || 'main';
 
-				// 获取默认分支最新提交SHA
-				const { data: baseRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${defaultBranch}` });
-				const baseSha = baseRef.object.sha;
-
 				// 目标分支命名：spcp/<username>
 				const safeUser = (user.login || user.username || 'user').replace(/[^a-zA-Z0-9-_]/g, '-');
 				const branchName = `spcp/${safeUser}`;
 
+				// 检查是否有未处理的 PR（从用户分支到默认分支的打开状态的 PR）
+				// 并收集这些 PR 中修改的所有文件和留言
+				const filesToInclude = new Map(); // 用于存储需要包含的文件路径和内容
+				const previousMessages = []; // 用于存储之前未审核 PR 的留言（排除有maintaining标签的）
+
+				try {
+					const { data: existingPRs } = await octokit.rest.pulls.list({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						state: 'open',
+						head: `${repoInfo.owner}:${branchName}`,
+						base: defaultBranch
+					});
+
+					// 如果有未处理的 PR，先获取它们修改的所有文件和留言，同时标记需要关闭的 PR（排除有maintaining标签的 PR）
+					const prsToClose = [];
+					if (existingPRs && existingPRs.length > 0) {
+						console.log(`发现 ${existingPRs.length} 个未处理的 PR，正在获取文件列表...`);
+
+						for (const pr of existingPRs) {
+							// 检查 PR 是否有"maintaining"标签
+							let hasMaintainingLabel = false;
+							try {
+								const { data: prLabels } = await octokit.rest.issues.listLabelsOnIssue({
+									owner: repoInfo.owner,
+									repo: repoInfo.repo,
+									issue_number: pr.number
+								});
+								hasMaintainingLabel = prLabels.some(label =>
+									label.name.toLowerCase() === 'maintaining'
+								);
+							} catch (labelErr) {
+								console.warn(`获取 PR #${pr.number} 的标签失败:`, labelErr);
+							}
+
+							// 如果有maintaining标签，跳过这个 PR（不收集文件、留言，也不关闭）
+							if (hasMaintainingLabel) {
+								console.log(`PR #${pr.number} 有maintaining标签，跳过收集文件、留言和关闭操作`);
+								continue;
+							}
+
+							// 标记这个 PR 需要关闭
+							prsToClose.push(pr);
+
+							// 收集没有maintaining标签的 PR 的留言
+							if (pr.body && pr.body.trim()) {
+								previousMessages.push(pr.body.trim());
+							}
+
+							try {
+								// 获取 PR 中修改的文件列表
+								const { data: prFiles } = await octokit.rest.pulls.listFiles({
+									owner: repoInfo.owner,
+									repo: repoInfo.repo,
+									pull_number: pr.number
+								});
+
+								// 从旧 PR 的分支中读取这些文件的内容
+								for (const file of prFiles) {
+									if (file.status !== 'removed' && !filesToInclude.has(file.filename)) {
+										try {
+											// 从 PR 的 head 分支（用户分支）读取文件内容
+											const { data: fileContent } = await octokit.rest.repos.getContent({
+												owner: repoInfo.owner,
+												repo: repoInfo.repo,
+												path: file.filename,
+												ref: branchName
+											});
+
+											if (fileContent && !Array.isArray(fileContent) && fileContent.content) {
+												// 解码 Base64 内容
+												const content = decodeURIComponent(escape(atob(fileContent.content.replace(/\s/g, ''))));
+												filesToInclude.set(file.filename, {
+													path: file.filename,
+													content: content,
+													sha: fileContent.sha,
+													status: file.status
+												});
+											}
+										} catch (fileErr) {
+											console.warn(`读取文件 ${file.filename} 失败:`, fileErr);
+											// 继续处理其他文件
+										}
+									}
+								}
+							} catch (prErr) {
+								console.warn(`获取 PR #${pr.number} 的文件列表失败:`, prErr);
+								// 继续处理其他 PR
+							}
+						}
+
+						if (prsToClose.length > 0) {
+							console.log(`正在关闭 ${prsToClose.length} 个旧 PR（已排除 ${existingPRs.length - prsToClose.length} 个维护中的 PR）...`);
+							for (const pr of prsToClose) {
+								try {
+									await octokit.rest.pulls.update({
+										owner: repoInfo.owner,
+										repo: repoInfo.repo,
+										pull_number: pr.number,
+										state: 'closed'
+									});
+									console.log(`已关闭 PR #${pr.number}`);
+								} catch (err) {
+									console.warn(`关闭 PR #${pr.number} 失败:`, err);
+									// 继续处理其他 PR，不中断流程
+								}
+							}
+						}
+					}
+				} catch (err) {
+					console.warn('检查现有 PR 失败:', err);
+					// 即使检查失败，也继续提交流程
+				}
+
+				// 获取默认分支最新提交SHA
+				const { data: baseRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${defaultBranch}` });
+				const baseSha = baseRef.object.sha;
+
 				// 尝试读取目标分支，不存在则创建
 				let branchExists = true;
+				let branchHeadSha = baseSha; // 保存分支当前的 HEAD SHA
 				try {
-					await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${branchName}` });
+					const { data: branchRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${branchName}` });
+					branchHeadSha = branchRef.object.sha;
 				} catch (err) {
 					if (err && err.status === 404) {
 						branchExists = false;
@@ -689,6 +827,7 @@ class EditorPage extends BasePage {
 					}
 				}
 
+				// 如果分支不存在，创建它
 				if (!branchExists) {
 					await octokit.rest.git.createRef({
 						owner: repoInfo.owner,
@@ -697,49 +836,148 @@ class EditorPage extends BasePage {
 						sha: baseSha
 					});
 				} else {
-					// 分支已存在：可选地快进到最新基线（避免落后）
-					await octokit.rest.git.updateRef({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						ref: `heads/${branchName}`,
-						sha: baseSha,
-						force: true
-					});
-				}
-
-				// 读取目标分支上的文件，若存在需要sha以便更新
-				let existingSha = undefined;
-				try {
-					const { data: existing } = await octokit.rest.repos.getContent({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						path: filePath,
-						ref: branchName
-					});
-					if (existing && !Array.isArray(existing) && existing.sha) {
-						existingSha = existing.sha;
-					}
-				} catch (err) {
-					// 404 表示文件不存在于该分支，忽略
-					if (!(err && err.status === 404)) {
-						throw err;
+					// 由于我们已经从旧 PR 中收集了文件，可以重置分支
+					if (filesToInclude.size > 0) {
+						// 有旧文件需要保留，先重置分支到基线（后面会重新提交所有文件）
+						await octokit.rest.git.updateRef({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							ref: `heads/${branchName}`,
+							sha: baseSha,
+							force: true
+						});
+					} else {
+						// 没有旧文件，保持分支现状或重置到基线
+						await octokit.rest.git.updateRef({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							ref: `heads/${branchName}`,
+							sha: baseSha,
+							force: true
+						});
 					}
 				}
 
-				// 将当前内容以 Base64 提交
+				// 将当前编辑的文件也添加到待提交文件列表中
+				// 如果旧 PR 中已经有这个文件，会被当前内容覆盖
 				const content = this.state.content || '';
-				const base64Content = btoa(unescape(encodeURIComponent(content)));
-				const commitMessage = this.t('editor.commitMessage', '通过DIPCP更新文件：') + (this.state.fileName || this.state.filePath || '文件');
 
-				await octokit.rest.repos.createOrUpdateFileContents({
-					owner: repoInfo.owner,
-					repo: repoInfo.repo,
-					path: filePath,
-					message: commitMessage,
-					content: base64Content,
-					branch: branchName,
-					sha: existingSha
-				});
+				// 如果这个文件不在旧文件中，需要获取它在分支上的 SHA（如果存在）
+				if (!filesToInclude.has(filePath)) {
+					let fileSha = undefined;
+					try {
+						const { data: existing } = await octokit.rest.repos.getContent({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							path: filePath,
+							ref: branchName
+						});
+						if (existing && !Array.isArray(existing) && existing.sha) {
+							fileSha = existing.sha;
+						}
+					} catch (err) {
+						// 404 表示文件不存在于该分支，忽略
+						if (err.status !== 404) {
+							throw err;
+						}
+					}
+					filesToInclude.set(filePath, {
+						path: filePath,
+						content: content,
+						sha: fileSha,
+						status: 'modified'
+					});
+				} else {
+					// 如果文件已经在旧 PR 中，用当前内容覆盖
+					const existingFile = filesToInclude.get(filePath);
+					existingFile.content = content;
+					// SHA 会在提交时重新获取
+				}
+
+				// 批量提交所有文件
+				console.log(`准备提交 ${filesToInclude.size} 个文件...`);
+				const commitMessage = `Update files via DIPCP: ${Array.from(filesToInclude.keys()).join(', ')}`;
+
+				// 收集所有文件路径用于PR标题和描述
+				const allFilePaths = Array.from(filesToInclude.keys());
+
+				// 转换文件格式为批量提交所需格式
+				const files = Array.from(filesToInclude.entries()).map(([path, fileInfo]) => ({
+					path: path,
+					content: fileInfo.content
+				}));
+
+				// 如果分支是新创建的（分支不存在），需要先提交第一个文件建立初始提交
+				if (!branchExists && files.length > 0) {
+					// 创建第一个文件，建立初始提交
+					const firstFile = files[0];
+					const base64Content = btoa(unescape(encodeURIComponent(firstFile.content)));
+					await octokit.rest.repos.createOrUpdateFileContents({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						path: firstFile.path,
+						message: `Initial commit: ${commitMessage}`,
+						content: base64Content,
+						branch: branchName
+					});
+					console.log(`✅ 已创建第一个文件 ${firstFile.path}，建立初始提交`);
+
+					// 如果还有其他文件，使用批量提交
+					if (files.length > 1) {
+						const remainingFiles = files.slice(1);
+						await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, remainingFiles, commitMessage, branchName);
+						console.log(`✅ 已批量提交剩余的 ${remainingFiles.length} 个文件`);
+					}
+				} else {
+					// 分支已存在，直接使用批量提交所有文件
+					await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, files, commitMessage, branchName);
+					console.log(`✅ 已批量提交 ${files.length} 个文件`);
+				}
+
+				// 文件提交成功后，创建新的 Pull Request
+				try {
+					// 合并用户输入的留言和之前收集的留言
+					let prBody = userMessage || '';
+					if (previousMessages.length > 0) {
+						const mergedMessages = previousMessages.join('\n\n---\n\n');
+						if (prBody.trim()) {
+							prBody = `${prBody}\n\n---\n\n${mergedMessages}`;
+						} else {
+							prBody = mergedMessages;
+						}
+					}
+
+					const { data: newPR } = await octokit.rest.pulls.create({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						title: 'Submit file update',
+						body: prBody,
+						head: branchName,
+						base: defaultBranch
+					});
+
+					// 添加提交者名字标签（c_用户名）
+					try {
+						const committerName = user.username || user.login || '';
+						if (committerName) {
+							await octokit.rest.issues.addLabels({
+								owner: repoInfo.owner,
+								repo: repoInfo.repo,
+								issue_number: newPR.number,
+								labels: [`c_${committerName}`]
+							});
+							console.log(`为 PR #${newPR.number} 添加提交者标签 c_${committerName}`);
+						}
+					} catch (labelError) {
+						// 如果标签不存在或添加失败，只记录警告，不影响主流程
+						console.warn('添加提交者标签失败:', labelError);
+					}
+
+					console.log(`成功创建 PR #${newPR.number}: ${newPR.html_url}`);
+
+				} catch (prError) {
+					console.error('创建 Pull Request 失败:', prError);
+				}
 
 				// 提交成功，提示并更新状态（标记已提交以隐藏提交按钮）
 				this.setState({ isModified: false, hasSubmitted: true });
@@ -822,6 +1060,89 @@ class EditorPage extends BasePage {
 			console.error('保存文件失败:', error);
 			alert(this.t('editor.saveFailed', '保存失败：{error}').replace('{error}', error.message));
 		}
+	}
+
+	/**
+	 * 使用git操作批量创建提交
+	 * @async
+	 * @param {Object} octokit - GitHub API客户端
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @param {Array} files - 文件数组，每个元素包含 {path, content}
+	 * @param {string} message - 提交消息
+	 * @param {string} branchName - 分支名称
+	 */
+	async createBatchCommit(octokit, owner, repo, files, message, branchName) {
+		// 1. 获取当前用户信息
+		const { data: userInfo } = await octokit.rest.users.getAuthenticated();
+		const author = {
+			name: userInfo.name || userInfo.login,
+			email: userInfo.email || `${userInfo.login}@users.noreply.github.com`,
+			date: new Date().toISOString()
+		};
+
+		// 2. 获取分支最新的提交SHA
+		const { data: refData } = await octokit.rest.git.getRef({
+			owner,
+			repo,
+			ref: `heads/${branchName}`
+		});
+		const baseTreeSHA = refData.object.sha;
+
+		// 3. 获取基础tree的SHA
+		const { data: commitData } = await octokit.rest.git.getCommit({
+			owner,
+			repo,
+			commit_sha: baseTreeSHA
+		});
+		const treeSha = commitData.tree.sha;
+
+		// 4. 为每个文件创建blob
+		const treeItems = await Promise.all(files.map(async (file) => {
+			const blobContent = btoa(unescape(encodeURIComponent(file.content)));
+
+			// 创建blob
+			const { data: blobData } = await octokit.rest.git.createBlob({
+				owner,
+				repo,
+				content: blobContent,
+				encoding: 'base64'
+			});
+
+			return {
+				path: file.path,
+				mode: '100644',
+				type: 'blob',
+				sha: blobData.sha
+			};
+		}));
+
+		// 5. 创建新的tree
+		const { data: treeData } = await octokit.rest.git.createTree({
+			owner,
+			repo,
+			base_tree: treeSha,
+			tree: treeItems
+		});
+
+		// 6. 创建新的commit
+		const { data: commit } = await octokit.rest.git.createCommit({
+			owner,
+			repo,
+			message: message,
+			tree: treeData.sha,
+			parents: [baseTreeSHA],
+			author: author,
+			committer: author
+		});
+
+		// 7. 更新引用
+		await octokit.rest.git.updateRef({
+			owner,
+			repo,
+			ref: `heads/${branchName}`,
+			sha: commit.sha
+		});
 	}
 
 	/**
