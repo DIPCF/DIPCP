@@ -129,6 +129,176 @@ class DIPCPApp {
 		this.state.permissionInfo = userInfo.permissionInfo;
 	}
 
+	/**
+	 * 从IndexedDB读取所有角色文件并构建角色映射（通用基础方法）
+	 * @async
+	 * @returns {Promise<Map<string, string[]>>} 用户名到角色数组的映射
+	 */
+	async buildUserRolesMap() {
+		const userRolesMap = new Map();
+
+		// 定义角色文件
+		const roleFiles = [
+			{ path: '.github/directors.txt', role: 'director' },
+			{ path: '.github/reviewers.txt', role: 'reviewer' },
+			{ path: '.github/maintainers.txt', role: 'maintainer' },
+			{ path: '.github/collaborators.txt', role: 'collaborator' }
+		];
+
+		// 先单独处理directors.txt以确定owner
+		let firstDirectorUsername = null;
+		try {
+			const directorsContent = await window.StorageService._execute('fileCache', 'get', '.github/directors.txt');
+			if (directorsContent && directorsContent.content) {
+				const lines = directorsContent.content.split('\n');
+				// 找到第一个非注释的director
+				for (const line of lines) {
+					const trimmedLine = line.trim();
+					if (trimmedLine && !trimmedLine.startsWith('#')) {
+						firstDirectorUsername = trimmedLine.toLowerCase();
+						break;
+					}
+				}
+				// 遍历所有director并添加角色
+				for (const line of lines) {
+					const trimmedLine = line.trim();
+					if (trimmedLine && !trimmedLine.startsWith('#')) {
+						const username = trimmedLine.toLowerCase();
+						if (!userRolesMap.has(username)) {
+							userRolesMap.set(username, []);
+						}
+						// 第一个director添加owner角色
+						if (trimmedLine.toLowerCase() === firstDirectorUsername) {
+							userRolesMap.get(username).push('director', 'owner');
+						} else {
+							userRolesMap.get(username).push('director');
+						}
+					}
+				}
+			}
+		} catch (error) {
+			console.log(`无法读取directors.txt:`, error.message);
+		}
+
+		// 处理其他角色文件
+		for (const { path, role } of roleFiles) {
+			// 跳过directors.txt，已经处理过了
+			if (path === '.github/directors.txt') {
+				continue;
+			}
+			try {
+				const fileContent = await window.StorageService._execute('fileCache', 'get', path);
+				if (fileContent && fileContent.content) {
+					const lines = fileContent.content.split('\n');
+					for (const line of lines) {
+						const trimmedLine = line.trim();
+						// 跳过注释和空行
+						if (trimmedLine && !trimmedLine.startsWith('#')) {
+							const username = trimmedLine.toLowerCase();
+							if (!userRolesMap.has(username)) {
+								userRolesMap.set(username, []);
+							}
+							userRolesMap.get(username).push(role);
+						}
+					}
+				}
+			} catch (error) {
+				// 文件不存在或读取失败，继续处理下一个文件
+				console.log(`无法读取角色文件 ${path}:`, error.message);
+			}
+		}
+
+		return userRolesMap;
+	}
+
+	/**
+	 * 从IndexedDB同步并更新用户权限
+	 * @async
+	 * @returns {Promise<void>}
+	 */
+	async syncAndUpdateUserPermissions() {
+		try {
+			const user = this.state.user;
+			if (!user || !user.repositoryInfo) {
+				return;
+			}
+
+			const username = user.username.toLowerCase();
+
+			// 使用统一方法构建角色映射
+			const userRolesMap = await this.buildUserRolesMap();
+			const foundRoles = userRolesMap.get(username) || [];
+
+			// 如果没有找到任何角色，设置为访客
+			if (foundRoles.length === 0) {
+				foundRoles.push('visitor');
+			}
+
+			// 更新权限
+			// 获取当前权限信息
+			const currentPermissionInfo = user.permissionInfo || {};
+			const currentRoles = currentPermissionInfo.roles || (currentPermissionInfo.role ? [currentPermissionInfo.role] : ['visitor']);
+			const currentRolesSet = new Set(currentRoles.sort());
+			const foundRolesSet = new Set(foundRoles.sort());
+
+			// 检查角色是否有变化
+			const hasChanged = currentRoles.length !== foundRoles.length ||
+				!Array.from(currentRolesSet).every(role => foundRolesSet.has(role));
+
+			// 如果角色有变化，更新权限
+			if (hasChanged) {
+				// 如果只有visitor角色，或者有visitor且是唯一角色，则没有权限
+				const hasPermission = !(foundRoles.length === 1 && foundRoles.includes('visitor'));
+				const updatedPermissionInfo = { roles: foundRoles, hasPermission: hasPermission };
+				const updatedUserInfo = {
+					...user,
+					permissionInfo: updatedPermissionInfo
+				};
+
+				// 更新localStorage
+				const userData = localStorage.getItem('dipcp-user');
+				if (userData) {
+					const userObj = JSON.parse(userData);
+					userObj.permissionInfo = updatedPermissionInfo;
+					localStorage.setItem('dipcp-user', JSON.stringify(userObj));
+				}
+
+				// 更新app.js状态（使用setState以触发通知）
+				this.setState({
+					user: updatedUserInfo,
+					userRoles: foundRoles,
+					userRole: foundRoles[0] || 'visitor',
+					permissionInfo: updatedPermissionInfo
+				});
+
+				console.log(`App: 用户权限已更新: [${currentRoles.join(', ')}] -> [${foundRoles.join(', ')}]`);
+			}
+		} catch (error) {
+			console.error('同步用户权限失败:', error);
+		}
+	}
+
+	/**
+	 * 为成员列表添加角色信息（通用方法，供所有页面使用）
+	 * @async
+	 * @param {Array} contributors - 贡献者列表
+	 * @returns {Promise<Array>} 包含角色信息的贡献者列表
+	 */
+	async enrichContributorsWithRoles(contributors) {
+		// 使用统一方法构建角色映射
+		const userRolesMap = await this.buildUserRolesMap();
+
+		// 为每个成员添加角色信息
+		return contributors.map(contributor => {
+			const username = contributor.login?.toLowerCase() || '';
+			const roles = userRolesMap.get(username) || [];
+
+			return {
+				...contributor,
+				roles: roles
+			};
+		});
+	}
 
 	/**
 	 * 初始化路由系统
@@ -354,22 +524,30 @@ class DIPCPApp {
 		this.currentPage = new PageClass(pageProps);
 
 		// 挂载到DOM（mount方法内部会调用render，并传递fullPath参数）
-		this.mountPage(fullPath);
+		await this.mountPage(fullPath);
 	}
 
 	/**
 	 * 挂载页面到DOM
 	 * 将当前页面组件挂载到应用容器中
 	 * @param {string} fullPath - 完整路径
-	 * @returns {void}
+	 * @returns {Promise<void>}
 	 */
-	mountPage(fullPath) {
+	async mountPage(fullPath) {
 		const appContainer = document.getElementById('app');
 		if (appContainer && this.currentPage) {
 			// 清空容器
 			appContainer.innerHTML = '';
 			// 挂载页面组件，传递fullPath参数
-			this.currentPage.mount(appContainer, fullPath);
+			await this.currentPage.mount(appContainer, fullPath);
+
+			// 挂载完成后，同步并更新用户权限
+			await this.syncAndUpdateUserPermissions();
+
+			// 权限更新后，通知当前页面更新状态
+			if (this.currentPage && this.currentPage.checkAndUpdateUserInfo) {
+				this.currentPage.checkAndUpdateUserInfo();
+			}
 		}
 	}
 

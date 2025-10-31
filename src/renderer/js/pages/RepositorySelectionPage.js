@@ -853,32 +853,57 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	async checkUserPermissions(owner, repo) {
 		if (!this.state.userInfo || !this.state.userInfo.token) {
-			return { role: 'visitor', hasPermission: false };
+			return { roles: ['visitor'], hasPermission: false };
 		}
 
-		const octokit = new window.Octokit({ auth: this.state.userInfo.token });
-
 		try {
-			// 检查用户是否是仓库所有者
-			const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
-			if (repoInfo.owner.login.toLowerCase() === this.state.userInfo.username.toLowerCase()) {
-				return { role: 'owner', hasPermission: true };
+			// 从IndexedDB读取角色文件确定用户角色
+			if (!window.StorageService) {
+				return { roles: ['visitor'], hasPermission: false };
 			}
 
-			// 检查是否是协作者
-			const { data: collaborators } = await octokit.rest.repos.listCollaborators({ owner, repo });
-			const isCollaborator = collaborators.some(collab =>
-				collab.login.toLowerCase() === this.state.userInfo.username.toLowerCase()
-			);
+			await window.StorageService.initDB();
+			const username = this.state.userInfo.username.toLowerCase();
+			const foundRoles = [];
 
-			if (isCollaborator) {
-				return { role: 'collaborator', hasPermission: true };
+			// 检查所有角色文件
+			const roleFiles = [
+				{ path: '.github/directors.txt', role: 'director' },
+				{ path: '.github/reviewers.txt', role: 'reviewer' },
+				{ path: '.github/maintainers.txt', role: 'maintainer' },
+				{ path: '.github/collaborators.txt', role: 'collaborator' }
+			];
+
+			for (const { path, role } of roleFiles) {
+				try {
+					const fileContent = await window.StorageService._execute('fileCache', 'get', path);
+					if (fileContent && fileContent.content) {
+						const lines = fileContent.content.split('\n');
+						for (const line of lines) {
+							const trimmedLine = line.trim();
+							if (trimmedLine && !trimmedLine.startsWith('#')) {
+								if (trimmedLine.toLowerCase() === username) {
+									foundRoles.push(role);
+									break;
+								}
+							}
+						}
+					}
+				} catch (error) {
+					// 文件不存在或读取失败，继续检查下一个文件
+				}
 			}
 
-			return { role: 'visitor', hasPermission: false };
+			// 如果找到角色，加上owner角色
+			if (foundRoles.length > 0) {
+				foundRoles.push('owner');
+				return { roles: foundRoles, hasPermission: true };
+			}
+
+			return { roles: ['visitor'], hasPermission: false };
 		} catch (error) {
 			console.log('权限检查失败，默认为访客:', error.message);
-			return { role: 'visitor', hasPermission: false };
+			return { roles: ['visitor'], hasPermission: false };
 		}
 	}
 
@@ -1252,6 +1277,7 @@ class RepositorySelectionPage extends BasePage {
 .github/reviewers.txt @${owner}/administrators
 .github/maintainers.txt @${owner}/administrators
 .github/directors.txt @${owner}/administrators
+.github/collaborators.txt @${owner}/administrators
 .github/CODEOWNERS @${owner}/administrators
 .github/workflows/ @${owner}/administrators
 `;
@@ -1285,6 +1311,11 @@ ${this.state.userInfo.username},1000,1000
 			},
 			{
 				path: '.github/directors.txt',
+				content: `${this.state.userInfo.username}\n`
+			},
+			// 协作者列表文件（由自动批准工作流更新）
+			{
+				path: '.github/collaborators.txt',
 				content: `${this.state.userInfo.username}\n`
 			}
 		];

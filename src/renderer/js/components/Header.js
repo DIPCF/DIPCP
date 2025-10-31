@@ -228,75 +228,14 @@ class Header extends Component {
 
 	/**
 	 * 检查并更新用户权限（如果权限文件更新）
+	 * 使用app.js的统一权限检查方法
 	 * @param {Object} currentUser - 当前用户信息
 	 * @param {Object} repoInfo - 仓库信息
 	 */
 	async checkAndUpdateUserPermissions(currentUser, repoInfo) {
-		try {
-			const username = currentUser.login || currentUser.username;
-			if (!username) {
-				return;
-			}
-
-			// 检查三个权限文件
-			const roleFiles = [
-				{ path: '.github/directors.txt', role: 'director' },
-				{ path: '.github/reviewers.txt', role: 'reviewer' },
-				{ path: '.github/maintainers.txt', role: 'maintainer' }
-			];
-
-			let newRole = null;
-			let hasPermission = false;
-
-			// 从IndexedDB读取权限文件内容
-			for (const { path, role } of roleFiles) {
-				try {
-					const fileContent = await window.StorageService._execute('fileCache', 'get', path);
-					if (fileContent && fileContent.content) {
-						const lines = fileContent.content.split('\n');
-						const usernameLower = username.toLowerCase();
-
-						// 检查用户名是否在文件中
-						for (const line of lines) {
-							const trimmedLine = line.trim();
-							// 跳过注释和空行
-							if (trimmedLine && !trimmedLine.startsWith('#')) {
-								if (trimmedLine.toLowerCase() === usernameLower) {
-									newRole = role;
-									hasPermission = true;
-									break;
-								}
-							}
-						}
-						if (newRole) break;
-					}
-				} catch (error) {
-					// 文件不存在或读取失败，继续检查下一个文件
-				}
-			}
-
-			// 如果找到新角色且与当前角色不同，更新用户权限
-			if (newRole && newRole !== currentUser.permissionInfo?.role) {
-				const updatedPermissionInfo = { role: newRole, hasPermission };
-				const updatedUserInfo = {
-					...currentUser,
-					permissionInfo: updatedPermissionInfo
-				};
-
-				// 更新localStorage
-				localStorage.setItem('dipcp-user', JSON.stringify(updatedUserInfo));
-
-				// 更新app.js状态
-				if (window.app) {
-					window.app.state.user = updatedUserInfo;
-					window.app.state.userRole = newRole;
-					window.app.state.permissionInfo = updatedPermissionInfo;
-				}
-
-				console.log(`用户权限已更新: ${currentUser.permissionInfo?.role || 'visitor'} -> ${newRole}`);
-			}
-		} catch (error) {
-			// 静默处理错误
+		// 使用app.js的统一权限检查方法
+		if (window.app && window.app.syncAndUpdateUserPermissions) {
+			await window.app.syncAndUpdateUserPermissions();
 		}
 	}
 

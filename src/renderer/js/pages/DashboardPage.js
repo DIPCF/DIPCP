@@ -362,6 +362,13 @@ class DashboardPage extends BasePage {
 	}
 
 	/**
+	 * 用于app.js调用的方法，检查并更新用户角色（外部调用）
+	 */
+	checkAndUpdateUserInfo() {
+		this.checkAndUpdateUserRole();
+	}
+
+	/**
 	 * 绑定事件监听器
 	 * @returns {void}
 	 */
@@ -405,26 +412,43 @@ class DashboardPage extends BasePage {
 	async handleApplicationSubmit() {
 		const user = this.state.user;
 		const repoInfo = this.parseGitHubUrl(user.repositoryUrl);
-		await this.showCLAAgreement(repoInfo, user, async () => {
-			console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
-			try {
-				// 1. 显示正在申请·状态
-				this.showReviewingStatus();
-				// 2. 提交申请
-				await this.applyContribution();
-				// 3. 开始轮询工作流状态
-				await this.pollCollaboratorInvitation();
-			} catch (error) {
-				// 根据错误类型显示不同的消息
-				if (error.message.includes('403')) {
-					this.showError(this.t('dashboard.application.error.insufficientPermissions', '申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。'));
-				} else if (error.message.includes('401')) {
-					this.showError(this.t('dashboard.application.error.authenticationFailed', '申请提交失败：认证失败。请检查您的GitHub Token是否有效。'));
-				} else {
-					this.showError(this.t('dashboard.application.error.general', '申请提交失败：{errorMessage}').replace('{errorMessage}', error.message));
+		// 1. 显示正在申请·状态
+		this.showReviewingStatus();
+		await this.showCLAAgreement(repoInfo, user,
+			async () => {
+				console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
+				try {
+					// 2. 提交申请
+					await this.applyContribution();
+					// 3. 开始轮询工作流状态
+					await this.pollCollaboratorInvitation();
+				} catch (error) {
+					// 根据错误类型显示不同的消息
+					if (error.message.includes('403')) {
+						this.showError(this.t('dashboard.application.error.insufficientPermissions', '申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。'));
+					} else if (error.message.includes('401')) {
+						this.showError(this.t('dashboard.application.error.authenticationFailed', '申请提交失败：认证失败。请检查您的GitHub Token是否有效。'));
+					} else {
+						this.showError(this.t('dashboard.application.error.general', '申请提交失败：{errorMessage}').replace('{errorMessage}', error.message));
+					}
+				}
+			},
+			async () => {
+				console.log('❌ [CLA Callback] 用户拒绝了CLA协议');
+				// 拒绝时重新显示申请区域
+				const applicationSection = this.element.querySelector('.application-section');
+				if (applicationSection) {
+					applicationSection.innerHTML = this.renderApplicationSection();
+					// 重新绑定申请按钮事件
+					const applyBtn = this.element.querySelector('#apply-contribution-btn');
+					if (applyBtn) {
+						applyBtn.addEventListener('click', () => {
+							this.handleApplicationSubmit();
+						});
+					}
 				}
 			}
-		});
+		);
 	}
 
 	/**
@@ -597,6 +621,21 @@ class DashboardPage extends BasePage {
 				console.log('用户权限:', permissions);
 
 				if (permissions && permissions.push) {
+					// 权限确认后，同步仓库数据以获取最新的 collaborators.txt
+					console.log('权限已确认，开始同步仓库数据...');
+					try {
+						if (window.StorageService) {
+							await window.StorageService.syncRepositoryData(
+								repoInfo.owner,
+								repoInfo.repo,
+								user.token
+							);
+							console.log('仓库数据同步完成');
+						}
+					} catch (syncError) {
+						console.warn('同步仓库数据失败:', syncError);
+						// 即使同步失败，也继续显示成功状态
+					}
 					this.showCollaboratorSuccessStatus();
 					return;
 				}

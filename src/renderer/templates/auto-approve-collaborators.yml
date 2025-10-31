@@ -16,6 +16,11 @@ jobs:
           echo "username=$USERNAME" >> $GITHUB_OUTPUT
           echo "Extracted username: $USERNAME"
       
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.COLLABORATOR_TOKEN }}
+      
       - name: Add collaborator
         uses: actions/github-script@v7
         with:
@@ -81,4 +86,35 @@ jobs:
                 issue_number: context.issue.number,
                 body: `❌ 自动批准失败：${error.message}\n\n请仓库管理员手动处理此申请。`
               });
+              
+              // 如果失败，抛出错误以停止后续步骤
+              throw error;
             }
+      
+      - name: Update collaborators.txt
+        run: |
+          USERNAME='${{ steps.extract_username.outputs.username }}'
+          FILE_PATH='.github/collaborators.txt'
+          
+          # 检查文件是否存在
+          if [ ! -f "$FILE_PATH" ]; then
+            echo "Creating $FILE_PATH..."
+            mkdir -p .github
+            echo "$USERNAME" > "$FILE_PATH"
+          else
+            # 检查用户名是否已存在
+            if ! grep -Fxq "$USERNAME" "$FILE_PATH"; then
+              echo "Adding $USERNAME to $FILE_PATH..."
+              echo "$USERNAME" >> "$FILE_PATH"
+            else
+              echo "$USERNAME already exists in $FILE_PATH"
+            fi
+          fi
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .github/collaborators.txt
+          git diff --staged --quiet || git commit -m "chore: add ${{ steps.extract_username.outputs.username }} to collaborators.txt [skip ci]"
+          git push

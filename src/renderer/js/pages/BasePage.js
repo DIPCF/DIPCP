@@ -102,9 +102,10 @@ class BasePage extends Component {
 	 * @param {Object} repoInfo - 仓库信息
 	 * @param {Object} userInfo - 用户信息
 	 * @param {Function} onSuccess - 签署成功回调
+	 * @param {Function} [onCancel] - 取消回调
 	 * @returns {Promise<void>}
 	 */
-	async showCLAAgreement(repoInfo, userInfo, onSuccess) {
+	async showCLAAgreement(repoInfo, userInfo, onSuccess, onCancel) {
 		try {
 			// 根据语言加载CLA协议内容
 			const claContent = await this.loadCLAContent();
@@ -147,8 +148,16 @@ class BasePage extends Component {
 					}
 				};
 
-				modal.onCancel = () => {
-					reject(new Error(this.t('cla.rejected', '用户拒绝签署CLA协议')));
+				modal.onCancel = async () => {
+					try {
+						if (onCancel) {
+							await onCancel();
+						}
+						resolve();
+					} catch (error) {
+						console.error('❌ [showCLAAgreement] onCancel 内部错误:', error);
+						reject(error);
+					}
 				};
 			});
 		} catch (error) {

@@ -101,7 +101,9 @@ class ProjectDetailPage extends BasePage {
 	 */
 	renderToolbar() {
 		// 根据用户角色决定显示哪些按钮
-		const canEdit = this.state.userRole === 'owner' || this.state.userRole === 'admin' || this.state.userRole === 'collaborator';
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+		const actualRoles = userRoles.filter(role => role !== 'visitor');
+		const canEdit = actualRoles.length > 0; // 只要有实际角色就可以编辑
 
 		return `
             <div class="editor-toolbar">
@@ -644,15 +646,22 @@ class ProjectDetailPage extends BasePage {
 		const userInfo = window.app.getUserFromStorage();
 		const user = userInfo.user;
 		const currentRole = userInfo.userRole;
+		const currentPermissionInfo = userInfo.permissionInfo;
 
 		// 如果用户信息或角色发生变化，更新状态
-		if (this.state.user !== user || this.state.userRole !== currentRole) {
+		if (this.state.user !== user || this.state.userRole !== currentRole || this.state.permissionInfo !== currentPermissionInfo) {
 			this.setState({
 				user: user,
-				userRole: currentRole
+				userRole: currentRole,
+				permissionInfo: currentPermissionInfo
 			});
+			// 角色变化后更新工具栏按钮状态
+			if (this.updateActionButtons) {
+				this.updateActionButtons();
+			}
 		}
 	}
+
 
 	/**
 	 * 加载项目数据
@@ -933,17 +942,8 @@ class ProjectDetailPage extends BasePage {
 			});
 		}
 
-		// 刷新成员按钮
-		const refreshMembersBtn = this.element.querySelector('#refreshMembersBtn');
-		if (refreshMembersBtn) {
-			refreshMembersBtn.addEventListener('click', () => {
-				this.showMembers(true); // 强制刷新
-			});
-		}
-
-		// 成员卡片点击事件
+		// 绑定成员卡片点击事件
 		this.bindContributorCardEvents();
-
 	}
 
 	/**
@@ -1300,52 +1300,12 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {Promise<Array>} 包含角色信息的贡献者列表
 	 */
 	async enrichContributorsWithRoles(contributors) {
-		// 定义角色文件
-		const roleFiles = [
-			{ path: '.github/directors.txt', role: 'director' },
-			{ path: '.github/reviewers.txt', role: 'reviewer' },
-			{ path: '.github/maintainers.txt', role: 'maintainer' }
-		];
-
-		// 从IndexedDB读取角色文件，构建用户名到角色的映射
-		const userRolesMap = new Map();
-
-		for (const { path, role } of roleFiles) {
-			try {
-				const fileContent = await window.StorageService._execute('fileCache', 'get', path);
-				if (fileContent && fileContent.content) {
-					const lines = fileContent.content.split('\n');
-					for (const line of lines) {
-						const trimmedLine = line.trim();
-						// 跳过注释和空行
-						if (trimmedLine && !trimmedLine.startsWith('#')) {
-							const username = trimmedLine.toLowerCase();
-							if (!userRolesMap.has(username)) {
-								userRolesMap.set(username, []);
-							}
-							userRolesMap.get(username).push(role);
-						}
-					}
-				}
-			} catch (error) {
-				// 文件不存在或读取失败，继续处理下一个文件
-				console.log(`无法读取角色文件 ${path}:`, error.message);
-			}
+		// 使用app.js的统一方法来添加角色信息
+		if (window.app && window.app.enrichContributorsWithRoles) {
+			return await window.app.enrichContributorsWithRoles(contributors);
 		}
-
-		// 为每个成员添加角色信息
-		return contributors.map(contributor => {
-			const username = contributor.login?.toLowerCase() || '';
-			const roles = userRolesMap.get(username) || [];
-
-			// 所有项目成员必定是collaborator，然后可能还有其他角色
-			const allRoles = roles.length > 0 ? ['collaborator', ...roles] : ['collaborator'];
-
-			return {
-				...contributor,
-				roles: allRoles
-			};
-		});
+		// 如果app.js不可用，返回原始列表
+		return contributors;
 	}
 
 	/**
@@ -1369,6 +1329,7 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {Promise<void>}
 	 */
 	async showMembers(forceRefresh = false) {
+		console.log('showMembers', forceRefresh);
 		// 如果有缓存且不是强制刷新，直接显示缓存数据
 		if (this.state.membersCache && !forceRefresh) {
 			const content = this.renderContributorsList(this.state.membersCache);
@@ -1379,24 +1340,6 @@ class ProjectDetailPage extends BasePage {
 				this.bindContributorCardEvents();
 			}, 100);
 			return;
-		}
-
-		// 尝试从IndexedDB加载缓存
-		if (!forceRefresh) {
-			const cachedMembers = await this.loadMembersCache();
-			if (cachedMembers) {
-				// 为缓存数据添加角色信息
-				const enrichedMembers = await this.enrichContributorsWithRoles(cachedMembers);
-				this.setState({ membersCache: enrichedMembers });
-				const content = this.renderContributorsList(enrichedMembers);
-				this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
-
-				// 绑定成员卡片点击事件
-				setTimeout(() => {
-					this.bindContributorCardEvents();
-				}, 100);
-				return;
-			}
 		}
 
 		try {
@@ -1424,37 +1367,61 @@ class ProjectDetailPage extends BasePage {
 				throw new Error(this.t('projectDetail.errors.repositoryInfoUnavailable', '仓库信息或访问令牌不可用'));
 			}
 
-			// 获取贡献者列表
-			const octokit = new window.Octokit({ auth: user.token });
+			// 从 IndexedDB 读取 collaborators.txt 文件
+			if (!window.StorageService) {
+				throw new Error('StorageService 不可用');
+			}
 
-			// 访客用户使用listContributors，其他用户使用listCollaborators
-			let contributors;
-			if (user.permissionInfo?.roles?.includes('visitor') || !user.permissionInfo?.roles?.length) {
-				// 访客用户使用listContributors API（不需要特殊权限）
-				const { data: contributorsData } = await octokit.rest.repos.listContributors({
-					owner: repoInfo.owner, repo: repoInfo.repo
-				});
-				contributors = contributorsData;
-			} else {
-				// 协作者和管理员使用listCollaborators API
-				const { data: collaboratorsData } = await octokit.rest.repos.listCollaborators({
-					owner: repoInfo.owner, repo: repoInfo.repo
-				});
-				contributors = collaboratorsData;
+			await window.StorageService.initDB();
+			const collaboratorsFile = await window.StorageService._execute('fileCache', 'get', '.github/collaborators.txt');
+
+			if (!collaboratorsFile || !collaboratorsFile.content) {
+				throw new Error('无法读取协作者列表文件');
+			}
+
+			// 解析 collaborators.txt 文件内容（每行一个用户名）
+			const usernames = collaboratorsFile.content
+				.split('\n')
+				.map(line => line.trim())
+				.filter(line => line && !line.startsWith('#'));
+
+			console.log('从 collaborators.txt 读取到的用户名:', usernames);
+
+			// 获取每个用户的详细信息（头像等）
+			const octokit = new window.Octokit({ auth: user.token });
+			const contributors = [];
+
+			for (const username of usernames) {
+				try {
+					const { data: userData } = await octokit.rest.users.getByUsername({
+						username: username
+					});
+					contributors.push({
+						login: userData.login,
+						avatar_url: userData.avatar_url,
+						...userData
+					});
+				} catch (error) {
+					console.warn(`获取用户 ${username} 的信息失败:`, error);
+					// 即使获取失败，也添加基本信息
+					contributors.push({
+						login: username,
+						avatar_url: '👤'
+					});
+				}
 			}
 
 			// 为每个成员添加角色信息（从角色文件中读取）
-			contributors = await this.enrichContributorsWithRoles(contributors);
+			const enrichedContributors = await this.enrichContributorsWithRoles(contributors);
 
-			// 缓存数据到IndexedDB
-			await this.saveMembersCache(contributors);
+			// 缓存数据
 			this.setState({
-				membersCache: contributors,
+				membersCache: enrichedContributors,
 				membersLoading: false
 			});
 
 			// 渲染贡献者列表
-			const content = this.renderContributorsList(contributors);
+			const content = this.renderContributorsList(enrichedContributors);
 			this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
 
 			// 绑定成员卡片点击事件（延迟执行，确保DOM已渲染）
@@ -1463,7 +1430,7 @@ class ProjectDetailPage extends BasePage {
 			}, 100);
 
 		} catch (error) {
-			console.error('获取贡献者列表失败:', error);
+			console.error('获取成员列表失败:', error);
 			this.setState({ membersLoading: false });
 
 			const errorContent = `
@@ -1472,7 +1439,6 @@ class ProjectDetailPage extends BasePage {
 					<div class="error-message">
 						<p>${this.t('projectDetail.membersLoadError', '获取成员列表失败：{error}').replace('{error}', error.message)}</p>
 						<p class="error-hint">${this.t('projectDetail.membersLoadHint', '可能的原因：权限不足或网络连接问题')}</p>
-						<button class="btn btn-sm btn-primary" id="refreshMembersBtn">${this.t('projectDetail.refreshMembers', '刷新')}</button>
 					</div>
 				</div>
 			`;
@@ -1499,17 +1465,6 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {string} 贡献者列表HTML字符串
 	 */
 	renderContributorsList(contributors) {
-		if (!contributors || contributors.length === 0) {
-			return `
-				<div class="info-section">
-					<h4>${this.t('projectDetail.projectMembers', '项目成员')}</h4>
-					<div class="empty-state">
-						<p>${this.t('projectDetail.noMembers', '暂无项目成员')}</p>
-					</div>
-				</div>
-			`;
-		}
-
 		const contributorsHtml = contributors.map(contributor => {
 			const avatar = contributor.avatar_url || '👤';
 			const name = contributor.login || 'Unknown';
@@ -1537,32 +1492,12 @@ class ProjectDetailPage extends BasePage {
 			<div class="info-section">
 				<div class="section-header">
 					<h4>${this.t('projectDetail.projectMembers', '项目成员')} (${contributors.length})</h4>
-					<button class="btn btn-sm btn-outline" id="refreshMembersBtn">
-						${this.state.membersLoading ? '🔄' : '🔄'} ${this.t('projectDetail.refreshMembers', '刷新')}
-					</button>
 				</div>
 				<div class="stats-grid">
 					${contributorsHtml}
 				</div>
 			</div>
 		`;
-	}
-
-	/**
-	 * 获取角色显示名称
-	 * @param {string} role - 角色名称
-	 * @returns {string} 角色显示名称
-	 */
-	getRoleDisplayName(role) {
-		const roleMap = {
-			'owner': this.t('projectDetail.roleOwner', '所有者'),
-			'director': this.t('projectDetail.roleDirector', '理事'),
-			'maintainer': this.t('projectDetail.roleMaintainer', '维护者'),
-			'reviewer': this.t('projectDetail.roleReviewer', '审核委员'),
-			'collaborator': this.t('projectDetail.roleCollaborator', '协作者'),
-			'visitor': this.t('projectDetail.roleVisitor', '访客')
-		};
-		return roleMap[role] || this.t('projectDetail.roleUnknown', '未知');
 	}
 
 	/**

@@ -310,15 +310,28 @@ window.StorageService = {
 		try {
 			const { data: items } = await octokit.rest.repos.getContent({ owner, repo, path });
 
+			// 收集目录
+			const dirs = [];
+			const files = [];
+
 			for (const item of items) {
 				if (item.type === 'file') {
-					// 包含所有文件，包括.github目录
-					allFiles.push(item);
+					files.push(item);
 				} else if (item.type === 'dir') {
-					// 递归处理子目录
-					await this.getAllFiles(octokit, owner, repo, item.path, allFiles);
+					dirs.push(item);
 				}
 			}
+
+			// 添加当前目录下的文件
+			allFiles.push(...files);
+
+			// 并发处理子目录
+			const dirPromises = dirs.map(dir =>
+				this.getAllFiles(octokit, owner, repo, dir.path, allFiles)
+			);
+
+			// 等待所有子目录处理完成
+			await Promise.all(dirPromises);
 
 			return allFiles;
 		} catch (error) {
@@ -382,10 +395,10 @@ window.StorageService = {
 		}
 	},
 
-	// 同步仓库数据 - 使用并发下载
+	// 同步仓库数据 - 差量同步，只下载变更的文件
 	async syncRepositoryData(owner, repo, token, progressCallback = null) {
 		try {
-			console.log(`开始同步仓库数据: ${owner}/${repo}`);
+			console.log(`开始差量同步仓库数据: ${owner}/${repo}`);
 
 			// 初始化数据库
 			if (window.StorageService) {
@@ -396,17 +409,63 @@ window.StorageService = {
 			const octokit = new window.Octokit({ auth: token });
 			const allFiles = await this.getAllFiles(octokit, owner, repo);
 
-			console.log(`需要下载 ${allFiles.length} 个文件`);
+			console.log(`仓库中共有 ${allFiles.length} 个文件`);
+
+			// 并发获取文件SHA配置
+			const CONCURRENCY_CHECK = 20; // 同时检查的文件数
+			const filesToDownload = [];
+
+			// 分批检查文件SHA
+			for (let i = 0; i < allFiles.length; i += CONCURRENCY_CHECK) {
+				const batch = allFiles.slice(i, Math.min(i + CONCURRENCY_CHECK, allFiles.length));
+
+				// 并发检查文件是否已更新
+				const checkResults = await Promise.all(
+					batch.map(async (file) => {
+						try {
+							// 获取本地缓存的SHA
+							const cachedFile = await window.StorageService._execute('fileCache', 'get', file.path);
+
+							// 如果文件不存在或SHA不匹配，则需要下载
+							if (!cachedFile || cachedFile.sha !== file.sha) {
+								return file;
+							}
+							return null;
+						} catch (error) {
+							// 如果检查失败，也需要下载
+							console.warn(`检查文件 ${file.path} 失败:`, error);
+							return file;
+						}
+					})
+				);
+
+				// 收集需要下载的文件
+				checkResults.forEach(file => {
+					if (file) {
+						filesToDownload.push(file);
+					}
+				});
+
+				// 更新进度
+				if (progressCallback) {
+					const progress = Math.round((i / allFiles.length) * 100);
+					progressCallback(progress, i, allFiles.length, null);
+				}
+
+				console.log(`已检查 ${Math.min(i + CONCURRENCY_CHECK, allFiles.length)}/${allFiles.length} 个文件`);
+			}
+
+			console.log(`需要下载 ${filesToDownload.length} 个文件（${allFiles.length - filesToDownload.length} 个已是最新）`);
 
 			// 并发下载配置
-			const CONCURRENCY = 10; // 同时下载的文件数
-			const totalFiles = allFiles.length;
+			const CONCURRENCY_DOWNLOAD = 10; // 同时下载的文件数
+			const totalFiles = filesToDownload.length;
 			let downloadedCount = 0;
 			let processedCount = 0;
 
-			// 分批处理文件
-			for (let i = 0; i < allFiles.length; i += CONCURRENCY) {
-				const batch = allFiles.slice(i, Math.min(i + CONCURRENCY, allFiles.length));
+			// 分批下载文件
+			for (let i = 0; i < filesToDownload.length; i += CONCURRENCY_DOWNLOAD) {
+				const batch = filesToDownload.slice(i, Math.min(i + CONCURRENCY_DOWNLOAD, filesToDownload.length));
 
 				// 并发下载当前批次
 				const results = await Promise.all(
@@ -429,7 +488,7 @@ window.StorageService = {
 					}
 				});
 
-				console.log(`已处理 ${processedCount}/${totalFiles} 个文件`);
+				console.log(`已下载 ${processedCount}/${totalFiles} 个文件`);
 			}
 
 			// 最终进度更新
@@ -441,11 +500,12 @@ window.StorageService = {
 			const syncInfo = {
 				lastSync: new Date().toISOString(),
 				repo: `${owner}/${repo}`,
-				fileCount: downloadedCount
+				fileCount: allFiles.length,
+				downloadedCount: downloadedCount
 			};
 			localStorage.setItem(`dipcp-sync-${repo}`, JSON.stringify(syncInfo));
 
-			console.log(`仓库数据同步完成，共下载 ${downloadedCount} 个文件`);
+			console.log(`仓库数据同步完成，共检查 ${allFiles.length} 个文件，下载 ${downloadedCount} 个文件`);
 			return syncInfo;
 		} catch (error) {
 			console.error('同步仓库数据失败:', error);
