@@ -357,14 +357,23 @@ class DIPCPApp {
 		const path = window.location.pathname;
 		const route = this.matchRoute(path);
 
-		// 如果已登录用户访问登录页面，重定向到仓库选择页面
-		if (this.state.user && this.state.user.token && route === 'LoginPage') {
-			this.navigateTo('/repository-selection');
-			return;
+		// 检查用户和仓库信息状态
+		const hasUser = this.state.user && this.state.user.token;
+		const hasRepository = hasUser && (this.state.user.repositoryInfo || this.state.user.repositoryUrl);
+
+		// 如果已登录用户访问登录页面，根据仓库信息重定向
+		if (hasUser && route === 'LoginPage') {
+			if (hasRepository) {
+				this.navigateTo('/');
+				return;
+			} else {
+				this.navigateTo('/repository-selection');
+				return;
+			}
 		}
 
 		// 如果未登录用户访问需要认证的页面，重定向到登录页面
-		if (!this.state.user || !this.state.user.token) {
+		if (!hasUser) {
 			if (route === 'RepositorySelectionPage' || route === 'ProjectDetailPage' ||
 				route === 'EditorPage' || route === 'ReviewsPage' || route === 'IssuesPage' ||
 				route === 'SettingsPage' || route === 'DiscussionsPage' || route === 'UserProfilePage' ||
@@ -376,21 +385,16 @@ class DIPCPApp {
 
 		// 处理根路径重定向
 		if (path === '/' || path === '') {
-			if (this.state.user && this.state.user.token) {
-				// 已登录用户：检查是否有仓库信息
-				if (this.state.user.repositoryInfo || this.state.user.repositoryUrl) {
-					// 有仓库信息，显示仪表盘（继续后面的逻辑来渲染）
-					// 不需要重定向，让路由正常处理
-				} else {
-					// 没有仓库信息，重定向到仓库选择页面
-					this.navigateTo('/repository-selection');
-					return;
-				}
-			} else {
-				// 未登录用户重定向到登录页面
+			if (!hasUser) {
+				// 没有用户信息，重定向到登录页面
 				this.navigateTo('/login');
 				return;
+			} else if (!hasRepository) {
+				// 有用户信息但没有仓库信息，重定向到仓库选择页面
+				this.navigateTo('/repository-selection');
+				return;
 			}
+			// 有用户信息和仓库信息，继续后面的逻辑来渲染仪表盘
 		}
 
 		if (route && route !== this.currentRoute) {
