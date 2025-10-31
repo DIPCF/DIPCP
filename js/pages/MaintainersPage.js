@@ -23,6 +23,9 @@ class MaintainersPage extends BasePage {
 			// API 状态
 			apiConfigured: false,
 			octokit: null,
+			// 文件查看状态
+			currentFile: null, // 当前查看的文件路径
+			currentFileFromBase: false, // 当前是否显示主分支内容
 		};
 	}
 
@@ -139,7 +142,7 @@ class MaintainersPage extends BasePage {
 			});
 			const prData = pr.data;
 
-			// 获取 PR 中修改的文件列表（保存完整路径）
+			// 获取 PR 中修改的文件列表（保存完整路径，包括删除的文件）
 			let fileList = [];
 			try {
 				const { data: prFiles } = await this.state.octokit.rest.pulls.listFiles({
@@ -147,12 +150,12 @@ class MaintainersPage extends BasePage {
 					repo,
 					pull_number: prData.number
 				});
-				fileList = prFiles
-					.filter(file => file.status !== 'removed')
-					.map(file => ({
-						path: file.filename,
-						name: file.filename.split('/').pop()
-					}));
+				fileList = prFiles.map(file => ({
+					path: file.filename,
+					name: file.filename.split('/').pop(),
+					status: file.status, // 'added', 'modified', 'removed', 'renamed', 'copied', 'changed'
+					isDeleted: file.status === 'removed'
+				}));
 			} catch (error) {
 				console.warn(`获取 PR #${prData.number} 的文件列表失败:`, error);
 			}
@@ -182,7 +185,10 @@ class MaintainersPage extends BasePage {
 				pr: prData,
 				headRef: prData.head.ref, // 保存 PR 的 head 分支引用，用于获取文件内容
 				headOwner: prData.head.repo.owner.login,
-				headRepo: prData.head.repo.name
+				headRepo: prData.head.repo.name,
+				baseRef: prData.base.ref, // 保存 PR 的 base 分支引用，用于获取删除的文件内容
+				baseOwner: owner, // base 分支通常是目标仓库
+				baseRepo: repo
 			};
 
 			// 更新状态，直接显示最旧的 PR
@@ -275,16 +281,26 @@ class MaintainersPage extends BasePage {
                     <div class="maintainer-files" style="margin-bottom: 1rem;">
                         <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">文件列表</h3>
                         <div class="files-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            ${maintainer.files.map((file, index) => `
-                                <button class="file-item-btn" data-file-path="${file.path}" data-file-index="${index}" style="text-align: left; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">
-                                    ${file.name}
+                            ${maintainer.files.map((file, index) => {
+			const isDeleted = file.isDeleted || file.status === 'removed';
+			const deletedStyle = isDeleted ? 'text-decoration: line-through; opacity: 0.7; background: var(--error-bg, rgba(220, 53, 69, 0.1)); border-color: var(--error-color, #dc3545);' : '';
+			const deletedIcon = isDeleted ? '🗑️ ' : '';
+			const deletedText = isDeleted ? ` <span style="color: var(--error-color, #dc3545); font-size: 0.85em;">(${this.t('maintainers.fileDeleted', '已删除')})</span>` : '';
+			return `
+                                <button class="file-item-btn ${isDeleted ? 'file-deleted' : ''}" data-file-path="${file.path}" data-file-index="${index}" data-is-deleted="${isDeleted}" style="text-align: left; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; ${deletedStyle}">
+                                    ${deletedIcon}${file.name}${deletedText}
                                 </button>
-                            `).join('')}
+                            `;
+		}).join('')}
                         </div>
                         <div id="fileContentDisplay" style="display: none; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-secondary, var(--bg-primary));">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <strong id="fileContentTitle" style="color: var(--text-primary);"></strong>
-                                <button id="closeFileContent" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">关闭</button>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button id="switchToBaseBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">${this.t('maintainers.viewBaseBranch', '查看主分支')}</button>
+                                    <button id="switchToHeadBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">${this.t('maintainers.viewPRBranch', '查看PR分支')}</button>
+                                    <button id="closeFileContent" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">${this.t('common.close', '关闭')}</button>
+                                </div>
                             </div>
                             <pre id="fileContentText" style="white-space: pre-wrap; word-wrap: break-word; color: var(--text-primary); margin: 0; max-height: 400px; overflow-y: auto;"></pre>
                         </div>
@@ -377,12 +393,13 @@ class MaintainersPage extends BasePage {
 			});
 		}
 
-		// 文件点击事件
+		// 文件点击事件（包括已删除的文件）
 		const fileButtons = this.element.querySelectorAll('.file-item-btn');
 		fileButtons.forEach(btn => {
 			btn.addEventListener('click', () => {
 				const filePath = btn.dataset.filePath;
-				this.handleFileClick(filePath);
+				const isDeleted = btn.dataset.isDeleted === 'true';
+				this.handleFileClick(filePath, isDeleted);
 			});
 		});
 
@@ -393,6 +410,31 @@ class MaintainersPage extends BasePage {
 				const fileContentDisplay = this.element.querySelector('#fileContentDisplay');
 				if (fileContentDisplay) {
 					fileContentDisplay.style.display = 'none';
+				}
+				// 重置文件查看状态
+				this.setState({ currentFile: null, currentFileFromBase: false });
+			});
+		}
+
+		// 切换到主分支按钮
+		const switchToBaseBtn = this.element.querySelector('#switchToBaseBtn');
+		if (switchToBaseBtn) {
+			switchToBaseBtn.addEventListener('click', () => {
+				if (this.state.currentFile) {
+					this.handleFileClick(this.state.currentFile, false, true); // 第三个参数表示强制从主分支获取
+				}
+			});
+		}
+
+		// 切换到PR分支按钮
+		const switchToHeadBtn = this.element.querySelector('#switchToHeadBtn');
+		if (switchToHeadBtn) {
+			switchToHeadBtn.addEventListener('click', () => {
+				if (this.state.currentFile) {
+					const maintainer = this.state.selectedMaintainer;
+					const file = maintainer?.files?.find(f => f.path === this.state.currentFile);
+					const isDeleted = file?.isDeleted || file?.status === 'removed';
+					this.handleFileClick(this.state.currentFile, isDeleted, false); // 第三个参数表示强制从PR分支获取
 				}
 			});
 		}
@@ -805,15 +847,17 @@ class MaintainersPage extends BasePage {
 	/**
 	 * 处理文件点击事件，获取并显示文件内容
 	 * @param {string} filePath - 文件路径
+	 * @param {boolean} isDeleted - 是否为删除的文件
+	 * @param {boolean} forceFromBase - 是否强制从主分支获取（用于切换）
 	 */
-	async handleFileClick(filePath) {
+	async handleFileClick(filePath, isDeleted = false, forceFromBase = false) {
 		if (!this.state.apiConfigured || !this.state.octokit) {
 			alert(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
 			return;
 		}
 
 		const maintainer = this.state.selectedMaintainer;
-		if (!maintainer || !maintainer.headRef) {
+		if (!maintainer) {
 			console.error('无法获取文件内容：缺少 PR 信息');
 			return;
 		}
@@ -826,25 +870,89 @@ class MaintainersPage extends BasePage {
 
 			if (fileContentDisplay && fileContentTitle && fileContentText) {
 				fileContentDisplay.style.display = 'block';
-				fileContentTitle.textContent = `加载中: ${filePath}`;
+				const loadingText = isDeleted
+					? `加载中（从主分支）: ${filePath}`
+					: `加载中: ${filePath}`;
+				fileContentTitle.textContent = loadingText;
 				fileContentText.textContent = '正在加载文件内容...';
 			}
 
-			// 从 PR 的 head 分支获取文件内容
-			const { data: fileData } = await this.state.octokit.rest.repos.getContent({
-				owner: maintainer.headOwner,
-				repo: maintainer.headRepo,
-				path: filePath,
-				ref: maintainer.headRef
-			});
+			// 确定从哪个分支获取内容
+			const showFromBase = forceFromBase || isDeleted;
+
+			let fileData;
+			if (showFromBase) {
+				// 从主分支（base）获取内容
+				if (!maintainer.baseRef || !maintainer.baseOwner || !maintainer.baseRepo) {
+					throw new Error('无法获取主分支信息');
+				}
+				const { data } = await this.state.octokit.rest.repos.getContent({
+					owner: maintainer.baseOwner,
+					repo: maintainer.baseRepo,
+					path: filePath,
+					ref: maintainer.baseRef
+				});
+				fileData = data;
+			} else {
+				// 从 PR 的 head 分支获取
+				if (!maintainer.headRef || !maintainer.headOwner || !maintainer.headRepo) {
+					throw new Error('无法获取 PR 分支信息');
+				}
+				const { data } = await this.state.octokit.rest.repos.getContent({
+					owner: maintainer.headOwner,
+					repo: maintainer.headRepo,
+					path: filePath,
+					ref: maintainer.headRef
+				});
+				fileData = data;
+			}
 
 			// 解码 Base64 内容
 			if (fileData && !Array.isArray(fileData) && fileData.content) {
 				const content = decodeURIComponent(escape(atob(fileData.content.replace(/\s/g, ''))));
 
 				if (fileContentDisplay && fileContentTitle && fileContentText) {
-					fileContentTitle.textContent = filePath;
+					// 显示文件路径和来源信息
+					let sourceInfo;
+					if (showFromBase) {
+						if (isDeleted) {
+							sourceInfo = `${filePath} ${this.t('maintainers.fileFromBase', '（从主分支读取，此文件将被删除）')}`;
+						} else {
+							sourceInfo = `${filePath} ${this.t('maintainers.viewingBaseBranch', '（主分支内容）')}`;
+						}
+					} else {
+						sourceInfo = `${filePath} ${this.t('maintainers.viewingPRBranch', '（PR分支内容）')}`;
+					}
+					fileContentTitle.textContent = sourceInfo;
 					fileContentText.textContent = content;
+
+					// 更新切换按钮的显示状态
+					const switchToBaseBtn = this.element.querySelector('#switchToBaseBtn');
+					const switchToHeadBtn = this.element.querySelector('#switchToHeadBtn');
+					if (switchToBaseBtn && switchToHeadBtn) {
+						// 只有非删除的文件才显示切换按钮（删除的文件只能查看主分支）
+						if (!isDeleted) {
+							if (showFromBase) {
+								// 当前显示主分支，显示切换到PR分支按钮
+								switchToBaseBtn.style.display = 'none';
+								switchToHeadBtn.style.display = 'inline-block';
+							} else {
+								// 当前显示PR分支，显示切换到主分支按钮
+								switchToBaseBtn.style.display = 'inline-block';
+								switchToHeadBtn.style.display = 'none';
+							}
+						} else {
+							// 删除的文件不显示切换按钮
+							switchToBaseBtn.style.display = 'none';
+							switchToHeadBtn.style.display = 'none';
+						}
+					}
+
+					// 保存当前查看的文件和分支状态
+					this.setState({
+						currentFile: filePath,
+						currentFileFromBase: showFromBase
+					});
 				}
 			} else {
 				throw new Error('无法获取文件内容');

@@ -530,6 +530,12 @@
 		"impactMultiplier": "Impact Multiplier",
 		"addComment": "Add Comment",
 		"commentPlaceholder": "Add comment...",
+		"fileDeleted": "Deleted",
+		"fileFromBase": "(read from base branch, this file will be deleted)",
+		"viewBaseBranch": "View Base Branch",
+		"viewPRBranch": "View PR Branch",
+		"viewingBaseBranch": "(Base Branch Content)",
+		"viewingPRBranch": "(PR Branch Content)",
 		"errors": {
 			"apiNotConfigured": "GitHub API not configured",
 			"commentRequired": "Please enter a comment first",

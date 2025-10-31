@@ -530,6 +530,12 @@
 		"impactMultiplier": "インパクト乗数",
 		"addComment": "コメント追加",
 		"commentPlaceholder": "コメントを追加...",
+		"fileDeleted": "削除済み",
+		"fileFromBase": "（ベースブランチから読み取り、このファイルは削除されます）",
+		"viewBaseBranch": "ベースブランチを表示",
+		"viewPRBranch": "PRブランチを表示",
+		"viewingBaseBranch": "（ベースブランチの内容）",
+		"viewingPRBranch": "（PRブランチの内容）",
 		"errors": {
 			"apiNotConfigured": "GitHub APIが設定されていません",
 			"commentRequired": "まずコメントを入力してください",

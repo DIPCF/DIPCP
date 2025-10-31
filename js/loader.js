@@ -100,7 +100,7 @@ class DynamicLoader {
 	async loadLibsodium() {
 		return new Promise((resolve, reject) => {
 			const libsodiumScript = document.createElement('script');
-			// 使用本地libsodium库
+			// 使用本地libsodium库（相对路径，base 标签会处理）
 			libsodiumScript.src = 'js/sodium.js';
 			libsodiumScript.onload = async () => {
 				try {

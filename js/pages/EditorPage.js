@@ -695,6 +695,17 @@ class EditorPage extends BasePage {
 				const safeUser = (user.login || user.username || 'user').replace(/[^a-zA-Z0-9-_]/g, '-');
 				const branchName = `spcp/${safeUser}`;
 
+				// 获取本地工作空间中的所有删除记录
+				const deletionRecords = await window.StorageService.getAllDeletionRecords();
+				const filesToDelete = new Set(); // 用于存储需要删除的文件路径
+
+				if (deletionRecords && deletionRecords.length > 0) {
+					console.log(`发现 ${deletionRecords.length} 个待删除的文件记录`);
+					deletionRecords.forEach(record => {
+						filesToDelete.add(record.path);
+					});
+				}
+
 				// 检查是否有未处理的 PR（从用户分支到默认分支的打开状态的 PR）
 				// 并收集这些 PR 中修改的所有文件和留言
 				const filesToInclude = new Map(); // 用于存储需要包含的文件路径和内容
@@ -894,9 +905,16 @@ class EditorPage extends BasePage {
 					// SHA 会在提交时重新获取
 				}
 
-				// 批量提交所有文件
-				console.log(`准备提交 ${filesToInclude.size} 个文件...`);
-				const commitMessage = `Update files via DIPCP: ${Array.from(filesToInclude.keys()).join(', ')}`;
+				// 批量提交所有文件（包括删除的文件）
+				const fileCount = filesToInclude.size;
+				const deleteCount = filesToDelete.size;
+				console.log(`准备提交 ${fileCount} 个文件，删除 ${deleteCount} 个文件...`);
+
+				// 构建提交消息
+				const filePathsList = Array.from(filesToInclude.keys());
+				const deletePathsList = Array.from(filesToDelete);
+				const allPathsList = [...filePathsList, ...deletePathsList.map(p => `删除: ${p}`)];
+				const commitMessage = `Update files via DIPCP: ${allPathsList.join(', ')}`;
 
 				// 收集所有文件路径用于PR标题和描述
 				const allFilePaths = Array.from(filesToInclude.keys());
@@ -907,31 +925,53 @@ class EditorPage extends BasePage {
 					content: fileInfo.content
 				}));
 
-				// 如果分支是新创建的（分支不存在），需要先提交第一个文件建立初始提交
-				if (!branchExists && files.length > 0) {
-					// 创建第一个文件，建立初始提交
-					const firstFile = files[0];
-					const base64Content = btoa(unescape(encodeURIComponent(firstFile.content)));
-					await octokit.rest.repos.createOrUpdateFileContents({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						path: firstFile.path,
-						message: `Initial commit: ${commitMessage}`,
-						content: base64Content,
-						branch: branchName
-					});
-					console.log(`✅ 已创建第一个文件 ${firstFile.path}，建立初始提交`);
+				// 添加删除的文件（使用 null SHA 表示删除）
+				const filesToDeleteList = Array.from(filesToDelete).map(path => ({
+					path: path,
+					content: null, // null 表示删除
+					isDeleted: true
+				}));
 
-					// 如果还有其他文件，使用批量提交
-					if (files.length > 1) {
-						const remainingFiles = files.slice(1);
-						await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, remainingFiles, commitMessage, branchName);
-						console.log(`✅ 已批量提交剩余的 ${remainingFiles.length} 个文件`);
+				// 合并所有文件（包括删除的文件）
+				const allFilesToCommit = [...files, ...filesToDeleteList];
+
+				// 如果分支是新创建的（分支不存在），需要先提交第一个非删除文件建立初始提交
+				if (!branchExists && allFilesToCommit.length > 0) {
+					// 找到第一个非删除的文件
+					const firstNonDeletedFile = allFilesToCommit.find(f => !f.isDeleted && f.content !== null);
+					if (firstNonDeletedFile) {
+						const base64Content = btoa(unescape(encodeURIComponent(firstNonDeletedFile.content)));
+						await octokit.rest.repos.createOrUpdateFileContents({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							path: firstNonDeletedFile.path,
+							message: `Initial commit: ${commitMessage}`,
+							content: base64Content,
+							branch: branchName
+						});
+						console.log(`✅ 已创建第一个文件 ${firstNonDeletedFile.path}，建立初始提交`);
+
+						// 如果还有其他文件，使用批量提交
+						const remainingFiles = allFilesToCommit.filter(f => f.path !== firstNonDeletedFile.path);
+						if (remainingFiles.length > 0) {
+							await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, remainingFiles, commitMessage, branchName);
+							console.log(`✅ 已批量提交剩余的 ${remainingFiles.length} 个文件（包括 ${filesToDeleteList.length} 个删除）`);
+						}
+					} else {
+						// 如果只有删除操作，也需要创建初始提交（使用批量提交）
+						await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
+						console.log(`✅ 已批量提交 ${allFilesToCommit.length} 个文件（包括 ${filesToDeleteList.length} 个删除）`);
 					}
 				} else {
-					// 分支已存在，直接使用批量提交所有文件
-					await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, files, commitMessage, branchName);
-					console.log(`✅ 已批量提交 ${files.length} 个文件`);
+					// 分支已存在，直接使用批量提交所有文件（包括删除的文件）
+					await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
+					console.log(`✅ 已批量提交 ${files.length} 个文件，删除 ${filesToDeleteList.length} 个文件`);
+				}
+
+				// 提交成功后，清理已删除文件的记录
+				if (filesToDelete.size > 0) {
+					await window.StorageService.clearDeletionRecords(Array.from(filesToDelete));
+					console.log(`✅ 已清理 ${filesToDelete.size} 个删除记录`);
 				}
 
 				// 文件提交成功后，创建新的 Pull Request
@@ -1097,32 +1137,71 @@ class EditorPage extends BasePage {
 		});
 		const treeSha = commitData.tree.sha;
 
-		// 4. 为每个文件创建blob
+		// 4. 为每个文件创建blob（或标记为删除）
 		const treeItems = await Promise.all(files.map(async (file) => {
-			const blobContent = btoa(unescape(encodeURIComponent(file.content)));
+			// 如果是删除操作（content 为 null 或 isDeleted 为 true）
+			if (file.isDeleted || file.content === null) {
+				// 对于删除操作，需要获取当前分支中该文件的 SHA
+				let fileSha = null;
+				try {
+					const { data: existingFile } = await octokit.rest.repos.getContent({
+						owner,
+						repo,
+						path: file.path,
+						ref: `heads/${branchName}`
+					});
+					if (existingFile && !Array.isArray(existingFile) && existingFile.sha) {
+						fileSha = existingFile.sha;
+					}
+				} catch (err) {
+					// 如果文件不存在（404），说明已经删除，跳过
+					if (err.status !== 404) {
+						console.warn(`获取文件 ${file.path} 的 SHA 失败:`, err);
+					}
+				}
 
-			// 创建blob
-			const { data: blobData } = await octokit.rest.git.createBlob({
-				owner,
-				repo,
-				content: blobContent,
-				encoding: 'base64'
-			});
+				// 如果找不到文件，说明已经不存在，不需要在 tree 中删除
+				if (!fileSha) {
+					return null;
+				}
 
-			return {
-				path: file.path,
-				mode: '100644',
-				type: 'blob',
-				sha: blobData.sha
-			};
+				// 返回删除标记（sha 为 null 表示删除）
+				return {
+					path: file.path,
+					mode: '100644',
+					type: 'blob',
+					sha: null // null SHA 表示删除文件
+				};
+			} else {
+				// 正常文件，创建 blob
+				const blobContent = btoa(unescape(encodeURIComponent(file.content)));
+
+				// 创建blob
+				const { data: blobData } = await octokit.rest.git.createBlob({
+					owner,
+					repo,
+					content: blobContent,
+					encoding: 'base64'
+				});
+
+				return {
+					path: file.path,
+					mode: '100644',
+					type: 'blob',
+					sha: blobData.sha
+				};
+			}
 		}));
 
-		// 5. 创建新的tree
+		// 过滤掉 null 值（文件不存在，无需删除）
+		const validTreeItems = treeItems.filter(item => item !== null);
+
+		// 5. 创建新的tree（包含添加、修改和删除的文件）
 		const { data: treeData } = await octokit.rest.git.createTree({
 			owner,
 			repo,
 			base_tree: treeSha,
-			tree: treeItems
+			tree: validTreeItems
 		});
 
 		// 6. 创建新的commit
@@ -1136,13 +1215,30 @@ class EditorPage extends BasePage {
 			committer: author
 		});
 
-		// 7. 更新引用
-		await octokit.rest.git.updateRef({
-			owner,
-			repo,
-			ref: `heads/${branchName}`,
-			sha: commit.sha
-		});
+		// 7. 更新引用（使用 force，因为我们已经重置了分支或这是新的提交）
+		try {
+			await octokit.rest.git.updateRef({
+				owner,
+				repo,
+				ref: `heads/${branchName}`,
+				sha: commit.sha,
+				force: false // 首先尝试非强制更新（fast-forward）
+			});
+		} catch (error) {
+			// 如果不是 fast-forward，使用强制更新
+			if (error.status === 422 && error.message && error.message.includes('not a fast forward')) {
+				console.warn('非 fast-forward 更新，使用强制更新');
+				await octokit.rest.git.updateRef({
+					owner,
+					repo,
+					ref: `heads/${branchName}`,
+					sha: commit.sha,
+					force: true
+				});
+			} else {
+				throw error;
+			}
+		}
 	}
 
 	/**

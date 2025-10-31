@@ -122,6 +122,63 @@ window.StorageService = {
 		}
 	},
 
+	/**
+	 * 获取所有删除记录
+	 * @returns {Promise<Array>} 删除记录数组，每个记录包含 {path, deletedFrom, deletedAt}
+	 */
+	async getAllDeletionRecords() {
+		try {
+			const allFiles = await this.getAllLocalWorkspaceFiles();
+			const deletionRecords = [];
+			
+			for (const file of allFiles) {
+				// 检查是否是删除记录（路径以 __deletions__/ 开头）
+				if (file.path && file.path.startsWith('__deletions__/')) {
+					try {
+						// 解析删除记录内容
+						const deletionData = file.content ? JSON.parse(file.content) : null;
+						if (deletionData && deletionData.path) {
+							// 提取实际的文件路径（移除 __deletions__/ 前缀）
+							const actualPath = deletionData.path;
+							deletionRecords.push({
+								path: actualPath,
+								deletedFrom: deletionData.deletedFrom || 'local',
+								deletedAt: deletionData.deletedAt,
+								recordPath: file.path // 保存记录的路径，用于后续清理
+							});
+						}
+					} catch (parseError) {
+						console.warn(`解析删除记录失败 ${file.path}:`, parseError);
+					}
+				}
+			}
+			
+			return deletionRecords;
+		} catch (error) {
+			console.error('Error getting deletion records:', error);
+			return [];
+		}
+	},
+
+	/**
+	 * 清理删除记录（提交成功后调用）
+	 * @param {Array<string>} filePaths - 要清理的文件路径数组
+	 */
+	async clearDeletionRecords(filePaths) {
+		try {
+			const promises = filePaths.map(filePath => {
+				const recordPath = `__deletions__/${filePath}`;
+				return this.deleteLocalWorkspaceFile(recordPath).catch(err => {
+					console.warn(`清理删除记录失败 ${recordPath}:`, err);
+				});
+			});
+			await Promise.all(promises);
+			console.log(`已清理 ${filePaths.length} 个删除记录`);
+		} catch (error) {
+			console.error('Error clearing deletion records:', error);
+		}
+	},
+
 	// 文件缓存相关 - 真正的实现
 	async getCachedFileContent(filePath) {
 		try {
@@ -491,6 +548,48 @@ window.StorageService = {
 				console.log(`已下载 ${processedCount}/${totalFiles} 个文件`);
 			}
 
+			// 检测并删除远程已删除的文件（只删除文件缓存，不删除本地工作空间的文件）
+			const remoteFilePaths = new Set(allFiles.map(file => file.path));
+			const cachedFiles = await this.getAllFileCacheFiles();
+			const filesToDelete = [];
+			
+			for (const cachedFile of cachedFiles) {
+				// 只处理文件缓存中的文件，不处理本地工作空间的文件
+				// 并且跳过删除记录（__deletions__/ 开头的路径）
+				if (cachedFile.path && 
+					!cachedFile.path.startsWith('__deletions__/') &&
+					!remoteFilePaths.has(cachedFile.path)) {
+					filesToDelete.push(cachedFile.path);
+				}
+			}
+
+			// 删除本地缓存中已不存在于远程仓库的文件
+			let deletedCount = 0;
+			if (filesToDelete.length > 0) {
+				console.log(`发现 ${filesToDelete.length} 个文件在远程已删除，正在清理本地缓存...`);
+				
+				const CONCURRENCY_DELETE = 20; // 同时删除的文件数
+				for (let i = 0; i < filesToDelete.length; i += CONCURRENCY_DELETE) {
+					const batch = filesToDelete.slice(i, Math.min(i + CONCURRENCY_DELETE, filesToDelete.length));
+					
+					const deleteResults = await Promise.all(
+						batch.map(async (filePath) => {
+							try {
+								await this._execute('fileCache', 'delete', filePath);
+								return true;
+							} catch (error) {
+								console.warn(`删除文件 ${filePath} 失败:`, error);
+								return false;
+							}
+						})
+					);
+					
+					deletedCount += deleteResults.filter(result => result === true).length;
+				}
+				
+				console.log(`已删除 ${deletedCount} 个已不存在于远程仓库的文件`);
+			}
+
 			// 最终进度更新
 			if (progressCallback) {
 				progressCallback(100, totalFiles, totalFiles, null);
@@ -501,11 +600,12 @@ window.StorageService = {
 				lastSync: new Date().toISOString(),
 				repo: `${owner}/${repo}`,
 				fileCount: allFiles.length,
-				downloadedCount: downloadedCount
+				downloadedCount: downloadedCount,
+				deletedCount: deletedCount
 			};
 			localStorage.setItem(`dipcp-sync-${repo}`, JSON.stringify(syncInfo));
 
-			console.log(`仓库数据同步完成，共检查 ${allFiles.length} 个文件，下载 ${downloadedCount} 个文件`);
+			console.log(`仓库数据同步完成，共检查 ${allFiles.length} 个文件，下载 ${downloadedCount} 个文件，删除 ${deletedCount} 个文件`);
 			return syncInfo;
 		} catch (error) {
 			console.error('同步仓库数据失败:', error);

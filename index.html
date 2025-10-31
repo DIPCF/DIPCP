@@ -7,6 +7,46 @@
 	<link rel="shortcut icon" href="./favicon.ico" type="image/x-icon">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>DIPCP - Decentralized Intellectual Property Collaboration Platform</title>
+	<!-- 动态设置 base 标签以支持子目录部署 -->
+	<script>
+		(function () {
+			// 检测基础路径
+			var path = window.location.pathname;
+			var basePath = '/';
+
+			// 如果路径包含 index.html，提取其目录
+			if (path.includes('index.html')) {
+				basePath = path.replace(/\/index\.html.*$/, '');
+				if (basePath && !basePath.endsWith('/')) {
+					basePath += '/';
+				}
+			} else if (path !== '/' && !path.startsWith('/login') && !path.startsWith('/maintainers') &&
+				!path.startsWith('/editor') && !path.startsWith('/reviews') && !path.startsWith('/issues') &&
+				!path.startsWith('/settings') && !path.startsWith('/discussions') && !path.startsWith('/repository-selection') &&
+				!path.startsWith('/project-detail') && !path.startsWith('/terms') && !path.startsWith('/privacy') &&
+				!path.startsWith('/user-profile') && !path.startsWith('/role-management')) {
+				// 尝试从 script 标签获取
+				var scripts = document.getElementsByTagName('script');
+				for (var i = 0; i < scripts.length; i++) {
+					if (scripts[i].src && scripts[i].src.includes('/js/')) {
+						try {
+							var url = new URL(scripts[i].src);
+							basePath = url.pathname.replace(/\/js\/.*$/, '');
+							if (basePath && !basePath.endsWith('/')) {
+								basePath += '/';
+							}
+							break;
+						} catch (e) { }
+					}
+				}
+			}
+
+			// 创建 base 标签
+			var base = document.createElement('base');
+			base.href = basePath || '/';
+			document.head.insertBefore(base, document.head.firstChild);
+		})();
+	</script>
 	<link rel="stylesheet" href="styles/main.css">
 	<link rel="stylesheet" href="styles/modal.css">
 </head>
@@ -22,6 +62,7 @@
 	</div>
 
 	<!-- 只加载i18n服务和动态加载器 -->
+	<!-- 使用相对路径，base 标签会处理子目录部署 -->
 	<script src="js/services/i18n-service.js"></script>
 	<script src="js/loader.js"></script>
 </body>

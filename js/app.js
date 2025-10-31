@@ -28,38 +28,74 @@ class DIPCPApp {
 	/**
 	 * 检测应用的基础路径
 	 * 如果部署在子目录（如 /DIPCP/），则返回该路径，否则返回 '/'
+	 * 基础路径应该从 index.html 的位置确定，而不是当前页面路径
 	 * @returns {string} 基础路径
 	 */
 	detectBasePath() {
-		// 获取当前页面路径，移除文件名部分
-		const path = window.location.pathname;
-
-		// 如果路径以 index.html 结尾，移除它
-		let basePath = path.replace(/\/index\.html$/, '');
-
-		// 如果不是以 / 结尾，添加 /
-		if (basePath && !basePath.endsWith('/')) {
-			basePath += '/';
-		}
-
-		// 如果路径为空，使用 /
-		if (!basePath) {
-			basePath = '/';
-		}
-
-		// 如果路径不是 /，则需要确保格式正确（去除重复的斜杠）
-		if (basePath !== '/') {
-			basePath = basePath.replace(/\/+/g, '/');
-			if (!basePath.startsWith('/')) {
-				basePath = '/' + basePath;
+		// 方法1：尝试从 script 标签的 src 属性中获取基础路径
+		// 查找包含 'app.js' 的 script 标签
+		const scripts = document.getElementsByTagName('script');
+		for (let script of scripts) {
+			if (script.src && script.src.includes('app.js')) {
+				try {
+					const url = new URL(script.src);
+					let path = url.pathname;
+					// 移除 /js/app.js 部分，获取基础路径
+					// 如果路径是 /js/app.js，基础路径应该是 /
+					// 如果路径是 /DIPCP/js/app.js，基础路径应该是 /DIPCP/
+					path = path.replace(/\/js\/[^\/]+\.js$/, '');
+					// 如果路径为空或只有 /，使用根目录
+					if (!path || path === '/') {
+						path = '/';
+					} else {
+						// 确保以 / 结尾
+						if (!path.endsWith('/')) {
+							path += '/';
+						}
+					}
+					console.log('从 script 标签检测到基础路径:', path);
+					return path;
+				} catch (e) {
+					console.warn('无法从 script 标签解析基础路径:', e);
+				}
 			}
-			if (!basePath.endsWith('/')) {
+		}
+
+		// 方法2：从 window.location.pathname 提取
+		// 检查当前路径是否是已知的应用路由
+		const path = window.location.pathname;
+		const knownRoutes = ['/', '/login', '/maintainers', '/editor', '/reviews', '/issues',
+			'/settings', '/discussions', '/repository-selection', '/project-detail',
+			'/terms', '/privacy', '/user-profile', '/role-management'];
+
+		// 如果当前路径是已知路由或子路径，基础路径应该是根目录
+		const isKnownRoute = knownRoutes.some(route => {
+			const normalizedRoute = route === '/' ? '/' : route.replace(/\/+$/, '');
+			const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
+			return normalizedPath === normalizedRoute || normalizedPath.startsWith(normalizedRoute + '/');
+		});
+
+		if (isKnownRoute) {
+			console.log('检测到已知路由，使用根目录作为基础路径');
+			return '/';
+		}
+
+		// 方法3：如果路径包含 index.html，使用包含 index.html 的目录作为基础路径
+		if (path.includes('index.html')) {
+			let basePath = path.replace(/\/index\.html.*$/, '');
+			if (basePath && !basePath.endsWith('/')) {
 				basePath += '/';
 			}
+			if (!basePath) {
+				basePath = '/';
+			}
+			console.log('从 index.html 检测到基础路径:', basePath);
+			return basePath;
 		}
 
-		console.log('检测到基础路径:', basePath);
-		return basePath;
+		// 默认返回根目录
+		console.log('使用默认基础路径: /');
+		return '/';
 	}
 
 	/**
@@ -91,12 +127,25 @@ class DIPCPApp {
 	 */
 	getFullPath(path) {
 		if (this.basePath === '/') {
+			// 确保路径以 / 开头
+			if (!path.startsWith('/')) {
+				path = '/' + path;
+			}
 			return path;
 		}
+
 		// 确保路径以 / 开头
 		if (!path.startsWith('/')) {
 			path = '/' + path;
 		}
+
+		// 检查路径是否已经包含基础路径
+		const baseForMatch = this.basePath.endsWith('/') ? this.basePath.slice(0, -1) : this.basePath;
+		if (path.startsWith(baseForMatch)) {
+			// 路径已经包含基础路径，直接返回（但需要规范化）
+			return path.replace(/\/+/g, '/');
+		}
+
 		// 移除基础路径末尾的 /，然后拼接
 		const base = this.basePath.endsWith('/') ? this.basePath.slice(0, -1) : this.basePath;
 		return base + path;
@@ -516,14 +565,22 @@ class DIPCPApp {
 			path = '/' + path;
 		}
 
-		// 精确匹配
+		// 规范化路径：移除尾随斜杠（除非是根路径）
+		const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
+
+		// 精确匹配（先尝试规范化路径）
+		if (this.routes.has(normalizedPath)) {
+			return this.routes.get(normalizedPath);
+		}
+
+		// 也尝试原始路径（向后兼容）
 		if (this.routes.has(path)) {
 			return this.routes.get(path);
 		}
 
-		// 参数匹配 - 支持查询参数
+		// 参数匹配 - 支持查询参数（使用规范化路径）
 		for (const [pattern, pageClass] of this.routes) {
-			if (this.isMatch(pattern, path)) {
+			if (this.isMatch(pattern, normalizedPath)) {
 				return pageClass;
 			}
 		}
@@ -546,12 +603,16 @@ class DIPCPApp {
 		const pathWithoutQuery = path.split('?')[0];
 		const patternWithoutQuery = pattern.split('?')[0];
 
-		// 精确匹配（无查询参数）
-		if (patternWithoutQuery === pathWithoutQuery) return true;
+		// 规范化路径：移除尾随斜杠（除非是根路径）
+		const normalizedPath = pathWithoutQuery === '/' ? '/' : pathWithoutQuery.replace(/\/+$/, '');
+		const normalizedPattern = patternWithoutQuery === '/' ? '/' : patternWithoutQuery.replace(/\/+$/, '');
+
+		// 精确匹配（无查询参数，规范化后）
+		if (normalizedPattern === normalizedPath) return true;
 
 		// 参数匹配
-		const patternParts = patternWithoutQuery.split('/');
-		const pathParts = pathWithoutQuery.split('/');
+		const patternParts = normalizedPattern.split('/');
+		const pathParts = normalizedPath.split('/');
 
 		if (patternParts.length !== pathParts.length) return false;
 
