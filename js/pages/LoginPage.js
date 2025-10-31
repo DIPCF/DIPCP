@@ -185,6 +185,12 @@ class LoginPage extends BasePage {
 		this.element.innerHTML = '';
 		this.element.appendChild(this.render());
 		this.bindEvents();
+		
+		// 为 #app 添加类名，用于应用登录页面特定的样式
+		const appContainer = document.getElementById('app');
+		if (appContainer) {
+			appContainer.classList.add('has-login-page');
+		}
 	}
 
 	/**
@@ -540,6 +546,12 @@ class LoginPage extends BasePage {
 	 * 清理资源并移除DOM元素
 	 */
 	destroy() {
+		// 移除登录页面特定的类名
+		const appContainer = document.getElementById('app');
+		if (appContainer) {
+			appContainer.classList.remove('has-login-page');
+		}
+		
 		// 清理资源
 		if (this.element) {
 			this.element.innerHTML = '';

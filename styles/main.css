@@ -329,14 +329,18 @@ body {
 	flex-direction: column;
 }
 
-/* #app 容器样式 - 登录页面居中 */
+/* #app 容器基础样式 */
 #app {
 	min-height: 100vh;
+	box-sizing: border-box;
+}
+
+/* 登录页面时，让 #app 居中显示 */
+#app.has-login-page {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	padding: 20px;
-	box-sizing: border-box;
 }
 
 /* 通用样式 */
