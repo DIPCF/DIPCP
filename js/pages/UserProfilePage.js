@@ -19,7 +19,7 @@ class UserProfilePage extends BasePage {
 		this.state = {
 			username: props.username || null,
 			user: userInfo.user,
-			userRole: userInfo.userRole,
+			userRoles: userInfo.userRoles, // 保存用户角色数组
 			permissionInfo: userInfo.permissionInfo,
 			userInfo: null, // 目标用户信息
 			userStats: null, // 用户统计信息
@@ -29,6 +29,9 @@ class UserProfilePage extends BasePage {
 			// 模态框实例
 			modal: null
 		};
+
+		// 事件绑定标记
+		this._eventsBound = false;
 	}
 
 	/**
@@ -54,6 +57,33 @@ class UserProfilePage extends BasePage {
 			</main>
 		`;
 		return container;
+	}
+
+	/**
+	 * 根据权限更新菜单按钮显示状态
+	 * @param {Object} userPermissions - 用户权限对象
+	 */
+	updateMenuVisibility(userPermissions = { isMaintainer: false, isReviewer: false, isDirector: false }) {
+		const inviteMenu = this.element.querySelector('#inviteMenu');
+		if (!inviteMenu) return;
+
+		// 更新邀请按钮的显示状态（只显示没有的权限）
+		const inviteMaintainer = inviteMenu.querySelector('[data-action="invite"][data-role="maintainer"]');
+		const inviteReviewer = inviteMenu.querySelector('[data-action="invite"][data-role="reviewer"]');
+		const inviteDirector = inviteMenu.querySelector('[data-action="invite"][data-role="director"]');
+
+		if (inviteMaintainer) inviteMaintainer.style.display = userPermissions.isMaintainer ? 'none' : 'block';
+		if (inviteReviewer) inviteReviewer.style.display = userPermissions.isReviewer ? 'none' : 'block';
+		if (inviteDirector) inviteDirector.style.display = userPermissions.isDirector ? 'none' : 'block';
+
+		// 更新移除按钮的显示状态（只显示已有的权限）
+		const removeMaintainer = inviteMenu.querySelector('[data-action="remove"][data-role="maintainer"]');
+		const removeReviewer = inviteMenu.querySelector('[data-action="remove"][data-role="reviewer"]');
+		const removeDirector = inviteMenu.querySelector('[data-action="remove"][data-role="director"]');
+
+		if (removeMaintainer) removeMaintainer.style.display = userPermissions.isMaintainer ? 'block' : 'none';
+		if (removeReviewer) removeReviewer.style.display = userPermissions.isReviewer ? 'block' : 'none';
+		if (removeDirector) removeDirector.style.display = userPermissions.isDirector ? 'block' : 'none';
 	}
 
 	/**
@@ -94,23 +124,30 @@ class UserProfilePage extends BasePage {
 
 		const user = this.state.userInfo;
 		const isAdmin = this.checkAdminPermission();
+		// 检查目标用户是否是当前登录用户自己
+		const currentUsername = (this.state.user?.username || this.state.user?.login || '').toLowerCase();
+		const targetUsername = (user.login || user.username || '').toLowerCase();
+		const isViewingSelf = currentUsername === targetUsername;
 
 		return `
 			<div class="user-info-card">
 				<div class="user-avatar">
 					<img src="${user.avatar_url}" alt="${user.login}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-					<span class="avatar-fallback" style="display: none;">👤</span>
+					<span class="avatar-fallback" style="display: none;">📝</span>
 				</div>
 				<div class="user-details">
 					<div class="breadcrumb-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
 						<h2 class="user-name" style="margin: 0;">${user.name || user.login}</h2>
-						${isAdmin ? `
+						${isAdmin && !isViewingSelf ? `
 							<div class="dropdown">
 								<button class="dropdown-toggle" id="inviteMenuBtn">⋯</button>
 								<div class="dropdown-menu" id="inviteMenu">
-									<a href="#" class="dropdown-item" data-role="maintainer">👤 ${this.t('userProfile.inviteMaintainer', '邀请成为维护者')}</a>
-									<a href="#" class="dropdown-item" data-role="reviewer">✨ ${this.t('userProfile.inviteReviewer', '邀请成为审核委员')}</a>
-									<a href="#" class="dropdown-item" data-role="director">👑 ${this.t('userProfile.inviteDirector', '邀请成为理事')}</a>
+									<a href="#" class="dropdown-item" data-action="invite" data-role="maintainer" style="display: none;">📝 ${this.t('userProfile.inviteMaintainer', '邀请成为维护者')}</a>
+									<a href="#" class="dropdown-item" data-action="invite" data-role="reviewer" style="display: none;">✨ ${this.t('userProfile.inviteReviewer', '邀请成为审核委员')}</a>
+									<a href="#" class="dropdown-item" data-action="invite" data-role="director" style="display: none;">👑 ${this.t('userProfile.inviteDirector', '邀请成为理事')}</a>
+									<a href="#" class="dropdown-item dropdown-item-danger" data-action="remove" data-role="maintainer" style="display: none;">🗑️ ${this.t('userProfile.removeMaintainer', '移除维护权限')}</a>
+									<a href="#" class="dropdown-item dropdown-item-danger" data-action="remove" data-role="reviewer" style="display: none;">🗑️ ${this.t('userProfile.removeReviewer', '移除审核权限')}</a>
+									<a href="#" class="dropdown-item dropdown-item-danger" data-action="remove" data-role="director" style="display: none;">🗑️ ${this.t('userProfile.removeDirector', '移除理事权限')}</a>
 								</div>
 							</div>
 						` : ''}
@@ -247,6 +284,39 @@ class UserProfilePage extends BasePage {
 
 		// 绑定邀请菜单
 		await this.bindInviteMenuEvents();
+
+		// 绑定StorageService的事件监听
+		this.bindStorageServiceEvents();
+	}
+
+	/**
+	 * 绑定StorageService的事件监听
+	 */
+	bindStorageServiceEvents() {
+		// 先调用父类方法（绑定导航菜单更新逻辑）
+		super.bindStorageServiceEvents();
+
+		// 权限变更事件监听 - 添加UserProfilePage特定的处理
+		if (window.StorageService && window.StorageService.on) {
+			// UserProfilePage特定的权限变更处理
+			const oldHandler = this._permissionChangedHandler;
+			this._permissionChangedHandler = async (data) => {
+				console.log('收到权限变更事件:', data);
+				// 先执行父类的菜单更新逻辑
+				if (oldHandler) {
+					oldHandler(data);
+				}
+				// 再执行UserProfilePage特定的逻辑：如果当前正在显示邀请菜单，更新菜单可见性
+				if (this.state.userInfo && this._eventsBound) {
+					const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
+					this.updateMenuVisibility(userPermissions);
+				}
+			};
+
+			// 重新注册更新后的处理器
+			window.StorageService.off('permission-changed', oldHandler);
+			window.StorageService.on('permission-changed', this._permissionChangedHandler);
+		}
 	}
 
 	/**
@@ -254,8 +324,9 @@ class UserProfilePage extends BasePage {
 	 * @returns {boolean} 是否是理事
 	 */
 	checkAdminPermission() {
-		const role = this.state.userRole || this.state.permissionInfo?.role;
-		return role === 'director' || role === 'owner';
+		// 使用userRoles数组检查权限（支持多重角色）
+		const roles = this.state.userRoles || (this.state.permissionInfo?.roles || []);
+		return roles.includes('director');
 	}
 
 	/**
@@ -264,13 +335,24 @@ class UserProfilePage extends BasePage {
 	 * @returns {Promise<Object>} 用户权限信息
 	 */
 	async getUserPermissions(username) {
-		// 默认返回所有权限都为false
-		// 实际应该从CODEOWNERS或权限配置文件中读取
-		return {
-			isMaintainer: false,
-			isReviewer: false,
-			isDirector: false
-		};
+		try {
+			// 使用app.js的buildUserRolesMap方法从角色文件中读取用户权限
+			const userRolesMap = await window.app.buildUserRolesMap();
+			const roles = userRolesMap.get(username.toLowerCase()) || [];
+
+			return {
+				isMaintainer: roles.includes('maintainer'),
+				isReviewer: roles.includes('reviewer'),
+				isDirector: roles.includes('director')
+			};
+		} catch (error) {
+			console.error('获取用户权限失败:', error);
+			return {
+				isMaintainer: false,
+				isReviewer: false,
+				isDirector: false
+			};
+		}
 	}
 
 	/**
@@ -278,56 +360,95 @@ class UserProfilePage extends BasePage {
 	 * @param {string} role - 角色类型：maintainer/reviewer/director
 	 */
 	async handleInvite(role) {
-		try {
-			const targetUser = this.state.userInfo;
-			const currentUser = this.state.user;
-			const repoInfo = this.state.user.repositoryInfo;
+		const targetUser = this.state.userInfo;
+		const currentUser = this.state.user;
+		const repoInfo = this.state.user.repositoryInfo;
 
-			// 根据角色确定权限级别和编号
-			const roleInfo = {
-				maintainer: {
-					permission: 'push',
-					label: this.t('roles.maintainer', '维护者'),
-					emoji: '👤',
-					code: '#1'
-				},
-				reviewer: {
-					permission: 'triage',
-					label: this.t('roles.reviewer', '审核委员'),
-					emoji: '✨',
-					code: '#2'
-				},
-				director: {
-					permission: 'admin',
-					label: this.t('roles.director', '理事'),
-					emoji: '👑',
-					code: '#3'
-				}
-			};
-
-			const info = roleInfo[role];
-
-			// 获取当前用户的用户名（login或username）
-			const currentUsername = currentUser.login || currentUser.username || '';
-
-			// 创建邀请Issue
-			await this.createInviteIssue({
-				username: targetUser.login || targetUser.username,
-				role: info.label,
-				emoji: info.emoji,
-				roleCode: info.code,
-				currentUser: currentUsername,
-				owner: repoInfo.owner,
-				repo: repoInfo.repo
-			});
-
-			this.showModal(`${info.emoji} ${this.t('userProfile.inviteSent', '邀请已发送')}`, `${this.t('userProfile.inviteSent', '邀请已发送')}`);
-		} catch (error) {
+		// 检查是否试图邀请自己
+		const currentUsernameCheck = (currentUser.username || currentUser.login || '').toLowerCase();
+		const targetUsernameCheck = (targetUser.login || targetUser.username || '').toLowerCase();
+		if (currentUsernameCheck === targetUsernameCheck) {
 			this.showModal(
-				this.t('userProfile.errors.inviteFailed', '发送邀请失败：{error}').replace('{error}', error.message),
+				this.t('userProfile.errors.cannotInviteSelf', '不能邀请自己成为角色成员'),
 				''
 			);
+			return;
 		}
+
+		// 根据角色确定权限级别和编号
+		const roleInfo = {
+			maintainer: {
+				permission: 'push',
+				label: this.t('roles.maintainer', '维护者'),
+				emoji: '📝',
+				code: '#1'
+			},
+			reviewer: {
+				permission: 'triage',
+				label: this.t('roles.reviewer', '审核委员'),
+				emoji: '✨',
+				code: '#2'
+			},
+			director: {
+				permission: 'admin',
+				label: this.t('roles.director', '理事'),
+				emoji: '👑',
+				code: '#3'
+			}
+		};
+
+		const info = roleInfo[role];
+		const targetUsername = targetUser.login || targetUser.username || '';
+
+		// 显示确认模态框
+		if (!this.state.modal) {
+			this.state.modal = new window.Modal();
+		}
+
+		this.state.modal.showConfirm(
+			`${info.emoji} ${this.t('userProfile.confirmInvite', '确认邀请')}`,
+			this.t('userProfile.confirmInviteMessage', '确定要邀请 @{username} 成为{role}吗？邀请将通过GitHub Issues发送，对方需要回复 ACCEPT 接受邀请。')
+				.replace('{username}', targetUsername)
+				.replace('{role}', info.label),
+			async (confirmed) => {
+				if (confirmed) {
+					// 用户确认，执行邀请操作
+					try {
+						// 获取当前用户的用户名（用于Issue内容，保持原始格式）
+						const currentUsername = currentUser.username || currentUser.login || '';
+
+						// 创建邀请Issue
+						await this.createInviteIssue({
+							username: targetUsername,
+							role: info.label,
+							emoji: info.emoji,
+							roleCode: info.code,
+							currentUser: currentUsername,
+							owner: repoInfo.owner,
+							repo: repoInfo.repo
+						});
+
+						// 邀请成功后不显示提示，静默处理
+						// 可选：更新菜单可见性，以便立即反映变化
+						if (this.state.userInfo && this._eventsBound) {
+							try {
+								const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
+								this.updateMenuVisibility(userPermissions);
+							} catch (error) {
+								console.warn('更新菜单可见性失败:', error);
+							}
+						}
+					} catch (error) {
+						// 只有出错时才显示错误提示
+						this.showModal(
+							this.t('userProfile.errors.inviteFailed', '发送邀请失败：{error}').replace('{error}', error.message),
+							''
+						);
+					}
+				}
+				// 如果用户取消，不执行任何操作
+			}
+		);
 	}
 
 	/**
@@ -336,7 +457,9 @@ class UserProfilePage extends BasePage {
 	 */
 	async createInviteIssue(params) {
 		const { username, role, emoji, roleCode, currentUser, owner, repo } = params;
-		const octokit = new window.Octokit({ auth: this.state.user.token });
+
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(this.state.user);
 
 		// Issue标题格式：邀请 @username 成为role (roleCode)
 		const issueTitle = `${emoji} 邀请 @${username} 成为${role} ${roleCode}`;
@@ -359,10 +482,8 @@ class UserProfilePage extends BasePage {
 		`;
 
 		try {
-			// 使用REST API创建Issue
-			const { data: issue } = await octokit.rest.issues.create({
-				owner,
-				repo,
+			// 使用 GitHubService 创建 Issue
+			const issue = await window.GitHubService.createIssue(owner, repo, {
 				title: issueTitle,
 				body: issueBody,
 				labels: ['role-invitation']
@@ -387,6 +508,138 @@ class UserProfilePage extends BasePage {
 	}
 
 	/**
+	 * 处理移除权限操作
+	 * @param {string} role - 角色类型：maintainer/reviewer/director
+	 */
+	async handleRemovePermission(role) {
+		const targetUser = this.state.userInfo;
+		const currentUser = this.state.user;
+		const repoInfo = this.state.user.repositoryInfo;
+
+		// 检查是否试图移除自己的权限
+		const currentUsernameCheck = (currentUser.username || currentUser.login || '').toLowerCase();
+		const targetUsernameCheck = (targetUser.login || targetUser.username || '').toLowerCase();
+		if (currentUsernameCheck === targetUsernameCheck) {
+			this.showModal(
+				this.t('userProfile.errors.cannotRemoveSelf', '不能移除自己的权限'),
+				''
+			);
+			return;
+		}
+
+		// 根据角色确定权限级别和编号
+		const roleInfo = {
+			maintainer: {
+				label: this.t('roles.maintainer', '维护者'),
+				emoji: '📝',
+				code: '#1'
+			},
+			reviewer: {
+				label: this.t('roles.reviewer', '审核委员'),
+				emoji: '✨',
+				code: '#2'
+			},
+			director: {
+				label: this.t('roles.director', '理事'),
+				emoji: '👑',
+				code: '#3'
+			}
+		};
+
+		const info = roleInfo[role];
+		const targetUsername = targetUser.login || targetUser.username || '';
+
+		// 显示确认模态框
+		if (!this.state.modal) {
+			this.state.modal = new window.Modal();
+		}
+
+		this.state.modal.showConfirm(
+			`${info.emoji} ${this.t('userProfile.confirmRemovePermission', '确认移除权限')}`,
+			this.t('userProfile.confirmRemovePermissionMessage', '确定要移除 @{username} 的{role}权限吗？此操作将通过GitHub Actions自动处理。')
+				.replace('{username}', targetUsername)
+				.replace('{role}', info.label),
+			async (confirmed) => {
+				if (confirmed) {
+					// 用户确认，执行移除操作
+					try {
+						// 获取当前用户的用户名（用于Issue内容，保持原始格式）
+						const currentUsername = currentUser.username || currentUser.login || '';
+
+						// 创建移除权限Issue（将自动触发工作流处理）
+						await this.createRemovePermissionIssue({
+							username: targetUsername,
+							role: info.label,
+							emoji: info.emoji,
+							roleCode: info.code,
+							currentUser: currentUsername,
+							owner: repoInfo.owner,
+							repo: repoInfo.repo
+						});
+
+						// 移除成功后不显示提示，静默处理
+						// 可选：更新菜单可见性，以便立即反映变化
+						if (this.state.userInfo && this._eventsBound) {
+							try {
+								const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
+								this.updateMenuVisibility(userPermissions);
+							} catch (error) {
+								console.warn('更新菜单可见性失败:', error);
+							}
+						}
+					} catch (error) {
+						// 只有出错时才显示错误提示
+						this.showModal(
+							this.t('userProfile.errors.removePermissionFailed', '发送移除权限请求失败：{error}').replace('{error}', error.message),
+							''
+						);
+					}
+				}
+				// 如果用户取消，不执行任何操作
+			}
+		);
+	}
+
+	/**
+	 * 创建移除权限Issue
+	 * @param {Object} params - 移除权限参数
+	 */
+	async createRemovePermissionIssue(params) {
+		const { username, role, emoji, roleCode, currentUser, owner, repo } = params;
+
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(this.state.user);
+
+		// Issue标题格式：移除 @username 的role权限 (roleCode)
+		const issueTitle = `${emoji} 移除 @${username} 的${role}权限 ${roleCode}`;
+		const issueBody = `
+此Issue将自动触发工作流，移除 @${username} 的${role}权限。
+
+**操作者：** @${currentUser}
+**目标用户：** @${username}
+**角色：** ${role} ${roleCode}
+**权限描述：** ${this.getRolePermission(role)}
+
+---
+
+*此操作将通过GitHub Actions自动处理，无需手动操作。*
+		`;
+
+		try {
+			// 使用 GitHubService 创建 Issue，创建后会自动触发工作流
+			const issue = await window.GitHubService.createIssue(owner, repo, {
+				title: issueTitle,
+				body: issueBody,
+				labels: ['role-removal']
+			});
+
+			return issue;
+		} catch (error) {
+			throw new Error(`创建Issue失败: ${error.message}`);
+		}
+	}
+
+	/**
 	 * 加载用户数据
 	 * 从GitHub API获取目标用户的基本信息、统计数据和活动记录
 	 * @async
@@ -401,15 +654,17 @@ class UserProfilePage extends BasePage {
 				throw new Error(this.t('userProfile.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
 			}
 
-			// 获取目标用户的基本信息
-			const octokit = new window.Octokit({ auth: userInfo.user.token });
-			const { data: targetUserInfo } = await octokit.rest.users.getByUsername({ username: this.state.username });
+			// 初始化 GitHubService（即使获取用户信息不需要 token，也初始化以便后续使用）
+			await window.GitHubService.initFromUser(userInfo.user);
+
+			// 获取目标用户的基本信息（使用公开 API，不需要 token）
+			const targetUserInfo = await window.GitHubService.getUserByUsername(this.state.username);
 
 			// 获取用户的贡献统计
-			const userStats = await this.getUserStats(this.state.username, userInfo.user.token);
+			const userStats = await this.getUserStats(this.state.username);
 
 			// 获取用户最近活动
-			const userActivity = await this.getUserActivity(this.state.username, userInfo.user.token);
+			const userActivity = await this.getUserActivity(this.state.username);
 
 			this.setState({
 				loading: false,
@@ -436,14 +691,12 @@ class UserProfilePage extends BasePage {
 	/**
 	 * 获取用户统计信息
 	 * @param {string} username - 用户名
-	 * @param {string} token - GitHub访问令牌
 	 * @returns {Promise<Object>} 用户统计信息
 	 */
-	async getUserStats(username, token) {
+	async getUserStats(username) {
 		try {
 			// 获取用户的仓库列表
-			const octokit = new window.Octokit({ auth: token });
-			const { data: repos } = await octokit.rest.repos.listForUser({ username });
+			const repos = await window.GitHubService.listUserRepos(username);
 
 			// 计算统计信息
 			const totalStars = repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
@@ -469,14 +722,12 @@ class UserProfilePage extends BasePage {
 	/**
 	 * 获取用户最近活动
 	 * @param {string} username - 用户名
-	 * @param {string} token - GitHub访问令牌
 	 * @returns {Promise<Array>} 用户活动列表
 	 */
-	async getUserActivity(username, token) {
+	async getUserActivity(username) {
 		try {
 			// 获取用户的事件
-			const octokit = new window.Octokit({ auth: token });
-			const { data: events } = await octokit.rest.activity.listPublicEventsForUser({ username });
+			const events = await window.GitHubService.listUserPublicEvents(username);
 
 			// 处理事件并转换为活动列表
 			const activities = events.slice(0, 10).map(event => {
@@ -565,23 +816,23 @@ class UserProfilePage extends BasePage {
 	 * 绑定邀请菜单事件
 	 */
 	async bindInviteMenuEvents() {
+		// 如果已经绑定过事件，直接更新菜单显示状态即可
+		if (this._eventsBound) {
+			if (this.state.userInfo) {
+				const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
+				this.updateMenuVisibility(userPermissions);
+			}
+			return;
+		}
+
 		const inviteMenuBtn = this.element.querySelector('#inviteMenuBtn');
 		const inviteMenu = this.element.querySelector('#inviteMenu');
 
 		if (inviteMenuBtn && inviteMenu) {
-			// 异步加载用户权限并隐藏已有权限的选项
+			// 异步加载用户权限并显示/隐藏对应的选项
 			if (this.state.userInfo) {
 				const userPermissions = await this.getUserPermissions(this.state.userInfo.login);
-				const menuItems = inviteMenu.querySelectorAll('.dropdown-item');
-
-				menuItems.forEach(item => {
-					const role = item.dataset.role;
-					if ((role === 'maintainer' && userPermissions.isMaintainer) ||
-						(role === 'reviewer' && userPermissions.isReviewer) ||
-						(role === 'director' && userPermissions.isDirector)) {
-						item.style.display = 'none';
-					}
-				});
+				this.updateMenuVisibility(userPermissions);
 			}
 
 			inviteMenuBtn.addEventListener('click', (e) => {
@@ -594,22 +845,32 @@ class UserProfilePage extends BasePage {
 			dropdownItems.forEach(item => {
 				item.addEventListener('click', async (e) => {
 					e.preventDefault();
+					const action = e.currentTarget.dataset.action;
 					const role = e.currentTarget.dataset.role;
 
 					// 关闭下拉菜单
 					inviteMenu.classList.remove('show');
 
-					// 处理邀请
-					await this.handleInvite(role);
+					// 根据操作类型处理
+					if (action === 'invite') {
+						await this.handleInvite(role);
+					} else if (action === 'remove') {
+						await this.handleRemovePermission(role);
+					}
 				});
 			});
 
 			// 点击其他地方关闭下拉菜单
-			document.addEventListener('click', (e) => {
+			const handleDocumentClick = (e) => {
 				if (!inviteMenuBtn.contains(e.target) && !inviteMenu.contains(e.target)) {
 					inviteMenu.classList.remove('show');
 				}
-			});
+			};
+			document.addEventListener('click', handleDocumentClick);
+
+			// 保存document事件处理器的引用，以便后续可以移除
+			this._documentClickHandler = handleDocumentClick;
+			this._eventsBound = true;
 		}
 	}
 
@@ -642,13 +903,15 @@ class UserProfilePage extends BasePage {
 	 * 显示模态框
 	 * @param {string} title - 标题
 	 * @param {string} message - 消息内容
+	 * @param {Object} [options] - 可选配置
 	 */
-	showModal(title, message) {
+	showModal(title, message, options = {}) {
 		// 如果没有创建过modal，创建一个新的
 		if (!this.state.modal) {
 			this.state.modal = new window.Modal();
 		}
-		this.state.modal.showInfo(title, message);
+		// 默认不显示取消按钮（信息提示只需要关闭按钮）
+		this.state.modal.showInfo(title, message, { showCancel: false, ...options });
 	}
 
 	/**
@@ -661,10 +924,24 @@ class UserProfilePage extends BasePage {
 			window.currentPage = null;
 		}
 
+		// 移除StorageService的事件监听
+		if (window.StorageService && window.StorageService.off) {
+			if (this._permissionChangedHandler) {
+				window.StorageService.off('permission-changed', this._permissionChangedHandler);
+				this._permissionChangedHandler = null;
+			}
+		}
+
 		// 清理模态框
 		if (this.state.modal) {
 			this.state.modal.destroy();
 			this.state.modal = null;
+		}
+
+		// 移除document点击事件监听器
+		if (this._documentClickHandler) {
+			document.removeEventListener('click', this._documentClickHandler);
+			this._documentClickHandler = null;
 		}
 
 		// 调用父类的destroy方法

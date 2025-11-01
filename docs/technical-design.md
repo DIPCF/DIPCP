@@ -304,7 +304,7 @@ async getDiscussions(owner, repo, first = 10) {
 ## 📁 项目结构
 
 ```
-spcp/
+DIPCP/
 ├── src/
 │   ├── main/                    # Electron主进程
 │   │   ├── main.js             # 主进程入口
@@ -1112,7 +1112,7 @@ DIPCP采用模板文件系统来管理外部配置文件，避免在JavaScript�
 ### 8.2 文件结构
 
 ```
-spcp/src/renderer/templates/
+DIPCP/src/renderer/templates/
 ├── auto-approve-collaborators.yml  # GitHub Actions工作流模板
 └── README.md                       # 模板文件说明文档
 ```
@@ -1154,7 +1154,7 @@ async loadWorkflowTemplate() {
 
 #### 8.4.2 模板文件管理
 
-**文件位置**: `spcp/src/renderer/templates/`
+**文件位置**: `DIPCP/src/renderer/templates/`
 **访问方式**: 通过HTTP请求 `/templates/文件名`
 **维护方式**: 
 - 模板文件独立于JavaScript代码

@@ -16,37 +16,28 @@ class ReviewsPage extends BasePage {
 			loading: true,
 			// API 状态
 			apiConfigured: false,
-			octokit: null,
 		};
 	}
 
 	/**
-	 * 初始化 Octokit
+	 * 初始化 GitHub 服务
 	 */
-	async initOctokit() {
+	async initGitHubService() {
 		try {
-			// 检查Octokit是否可用
-			if (typeof window.Octokit === 'undefined') {
-				console.warn('Octokit 未加载');
-				this.state.apiConfigured = false;
-				return;
-			}
-
-			// 从用户信息获取token
 			if (!this.state.user || !this.state.user.token) {
 				console.warn('用户未登录或没有token');
 				this.state.apiConfigured = false;
 				return;
 			}
 
-			const token = this.state.user.token;
+			const initialized = await window.GitHubService.initFromUser(this.state.user);
+			this.state.apiConfigured = initialized;
 
-			// 创建Octokit实例
-			this.state.octokit = new window.Octokit({ auth: token });
-			this.state.apiConfigured = true;
-			console.log('Octokit 初始化成功');
+			if (initialized) {
+				console.log('GitHub 服务初始化成功');
+			}
 		} catch (error) {
-			console.error('初始化 Octokit 失败:', error);
+			console.error('初始化 GitHub 服务失败:', error);
 			this.state.apiConfigured = false;
 		}
 	}
@@ -55,7 +46,7 @@ class ReviewsPage extends BasePage {
 	 * 从 GitHub 获取已合并的 Pull Requests
 	 */
 	async loadMergedPullRequests() {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			console.error('GitHub API 未配置');
 			this.setLoading(false);
 			return;
@@ -76,7 +67,7 @@ class ReviewsPage extends BasePage {
 			console.log('从 GitHub 获取已合并的未打分 Pull Requests...', { owner, repo });
 
 			// 获取当前用户名
-			const currentUser = this.state.user.username || this.state.user.login || '';
+			const currentUser = this.state.user.username || '';
 
 			// 使用 GitHub 搜索 API 直接过滤：
 			// 合并两个查询结果，找到最旧的
@@ -88,23 +79,26 @@ class ReviewsPage extends BasePage {
 			];
 
 			const searchPromises = queries.map(query =>
-				this.state.octokit.rest.search.issuesAndPullRequests({
-					q: query,
-					sort: 'created',
-					order: 'asc',
-					per_page: 1 // 每个查询只取最旧的1个
+				window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.search.issuesAndPullRequests({
+						q: query,
+						sort: 'created',
+						order: 'asc',
+						per_page: 1 // 每个查询只取最旧的1个
+					});
+					return data;
 				})
 			);
 
-			const searchResponses = await Promise.all(searchPromises);
+			const searchResults = await Promise.all(searchPromises);
 
 			// 合并所有搜索结果
 			const allPRs = [];
-			searchResponses.forEach((response, index) => {
-				if (response.data.items.length > 0) {
-					allPRs.push(...response.data.items);
+			searchResults.forEach((result, index) => {
+				if (result.items && result.items.length > 0) {
+					allPRs.push(...result.items);
 				}
-				console.log(`查询 ${index + 1} 找到 ${response.data.items.length} 个 PR`);
+				console.log(`查询 ${index + 1} 找到 ${result.items ? result.items.length : 0} 个 PR`);
 			});
 
 			console.log(`总共找到 ${allPRs.length} 个可审核的 PR`);
@@ -126,22 +120,13 @@ class ReviewsPage extends BasePage {
 				return currentDate < oldestDate ? current : oldest;
 			});
 			// 搜索 API 返回的是 issue 对象，需要获取完整的 PR 信息
-			const pr = await this.state.octokit.rest.pulls.get({
-				owner,
-				repo,
-				pull_number: item.number
-			});
-			const prData = pr.data;
+			const prData = await window.GitHubService.getPullRequest(owner, repo, item.number);
 
 			// 获取 PR 评论
 			let comments = [];
 			try {
-				const commentsResponse = await this.state.octokit.rest.issues.listComments({
-					owner,
-					repo,
-					issue_number: prData.number
-				});
-				comments = commentsResponse.data.map(comment => ({
+				const commentsData = await window.GitHubService.listIssueComments(owner, repo, prData.number);
+				comments = commentsData.map(comment => ({
 					author: comment.user.login,
 					date: new Date(comment.created_at).toLocaleString(),
 					content: comment.body
@@ -153,11 +138,7 @@ class ReviewsPage extends BasePage {
 			// 获取 PR 中修改的文件列表（保存完整路径）
 			let fileList = [];
 			try {
-				const { data: prFiles } = await this.state.octokit.rest.pulls.listFiles({
-					owner,
-					repo,
-					pull_number: prData.number
-				});
+				const prFiles = await window.GitHubService.listPullRequestFiles(owner, repo, prData.number);
 				fileList = prFiles
 					.filter(file => file.status !== 'removed')
 					.map(file => ({
@@ -174,8 +155,8 @@ class ReviewsPage extends BasePage {
 				author: prData.user.login,
 				date: new Date(prData.created_at).toLocaleString(),
 				mergedDate: prData.merged_at ? new Date(prData.merged_at).toLocaleString() : null,
-				status: '已合并',
-				content: prData.body || '无描述',
+				status: this.t('reviews.status.merged', '已合并'),
+				content: prData.body || this.t('reviews.noDescription', '无描述'),
 				comments: comments,
 				files: fileList,
 				pr: prData,
@@ -204,7 +185,7 @@ class ReviewsPage extends BasePage {
 				if (content) {
 					const errorDiv = document.createElement('div');
 					errorDiv.className = 'error-message';
-					errorDiv.textContent = `加载失败: ${error.message}`;
+					errorDiv.textContent = `${this.t('common.loadFailed', '加载失败')}: ${error.message}`;
 					errorDiv.style.cssText = 'color: red; padding: 2rem; text-align: center; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 4px;';
 					content.innerHTML = '';
 					content.appendChild(errorDiv);
@@ -233,74 +214,74 @@ class ReviewsPage extends BasePage {
 		// 如果没有选中的 PR，显示空状态
 		if (!this.state.selectedReview) {
 			if (this.state.loading) {
-				return '<div class="loading" style="color: var(--text-primary); padding: 2rem; text-align: center;">载入中...</div>';
+				return `<div class="loading" style="color: var(--text-primary); padding: 2rem; text-align: center;">${this.t('common.loading', '载入中...')}</div>`;
 			}
-			return '<div class="empty" style="color: var(--text-secondary); padding: 2rem; text-align: center;">暂无待打分内容</div>';
+			return `<div class="empty" style="color: var(--text-secondary); padding: 2rem; text-align: center;">${this.t('reviews.noReviews', '暂无待打分内容')}</div>`;
 		}
 
 		const review = this.state.selectedReview;
 		return `
             <div class="review-detail">
 				<div class="review-detail-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h2 style="margin: 0;">待打分内容</h2>
+                    <h2 style="margin: 0;">${this.t('reviews.pendingScoring', '待打分内容')}</h2>
                     <button class="btn btn-sm btn-secondary" id="refreshBtn" data-action="refresh">
-                        🔄 刷新
+                        🔄 ${this.t('common.refresh', '刷新')}
                     </button>
                 </div>
                 <div class="review-detail-header">
-                    <h2>${review.title}</h2>
+                    <h2>${this.escapeHtml(review.title)}</h2>
                     <div class="review-detail-actions">
                         <button class="btn btn-success" data-action="approve-detail">
-                            ✅ 通过审核
+                            ✅ ${this.t('reviews.approve', '通过审核')}
                         </button>
                         <button class="btn btn-danger" data-action="reject-detail">
-                            ❌ 拒绝审核
+                            ❌ ${this.t('reviews.reject', '拒绝审核')}
                         </button>
                     </div>
                 </div>
                 <div class="review-detail-content">
                     <div class="review-info">
                         <div class="info-item">
-                            <label>作者:</label>
-                            <span>${review.author}</span>
+                            <label>${this.t('reviews.author', '作者')}:</label>
+                            <span>${this.escapeHtml(review.author)}</span>
                         </div>
                         <div class="info-item">
-                            <label>提交时间:</label>
-                            <span>${review.date}</span>
+                            <label>${this.t('reviews.submitTime', '提交时间')}:</label>
+                            <span>${this.escapeHtml(review.date)}</span>
                         </div>
                         ${review.mergedDate ? `
                         <div class="info-item">
-                            <label>合并时间:</label>
-                            <span>${review.mergedDate}</span>
+                            <label>${this.t('reviews.mergeTime', '合并时间')}:</label>
+                            <span>${this.escapeHtml(review.mergedDate)}</span>
                         </div>
                         ` : ''}
                         <div class="info-item">
-                            <label>状态:</label>
-                            <span class="status status-${review.status}">${review.status}</span>
+                            <label>${this.t('reviews.status', '状态')}:</label>
+                            <span class="status status-${this.escapeHtmlAttribute(review.status)}">${this.escapeHtml(review.status)}</span>
                         </div>
                         ${review.pr ? `
                         <div class="info-item">
-                            <label>GitHub 链接:</label>
-                            <a href="${review.pr.html_url}" target="_blank" rel="noopener noreferrer">
-                                在 GitHub 上查看
+                            <label>${this.t('reviews.githubLink', 'GitHub 链接')}:</label>
+                            <a href="${this.escapeHtmlAttribute(review.pr.html_url)}" target="_blank" rel="noopener noreferrer">
+                                ${this.t('reviews.viewOnGitHub', '在 GitHub 上查看')}
                             </a>
                         </div>
                         ` : ''}
                     </div>
                     <div class="review-content">
-                        <h3>内容预览</h3>
+                        <h3>${this.t('reviews.contentPreview', '内容预览')}</h3>
                         <div class="content-preview">
-                            ${review.content}
+                            ${this.escapeHtml(review.content)}
                         </div>
                     </div>
                     <div class="review-comments">
-                        <h3>评论</h3>
+                        <h3>${this.t('reviews.comments', '评论')}</h3>
                         <div class="comments-list">
                             ${this.renderComments(review.comments || [])}
                         </div>
                         <div class="comment-form">
-                            <textarea placeholder="添加评论..." id="commentText"></textarea>
-                            <button class="btn btn-primary" data-action="add-comment">添加评论</button>
+                            <textarea placeholder="${this.tAttr('reviews.commentPlaceholder', '添加评论...')}" id="commentText"></textarea>
+                            <button class="btn btn-primary" data-action="add-comment">${this.t('reviews.addComment', '添加评论')}</button>
                         </div>
                     </div>
                 </div>
@@ -310,17 +291,17 @@ class ReviewsPage extends BasePage {
 
 	renderComments(comments) {
 		if (comments.length === 0) {
-			return '<div class="empty-comments">暂无评论</div>';
+			return `<div class="empty-comments">${this.t('reviews.noComments', '暂无评论')}</div>`;
 		}
 
 		return comments.map(comment => `
             <div class="comment-item">
                 <div class="comment-header">
-                    <span class="comment-author">${comment.author}</span>
-                    <span class="comment-date">${comment.date}</span>
+                    <span class="comment-author">${this.escapeHtml(comment.author)}</span>
+                    <span class="comment-date">${this.escapeHtml(comment.date)}</span>
                 </div>
                 <div class="comment-content">
-                    ${comment.content}
+                    ${this.escapeHtml(comment.content)}
                 </div>
             </div>
         `).join('');
@@ -332,8 +313,8 @@ class ReviewsPage extends BasePage {
 		// 绑定事件
 		this.bindEvents();
 
-		// 等待 Octokit 初始化完成
-		await this.initOctokit();
+		// 等待 GitHub 服务初始化完成
+		await this.initGitHubService();
 
 		// 加载 GitHub 已合并的 Pull Requests
 		if (this.state.apiConfigured) {
@@ -381,7 +362,7 @@ class ReviewsPage extends BasePage {
 	 * 处理刷新操作
 	 */
 	async handleRefresh() {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			alert(this.t('reviews.errors.apiNotConfigured', 'GitHub API 未配置'));
 			return;
 		}
@@ -390,7 +371,7 @@ class ReviewsPage extends BasePage {
 		const refreshBtn = this.element.querySelector('#refreshBtn');
 		if (refreshBtn) {
 			refreshBtn.disabled = true;
-			refreshBtn.textContent = '⏳ 刷新中...';
+			refreshBtn.textContent = `⏳ ${this.t('common.refreshing', '刷新中...')}`;
 		}
 
 		try {
@@ -401,7 +382,7 @@ class ReviewsPage extends BasePage {
 			// 恢复刷新按钮状态
 			if (refreshBtn) {
 				refreshBtn.disabled = false;
-				refreshBtn.textContent = '🔄 刷新';
+				refreshBtn.textContent = `🔄 ${this.t('common.refresh', '刷新')}`;
 			}
 		}
 	}
@@ -432,7 +413,7 @@ class ReviewsPage extends BasePage {
 		if (!commentText || !commentText.value.trim()) return;
 
 		// 获取当前用户名
-		const currentUser = this.state.user?.username || this.state.user?.login || '当前用户';
+		const currentUser = this.state.user?.username || '当前用户';
 
 		const comment = {
 			author: currentUser,
@@ -487,7 +468,7 @@ class ReviewsPage extends BasePage {
 	 * @param {Object} review - 审核项对象
 	 */
 	async markPRAsReviewing(review) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			return;
 		}
 
@@ -496,17 +477,13 @@ class ReviewsPage extends BasePage {
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
 			const prNumber = parseInt(review.id);
-			const currentUser = user.username || user.login || 'reviewer';
+			const currentUser = user.username || 'reviewer';
 
 			// 获取PR作者（提交者）信息，如果没有提交者标签则添加
 			let committerName = null;
 			try {
-				const pr = await this.state.octokit.rest.pulls.get({
-					owner,
-					repo,
-					pull_number: prNumber
-				});
-				committerName = pr.data.user.login;
+				const pr = await window.GitHubService.getPullRequest(owner, repo, prNumber);
+				committerName = pr.user.login;
 			} catch (error) {
 				console.warn('获取PR信息失败:', error);
 			}
@@ -519,12 +496,7 @@ class ReviewsPage extends BasePage {
 
 			// 添加"scored"标签、审核者名字标签（r_用户名）和提交者标签（c_用户名）
 			try {
-				await this.state.octokit.rest.issues.addLabels({
-					owner,
-					repo,
-					issue_number: prNumber,
-					labels: labelsToAdd
-				});
+				await window.GitHubService.addIssueLabels(owner, repo, prNumber, labelsToAdd);
 			} catch (labelError) {
 				// 如果标签不存在或添加失败，只记录警告，继续执行
 				console.warn('添加标签失败（标签可能不存在）:', labelError);

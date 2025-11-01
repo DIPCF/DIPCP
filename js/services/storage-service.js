@@ -2,6 +2,51 @@
 window.StorageService = {
 	dbName: 'DIPCP_Database',
 	dbVersion: 4,
+	// 事件监听器
+	_listeners: {},
+	// 速率限制状态
+	_rateLimitState: null,
+
+	/**
+	 * 添加事件监听器
+	 * @param {string} eventName - 事件名称：'permission-changed' 或 'files-changed'
+	 * @param {Function} callback - 回调函数
+	 */
+	on(eventName, callback) {
+		if (!this._listeners[eventName]) {
+			this._listeners[eventName] = [];
+		}
+		this._listeners[eventName].push(callback);
+	},
+
+	/**
+	 * 移除事件监听器
+	 * @param {string} eventName - 事件名称
+	 * @param {Function} callback - 回调函数
+	 */
+	off(eventName, callback) {
+		if (!this._listeners[eventName]) return;
+		const index = this._listeners[eventName].indexOf(callback);
+		if (index > -1) {
+			this._listeners[eventName].splice(index, 1);
+		}
+	},
+
+	/**
+	 * 触发事件
+	 * @param {string} eventName - 事件名称
+	 * @param {*} data - 事件数据
+	 */
+	_emit(eventName, data) {
+		if (!this._listeners[eventName]) return;
+		this._listeners[eventName].forEach(callback => {
+			try {
+				callback(data);
+			} catch (error) {
+				console.error(`事件监听器执行失败: ${eventName}`, error);
+			}
+		});
+	},
 
 	// 初始化IndexedDB
 	async initDB() {
@@ -452,6 +497,57 @@ window.StorageService = {
 		}
 	},
 
+	/**
+	 * 检查文件是否为权限文件
+	 * @param {string} filePath - 文件路径
+	 * @returns {boolean}
+	 */
+	_isPermissionFile(filePath) {
+		const permissionFiles = [
+			'.github/directors.txt',
+			'.github/reviewers.txt',
+			'.github/maintainers.txt',
+			'.github/collaborators.txt'
+		];
+		return permissionFiles.includes(filePath);
+	},
+
+	/**
+	 * 检测权限文件是否有变化
+	 * @param {Array} downloadedFiles - 下载的文件列表
+	 * @returns {boolean}
+	 */
+	async _checkPermissionFilesChanged(downloadedFiles) {
+		let hasPermissionChanged = false;
+		const permissionFiles = [
+			'.github/directors.txt',
+			'.github/reviewers.txt',
+			'.github/maintainers.txt',
+			'.github/collaborators.txt'
+		];
+
+		for (const filePath of permissionFiles) {
+			// 检查是否有该权限文件在下载列表中
+			const downloadedFile = downloadedFiles.find(f => f.path === filePath);
+			if (downloadedFile) {
+				// 获取本地旧版本的SHA进行比较
+				try {
+					const cachedFile = await this._execute('fileCache', 'get', filePath);
+					if (!cachedFile || cachedFile.sha !== downloadedFile.sha) {
+						hasPermissionChanged = true;
+						console.log(`检测到权限文件变化: ${filePath}`);
+					}
+				} catch (error) {
+					// 如果本地没有缓存，也算作变化
+					hasPermissionChanged = true;
+					console.log(`检测到新的权限文件: ${filePath}`);
+				}
+			}
+		}
+
+		return hasPermissionChanged;
+	},
+
 	// 同步仓库数据 - 差量同步，只下载变更的文件
 	async syncRepositoryData(owner, repo, token, progressCallback = null) {
 		try {
@@ -519,6 +615,7 @@ window.StorageService = {
 			const totalFiles = filesToDownload.length;
 			let downloadedCount = 0;
 			let processedCount = 0;
+			const successfullyDownloadedFiles = []; // 保存成功下载的文件列表
 
 			// 分批下载文件
 			for (let i = 0; i < filesToDownload.length; i += CONCURRENCY_DOWNLOAD) {
@@ -530,9 +627,10 @@ window.StorageService = {
 				);
 
 				// 统计成功下载的文件数
-				results.forEach(success => {
+				results.forEach((success, index) => {
 					if (success) {
 						downloadedCount++;
+						successfullyDownloadedFiles.push(batch[index]); // 保存成功下载的文件
 					}
 					processedCount++;
 
@@ -606,10 +704,84 @@ window.StorageService = {
 			localStorage.setItem(`dipcp-sync-${repo}`, JSON.stringify(syncInfo));
 
 			console.log(`仓库数据同步完成，共检查 ${allFiles.length} 个文件，下载 ${downloadedCount} 个文件，删除 ${deletedCount} 个文件`);
+
+			// 检查是否有权限文件变化
+			const deletedPermissionFiles = filesToDelete.filter(path => this._isPermissionFile(path));
+			const changedPermissionFiles = successfullyDownloadedFiles.filter(file => this._isPermissionFile(file.path));
+			
+			// 如果权限文件有变化，触发权限变更事件
+			if (deletedPermissionFiles.length > 0 || changedPermissionFiles.length > 0) {
+				console.log('检测到权限文件变化，触发权限变更事件');
+				this._emit('permission-changed', {
+					owner,
+					repo,
+					deletedFiles: deletedPermissionFiles,
+					changedFiles: changedPermissionFiles.map(f => f.path),
+					timestamp: new Date().toISOString()
+				});
+			}
+
+			// 过滤掉权限文件，检查是否有其他文件变化
+			const otherChangedFiles = successfullyDownloadedFiles.filter(file => !this._isPermissionFile(file.path));
+			const otherDeletedFiles = filesToDelete.filter(path => !this._isPermissionFile(path));
+			
+			// 如果有其他文件变化，触发文件变更事件
+			if (otherChangedFiles.length > 0 || otherDeletedFiles.length > 0) {
+				console.log('检测到文件变化，触发文件变更事件');
+				this._emit('files-changed', {
+					owner,
+					repo,
+					changedFiles: otherChangedFiles.map(f => f.path),
+					deletedFiles: otherDeletedFiles,
+					timestamp: new Date().toISOString()
+				});
+			}
+
 			return syncInfo;
 		} catch (error) {
 			console.error('同步仓库数据失败:', error);
 			throw error;
 		}
+	},
+
+	/**
+	 * 检查是否处于 GitHub API 速率限制状态
+	 * @returns {boolean} 如果处于限制状态返回 true
+	 */
+	isRateLimited() {
+		return window.GitHubService.isRateLimited();
+	},
+
+	/**
+	 * 获取速率限制剩余时间（毫秒）
+	 * @returns {number} 剩余时间，如果未限制则返回 0
+	 */
+	getRateLimitRemainingTime() {
+		return window.GitHubService.getRateLimitRemainingTime();
+	},
+
+	/**
+	 * 处理 GitHub API 速率限制错误
+	 * @param {Error} error - 错误对象
+	 * @returns {boolean} 是否是速率限制错误
+	 */
+	handleRateLimitError(error) {
+		return window.GitHubService.handleRateLimitError(error);
+	},
+
+	/**
+	 * 显示速率限制通知
+	 */
+	showRateLimitNotification() {
+		return window.GitHubService.showRateLimitNotification();
+	},
+
+	/**
+	 * 包装 GitHub API 调用，自动检查和处理速率限制
+	 * @param {Function} apiCall - 要执行的 API 调用函数（返回 Promise）
+	 * @returns {Promise} API 调用的结果
+	 */
+	async safeGitHubApiCall(apiCall) {
+		return await window.GitHubService.safeCall(apiCall);
 	}
 };

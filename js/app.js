@@ -32,7 +32,14 @@ class DIPCPApp {
 	 * @returns {string} 基础路径
 	 */
 	detectBasePath() {
-		// 方法1：尝试从 script 标签的 src 属性中获取基础路径
+		// 方法1：优先从URL路径检测（适用于 /DIPCP, /DIPCP/, /DIPCP/login 等情况）
+		const path = window.location.pathname;
+		if (path.startsWith('/DIPCP')) {
+			console.log('从 URL 路径检测到基础路径: /DIPCP/');
+			return '/DIPCP/';
+		}
+
+		// 方法2：尝试从 script 标签的 src 属性中获取基础路径
 		// 查找包含 'app.js' 的 script 标签
 		const scripts = document.getElementsByTagName('script');
 		for (let script of scripts) {
@@ -59,25 +66,6 @@ class DIPCPApp {
 					console.warn('无法从 script 标签解析基础路径:', e);
 				}
 			}
-		}
-
-		// 方法2：从 window.location.pathname 提取
-		// 检查当前路径是否是已知的应用路由
-		const path = window.location.pathname;
-		const knownRoutes = ['/', '/login', '/maintainers', '/editor', '/reviews', '/issues',
-			'/settings', '/discussions', '/repository-selection', '/project-detail',
-			'/terms', '/privacy', '/user-profile', '/role-management'];
-
-		// 如果当前路径是已知路由或子路径，基础路径应该是根目录
-		const isKnownRoute = knownRoutes.some(route => {
-			const normalizedRoute = route === '/' ? '/' : route.replace(/\/+$/, '');
-			const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
-			return normalizedPath === normalizedRoute || normalizedPath.startsWith(normalizedRoute + '/');
-		});
-
-		if (isKnownRoute) {
-			console.log('检测到已知路由，使用根目录作为基础路径');
-			return '/';
 		}
 
 		// 方法3：如果路径包含 index.html，使用包含 index.html 的目录作为基础路径

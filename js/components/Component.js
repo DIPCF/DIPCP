@@ -162,6 +162,44 @@ class Component {
 	}
 
 	/**
+	 * HTML 转义函数，防止 XSS 攻击
+	 * @param {string} text - 需要转义的文本
+	 * @returns {string} 转义后的文本
+	 */
+	escapeHtml(text) {
+		if (typeof text !== 'string') {
+			return '';
+		}
+		const map = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;'
+		};
+		return text.replace(/[&<>"']/g, m => map[m]);
+	}
+
+	/**
+	 * HTML 属性转义函数，用于转义 HTML 属性值
+	 * @param {string} text - 需要转义的文本
+	 * @returns {string} 转义后的文本
+	 */
+	escapeHtmlAttribute(text) {
+		if (typeof text !== 'string') {
+			return '';
+		}
+		const map = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;'
+		};
+		return text.replace(/[&<>"']/g, m => map[m]);
+	}
+
+	/**
 	 * 简单的Markdown转HTML转换器
 	 * 注意：这是一个简化版本，仅处理基本的Markdown语法
 	 * @param {string} markdown - Markdown文本

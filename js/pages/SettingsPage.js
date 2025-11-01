@@ -163,7 +163,7 @@ class SettingsPage extends BasePage {
 	 */
 	renderAccountSection() {
 		// 获取真实用户名
-		const realUsername = this.state.user?.username || this.state.user?.login || 'Unknown User';
+		const realUsername = this.state.user?.username || 'Unknown User';
 
 		return `
             <div class="settings-section">
@@ -252,7 +252,7 @@ class SettingsPage extends BasePage {
 	updateUserInfoDOM(user) {
 		if (!this.element) return;
 
-		const realUsername = user?.username || user?.login || 'Unknown User';
+		const realUsername = user?.username || 'Unknown User';
 		const usernameLabel = this.element.querySelector('.setting-item label');
 		if (usernameLabel) {
 			usernameLabel.textContent = `${this.t('login.githubUsername', 'GitHub用户名')}: ${realUsername}`;

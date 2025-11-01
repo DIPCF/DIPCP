@@ -134,6 +134,27 @@ jobs:
           
           echo "Extracted: user=$INVITED_USER, role=$ROLE, file=$FILE"
       
+      - name: Verify not inviting self
+        if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept'
+        id: verify_not_self
+        run: |
+          ISSUE_AUTHOR="${{ github.event.issue.user.login }}"
+          INVITED_USER="${{ steps.extract_details.outputs.invited_user }}"
+          
+          echo "Issue author: $ISSUE_AUTHOR"
+          echo "Invited user: $INVITED_USER"
+          
+          # 将用户名转换为小写进行比较
+          ISSUE_AUTHOR_LOWER=$(echo "$ISSUE_AUTHOR" | tr '[:upper:]' '[:lower:]')
+          INVITED_USER_LOWER=$(echo "$INVITED_USER" | tr '[:upper:]' '[:lower:]')
+          
+          if [ "$ISSUE_AUTHOR_LOWER" = "$INVITED_USER_LOWER" ]; then
+            echo "❌ Cannot invite self. Director cannot invite themselves as a role member."
+            exit 1
+          fi
+          
+          echo "✅ Verified: issue author is not the same as invited user"
+      
       - name: Verify comment author is invited user
         if: steps.check_status.outputs.skip != 'true' && steps.verify_comment.outputs.action == 'accept'
         id: verify_commenter
@@ -214,7 +235,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `❌ Permission verification failed. Only Director can create role invitations, and only the invited user can accept the invitation.`
+              body: `❌ Permission verification failed. Possible reasons:\n1. Only Director can create role invitations\n2. Director cannot invite themselves\n3. Only the invited user can accept the invitation`
             });
             
             await github.rest.issues.update({

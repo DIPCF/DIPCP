@@ -40,43 +40,34 @@ class IssuesPage extends BasePage {
 			},
 			// API 状态
 			apiConfigured: false,
-			octokit: null,
 			// 邀请处理状态
 			pollingInvitation: false,
 			invitationPollingInterval: null
 		};
 
-		// 初始化 Octokit（如果可用）
-		this.initOctokit();
+		// 初始化 GitHub 服务（如果可用）
+		this.initGitHubService();
 	}
 
 	/**
-	 * 初始化 Octokit
+	 * 初始化 GitHub 服务
 	 */
-	async initOctokit() {
+	async initGitHubService() {
 		try {
-			// 检查Octokit是否可用
-			if (typeof Octokit === 'undefined') {
-				console.warn('Octokit 未加载');
-				this.state.apiConfigured = false;
-				return;
-			}
-
-			// 从用户信息获取token
 			if (!this.state.user || !this.state.user.token) {
 				console.warn('用户未登录或没有token');
 				this.state.apiConfigured = false;
 				return;
 			}
 
-			const token = this.state.user.token;
+			const initialized = await window.GitHubService.initFromUser(this.state.user);
+			this.state.apiConfigured = initialized;
 
-			// 创建Octokit实例
-			this.state.octokit = new Octokit({ auth: token });
-			this.state.apiConfigured = true;
-			console.log('Octokit 初始化成功');
+			if (initialized) {
+				console.log('GitHub 服务初始化成功');
+			}
 		} catch (error) {
-			console.error('初始化 Octokit 失败:', error);
+			console.error('初始化 GitHub 服务失败:', error);
 			this.state.apiConfigured = false;
 		}
 	}
@@ -471,7 +462,7 @@ class IssuesPage extends BasePage {
 	 * 加载 Issues 列表
 	 */
 	async loadIssues() {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			console.error('GitHub API 未配置');
 			return;
 		}
@@ -490,17 +481,15 @@ class IssuesPage extends BasePage {
 
 			console.log('Fetching issues from GitHub...', { owner, repo, state: this.state.filters.state });
 
-			const response = await this.state.octokit.rest.issues.listForRepo({
-				owner,
-				repo,
+			const issues = await window.GitHubService.listIssues(owner, repo, {
 				state: this.state.filters.state,
 				sort: this.state.filters.sort,
 				direction: this.state.filters.direction
 			});
 
-			console.log('Issues loaded:', response.data.length);
+			console.log('Issues loaded:', issues.length);
 
-			this.state.issues = response.data;
+			this.state.issues = issues;
 			this.state.loading = false;
 
 			// 更新 UI
@@ -509,6 +498,11 @@ class IssuesPage extends BasePage {
 		} catch (error) {
 			console.error('加载 Issues 失败:', error);
 			this.state.loading = false;
+
+			// 如果是速率限制错误，更新 UI 显示错误信息
+			if (error.isRateLimited) {
+				this.updateIssuesContent();
+			}
 		}
 	}
 
@@ -516,7 +510,7 @@ class IssuesPage extends BasePage {
 	 * 加载 Issue 评论
 	 */
 	async loadIssueComments(issueNumber) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			console.error('GitHub API 未配置');
 			return;
 		}
@@ -531,13 +525,9 @@ class IssuesPage extends BasePage {
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
 
-			const response = await this.state.octokit.rest.issues.listComments({
-				owner,
-				repo,
-				issue_number: issueNumber
-			});
+			const comments = await window.GitHubService.listIssueComments(owner, repo, issueNumber);
 
-			this.state.issueComments = response.data;
+			this.state.issueComments = comments;
 
 		} catch (error) {
 			console.error('加载 Issue 评论失败:', error);
@@ -555,10 +545,10 @@ class IssuesPage extends BasePage {
 		// 绑定事件
 		this.bindEvents();
 
-		// 确保Octokit初始化完成
+		// 确保 GitHub 服务初始化完成
 		if (!this.state.apiConfigured) {
-			console.log('Initializing Octokit...');
-			await this.initOctokit();
+			console.log('Initializing GitHub Service...');
+			await this.initGitHubService();
 		}
 
 		// 异步加载数据
@@ -681,7 +671,7 @@ class IssuesPage extends BasePage {
 			return false;
 		}
 
-		const username = (this.state.user.login || this.state.user.username || '').toLowerCase();
+		const username = (this.state.user.username || '').toLowerCase();
 		if (!username) {
 			return false;
 		}
@@ -751,10 +741,14 @@ class IssuesPage extends BasePage {
 					// 下载并更新权限文件
 					await this.downloadAndUpdateRoleFiles();
 
+					// 从列表中移除已关闭的issue
+					this.state.issues = this.state.issues.filter(issue => issue.number !== issueNumber);
+
 					// 重置状态
 					this.setState({
 						pollingInvitation: false,
-						selectedIssue: null
+						selectedIssue: null,
+						issues: this.state.issues
 					});
 
 					// 返回列表
@@ -791,13 +785,7 @@ class IssuesPage extends BasePage {
 		const owner = user.repositoryInfo.owner;
 		const repo = user.repositoryInfo.repo;
 
-		const response = await this.state.octokit.rest.issues.get({
-			owner,
-			repo,
-			issue_number: issueNumber
-		});
-
-		return response.data;
+		return await window.GitHubService.getIssue(owner, repo, issueNumber);
 	}
 
 	/**
@@ -814,7 +802,15 @@ class IssuesPage extends BasePage {
 
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
-			const username = user.login;
+			const username = user.username;
+
+			// 检查username是否存在
+			if (!username) {
+				console.error('无法获取用户名，user对象:', user);
+				return;
+			}
+
+			console.log(`获取到用户名: ${username}`);
 
 			// 首先同步仓库数据以确保IndexedDB中的文件是最新的
 			if (window.StorageService) {
@@ -912,8 +908,15 @@ class IssuesPage extends BasePage {
 			const commentText = 'REJECT';
 			await this.addIssueComment(commentText);
 
+			// 从列表中移除该issue（因为拒绝后Issue会很快关闭）
+			const issueNumber = this.state.selectedIssue.number;
+			this.state.issues = this.state.issues.filter(issue => issue.number !== issueNumber);
+
 			// 关闭Issue并返回列表
-			this.setState({ selectedIssue: null });
+			this.setState({
+				selectedIssue: null,
+				issues: this.state.issues
+			});
 			this.updateIssuesContent();
 
 		} catch (error) {
@@ -941,15 +944,12 @@ class IssuesPage extends BasePage {
 		const owner = user.repositoryInfo.owner;
 		const repo = user.repositoryInfo.repo;
 
-		// 使用 REST API 在 Issue 中添加评论
-		const { data } = await this.state.octokit.rest.issues.createComment({
+		return await window.GitHubService.createIssueComment(
 			owner,
 			repo,
-			issue_number: this.state.selectedIssue.number,
-			body: commentText
-		});
-
-		return data;
+			this.state.selectedIssue.number,
+			commentText
+		);
 	}
 
 	/**

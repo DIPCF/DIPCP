@@ -22,7 +22,6 @@ class MaintainersPage extends BasePage {
 			loading: true,
 			// API 状态
 			apiConfigured: false,
-			octokit: null,
 			// 文件查看状态
 			currentFile: null, // 当前查看的文件路径
 			currentFileFromBase: false, // 当前是否显示主分支内容
@@ -30,17 +29,10 @@ class MaintainersPage extends BasePage {
 	}
 
 	/**
-	 * 初始化 Octokit
+	 * 初始化 GitHub 服务
 	 */
-	async initOctokit() {
+	async initGitHubService() {
 		try {
-			// 检查Octokit是否可用
-			if (typeof window.Octokit === 'undefined') {
-				console.warn('Octokit 未加载');
-				this.state.apiConfigured = false;
-				return;
-			}
-
 			// 从用户信息获取token
 			if (!this.state.user || !this.state.user.token) {
 				console.warn('用户未登录或没有token');
@@ -48,14 +40,14 @@ class MaintainersPage extends BasePage {
 				return;
 			}
 
-			const token = this.state.user.token;
+			const initialized = await window.GitHubService.initFromUser(this.state.user);
+			this.state.apiConfigured = initialized;
 
-			// 创建Octokit实例
-			this.state.octokit = new window.Octokit({ auth: token });
-			this.state.apiConfigured = true;
-			console.log('Octokit 初始化成功');
+			if (initialized) {
+				console.log('GitHub 服务初始化成功');
+			}
 		} catch (error) {
-			console.error('初始化 Octokit 失败:', error);
+			console.error('初始化 GitHub 服务失败:', error);
 			this.state.apiConfigured = false;
 		}
 	}
@@ -64,7 +56,7 @@ class MaintainersPage extends BasePage {
 	 * 从 GitHub 获取 Pull Requests
 	 */
 	async loadPullRequests() {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			console.error('GitHub API 未配置');
 			this.setLoading(false);
 			return;
@@ -85,7 +77,7 @@ class MaintainersPage extends BasePage {
 			console.log('从 GitHub 获取未维护的 Pull Requests...', { owner, repo });
 
 			// 获取当前用户名
-			const currentUser = this.state.user.username || this.state.user.login || '';
+			const currentUser = this.state.user.username || '';
 
 			// 使用 GitHub 搜索 API 直接过滤：
 			// 合并两个查询结果，找到最旧的
@@ -97,23 +89,26 @@ class MaintainersPage extends BasePage {
 			];
 
 			const searchPromises = queries.map(query =>
-				this.state.octokit.rest.search.issuesAndPullRequests({
-					q: query,
-					sort: 'created',
-					order: 'asc',
-					per_page: 1 // 每个查询只取最旧的1个
+				window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.search.issuesAndPullRequests({
+						q: query,
+						sort: 'created',
+						order: 'asc',
+						per_page: 1 // 每个查询只取最旧的1个
+					});
+					return data;
 				})
 			);
 
-			const searchResponses = await Promise.all(searchPromises);
+			const searchResults = await Promise.all(searchPromises);
 
 			// 合并所有搜索结果
 			const allPRs = [];
-			searchResponses.forEach((response, index) => {
-				if (response.data.items.length > 0) {
-					allPRs.push(...response.data.items);
+			searchResults.forEach((result, index) => {
+				if (result.items && result.items.length > 0) {
+					allPRs.push(...result.items);
 				}
-				console.log(`查询 ${index + 1} 找到 ${response.data.items.length} 个 PR`);
+				console.log(`查询 ${index + 1} 找到 ${result.items ? result.items.length : 0} 个 PR`);
 			});
 
 			console.log(`总共找到 ${allPRs.length} 个可维护的 PR`);
@@ -135,21 +130,12 @@ class MaintainersPage extends BasePage {
 				return currentDate < oldestDate ? current : oldest;
 			});
 			// 搜索 API 返回的是 issue 对象，需要获取完整的 PR 信息
-			const pr = await this.state.octokit.rest.pulls.get({
-				owner,
-				repo,
-				pull_number: item.number
-			});
-			const prData = pr.data;
+			const prData = await window.GitHubService.getPullRequest(owner, repo, item.number);
 
 			// 获取 PR 中修改的文件列表（保存完整路径，包括删除的文件）
 			let fileList = [];
 			try {
-				const { data: prFiles } = await this.state.octokit.rest.pulls.listFiles({
-					owner,
-					repo,
-					pull_number: prData.number
-				});
+				const prFiles = await window.GitHubService.listPullRequestFiles(owner, repo, prData.number);
 				fileList = prFiles.map(file => ({
 					path: file.filename,
 					name: file.filename.split('/').pop(),
@@ -211,7 +197,7 @@ class MaintainersPage extends BasePage {
 				if (content) {
 					const errorDiv = document.createElement('div');
 					errorDiv.className = 'error-message';
-					errorDiv.textContent = `加载失败: ${error.message}`;
+					errorDiv.textContent = `${this.t('common.error', '加载失败')}: ${error.message}`;
 					errorDiv.style.cssText = 'color: red; padding: 2rem; text-align: center; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 4px;';
 					content.innerHTML = '';
 					content.appendChild(errorDiv);
@@ -253,7 +239,7 @@ class MaintainersPage extends BasePage {
 		// 如果没有选中的 PR，显示空状态
 		if (!this.state.selectedMaintainer) {
 			if (this.state.loading) {
-				return '<div class="loading" style="color: var(--text-primary); padding: 2rem; text-align: center;">载入中...</div>';
+				return `<div class="loading" style="color: var(--text-primary); padding: 2rem; text-align: center;">${this.t('common.loading', '载入中...')}</div>`;
 			}
 			return `
 				<div style="color: var(--text-secondary); padding: 2rem; text-align: center;">
@@ -269,12 +255,12 @@ class MaintainersPage extends BasePage {
 		return `
             <div class="maintainer-detail">
 				<div class="maintainer-detail-header" style="margin-bottom: 1rem;">
-                    <h2 style="margin: 0;">${maintainer.author} - ${maintainer.date}</h2>
+                    <h2 style="margin: 0;">${this.escapeHtml(maintainer.author)} - ${this.escapeHtml(maintainer.date)}</h2>
                 </div>
                 <div class="maintainer-detail-content">
                     <div class="maintainer-content" style="margin-bottom: 1rem;">
                         <div class="content-preview" style="white-space: pre-wrap; color: var(--text-primary); padding: 0.75rem; background: var(--bg-secondary, var(--bg-primary)); border: 1px solid var(--border-primary); border-radius: 4px;">
-                            ${maintainer.content}
+                            ${this.escapeHtml(maintainer.content)}
                         </div>
                     </div>
                     ${maintainer.files && maintainer.files.length > 0 ? `
@@ -287,8 +273,8 @@ class MaintainersPage extends BasePage {
 			const deletedIcon = isDeleted ? '🗑️ ' : '';
 			const deletedText = isDeleted ? ` <span style="color: var(--error-color, #dc3545); font-size: 0.85em;">(${this.t('maintainers.fileDeleted', '已删除')})</span>` : '';
 			return `
-                                <button class="file-item-btn ${isDeleted ? 'file-deleted' : ''}" data-file-path="${file.path}" data-file-index="${index}" data-is-deleted="${isDeleted}" style="text-align: left; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; ${deletedStyle}">
-                                    ${deletedIcon}${file.name}${deletedText}
+                                <button class="file-item-btn ${isDeleted ? 'file-deleted' : ''}" data-file-path="${this.escapeHtmlAttribute(file.path)}" data-file-index="${index}" data-is-deleted="${isDeleted}" style="text-align: left; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; ${deletedStyle}">
+                                    ${deletedIcon}${this.escapeHtml(file.name)}${deletedText}
                                 </button>
                             `;
 		}).join('')}
@@ -308,7 +294,7 @@ class MaintainersPage extends BasePage {
                     ` : ''}
                     <div class="maintainer-comments">
                         <div class="comment-form" style="margin-bottom: 1rem;">
-                            <textarea id="commentText" placeholder="${this.t('maintainers.commentPlaceholder', '添加评论...')}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; resize: vertical; font-family: inherit; margin-bottom: 0.5rem;"></textarea>
+                            <textarea id="commentText" placeholder="${this.tAttr('maintainers.commentPlaceholder', '添加评论...')}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; resize: vertical; font-family: inherit; margin-bottom: 0.5rem;"></textarea>
                         </div>
                         <div class="maintainer-detail-actions" style="display: flex; align-items: center; gap: 0.5rem;">
                             <select id="commitSize" class="form-select" style="padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
@@ -354,8 +340,8 @@ class MaintainersPage extends BasePage {
 		// 绑定事件
 		this.bindEvents();
 
-		// 等待 Octokit 初始化完成
-		await this.initOctokit();
+		// 等待 GitHub 服务初始化完成
+		await this.initGitHubService();
 
 		// 加载 GitHub Pull Requests
 		if (this.state.apiConfigured) {
@@ -497,7 +483,7 @@ class MaintainersPage extends BasePage {
 	 * 处理刷新操作
 	 */
 	async handleRefresh() {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			alert(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
 			return;
 		}
@@ -529,7 +515,7 @@ class MaintainersPage extends BasePage {
 	 * @async
 	 */
 	async handleApprove(maintainer) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			this.showApproveError(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
 			return;
 		}
@@ -573,17 +559,19 @@ class MaintainersPage extends BasePage {
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
 			const prNumber = parseInt(maintainer.id);
-			const maintainerName = user.username || user.login || '维护者';
+			const maintainerName = user.username || '维护者';
 
 			// 合并 PR，将所有信息写入 commit_message
 			const commitMessage = `✅ maintainer：\n\n@${author}\n\n**Size：** ${commitSize}\n**Impact：** ${impactMultiplier}\n\n**Comment：**\n${comment}`;
 
-			await this.state.octokit.rest.pulls.merge({
-				owner,
-				repo,
-				pull_number: prNumber,
-				commit_title: `Merge: ${maintainer.title}`,
-				commit_message: commitMessage
+			await window.GitHubService.safeCall(async (octokit) => {
+				await octokit.rest.pulls.merge({
+					owner,
+					repo,
+					pull_number: prNumber,
+					commit_title: `Merge: ${maintainer.title}`,
+					commit_message: commitMessage
+				});
 			});
 
 			// 在Discussions的Announcements中创建讨论主题
@@ -598,7 +586,7 @@ class MaintainersPage extends BasePage {
 			await this.loadPullRequests();
 		} catch (error) {
 			console.error('合并 PR 失败:', error);
-			this.showApproveError(this.t('maintainers.errors.approveFailed', `合并失败: ${error.message}`));
+			this.showApproveError(`${this.t('maintainers.errors.approveFailed', '合并失败')}: ${this.escapeHtml(error.message)}`);
 		} finally {
 			// 恢复按钮状态
 			this.setButtonsProcessing(false);
@@ -633,14 +621,16 @@ class MaintainersPage extends BasePage {
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
 			const prNumber = parseInt(maintainer.id);
-			const maintainerName = user.username || user.login || '维护者';
+			const maintainerName = user.username || '维护者';
 
 			// 关闭 PR
-			await this.state.octokit.rest.pulls.update({
-				owner,
-				repo,
-				pull_number: prNumber,
-				state: 'closed'
+			await window.GitHubService.safeCall(async (octokit) => {
+				await octokit.rest.pulls.update({
+					owner,
+					repo,
+					pull_number: prNumber,
+					state: 'closed'
+				});
 			});
 
 			// 在Discussions的Announcements中创建讨论主题
@@ -654,7 +644,7 @@ class MaintainersPage extends BasePage {
 			await this.loadPullRequests();
 		} catch (error) {
 			console.error('拒绝 PR 失败:', error);
-			this.showRejectError(this.t('maintainers.errors.rejectFailed', `拒绝失败: ${error.message}`));
+			this.showRejectError(`${this.t('maintainers.errors.rejectFailed', '拒绝失败')}: ${this.escapeHtml(error.message)}`);
 		} finally {
 			// 恢复按钮状态
 			this.setButtonsProcessing(false);
@@ -742,10 +732,7 @@ class MaintainersPage extends BasePage {
 	async createDiscussion(owner, repo, author, body, prNumber, titlePrefix = '❌') {
 		try {
 			// 获取仓库ID
-			const { data: repoInfo } = await this.state.octokit.rest.repos.get({
-				owner,
-				repo
-			});
+			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
 			const repositoryId = repoInfo.node_id;
 
 			// 从本地存储获取categories列表（全局共享的缓存）
@@ -766,7 +753,7 @@ class MaintainersPage extends BasePage {
 			if (!categories) {
 				console.log('缓存中未找到分类列表，正在查询...');
 				// 获取Discussions分类列表
-				const categoriesResult = await this.state.octokit.graphql(`
+				const categoriesResult = await window.GitHubService.graphql(`
 					query GetDiscussionCategories($owner: String!, $name: String!) {
 						repository(owner: $owner, name: $name) {
 							discussionCategories(first: 10) {
@@ -814,7 +801,7 @@ class MaintainersPage extends BasePage {
 			// 创建讨论主题
 			const discussionTitle = `${titlePrefix}：PR #${prNumber}`;
 
-			await this.state.octokit.graphql(`
+			await window.GitHubService.graphql(`
 				mutation CreateDiscussion($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 					createDiscussion(input: {
 						repositoryId: $repoId
@@ -851,7 +838,7 @@ class MaintainersPage extends BasePage {
 	 * @param {boolean} forceFromBase - 是否强制从主分支获取（用于切换）
 	 */
 	async handleFileClick(filePath, isDeleted = false, forceFromBase = false) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			alert(this.t('maintainers.errors.apiNotConfigured', 'GitHub API 未配置'));
 			return;
 		}
@@ -871,8 +858,8 @@ class MaintainersPage extends BasePage {
 			if (fileContentDisplay && fileContentTitle && fileContentText) {
 				fileContentDisplay.style.display = 'block';
 				const loadingText = isDeleted
-					? `加载中（从主分支）: ${filePath}`
-					: `加载中: ${filePath}`;
+					? `${this.t('common.loading', '加载中')}（${this.t('maintainers.fromBaseBranch', '从主分支')}）: ${this.escapeHtml(filePath)}`
+					: `${this.t('common.loading', '加载中')}: ${this.escapeHtml(filePath)}`;
 				fileContentTitle.textContent = loadingText;
 				fileContentText.textContent = '正在加载文件内容...';
 			}
@@ -886,25 +873,29 @@ class MaintainersPage extends BasePage {
 				if (!maintainer.baseRef || !maintainer.baseOwner || !maintainer.baseRepo) {
 					throw new Error('无法获取主分支信息');
 				}
-				const { data } = await this.state.octokit.rest.repos.getContent({
-					owner: maintainer.baseOwner,
-					repo: maintainer.baseRepo,
-					path: filePath,
-					ref: maintainer.baseRef
+				fileData = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.repos.getContent({
+						owner: maintainer.baseOwner,
+						repo: maintainer.baseRepo,
+						path: filePath,
+						ref: maintainer.baseRef
+					});
+					return data;
 				});
-				fileData = data;
 			} else {
 				// 从 PR 的 head 分支获取
 				if (!maintainer.headRef || !maintainer.headOwner || !maintainer.headRepo) {
 					throw new Error('无法获取 PR 分支信息');
 				}
-				const { data } = await this.state.octokit.rest.repos.getContent({
-					owner: maintainer.headOwner,
-					repo: maintainer.headRepo,
-					path: filePath,
-					ref: maintainer.headRef
+				fileData = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.repos.getContent({
+						owner: maintainer.headOwner,
+						repo: maintainer.headRepo,
+						path: filePath,
+						ref: maintainer.headRef
+					});
+					return data;
 				});
-				fileData = data;
 			}
 
 			// 解码 Base64 内容
@@ -916,12 +907,12 @@ class MaintainersPage extends BasePage {
 					let sourceInfo;
 					if (showFromBase) {
 						if (isDeleted) {
-							sourceInfo = `${filePath} ${this.t('maintainers.fileFromBase', '（从主分支读取，此文件将被删除）')}`;
+							sourceInfo = `${this.escapeHtml(filePath)} ${this.t('maintainers.fileFromBase', '（从主分支读取，此文件将被删除）')}`;
 						} else {
-							sourceInfo = `${filePath} ${this.t('maintainers.viewingBaseBranch', '（主分支内容）')}`;
+							sourceInfo = `${this.escapeHtml(filePath)} ${this.t('maintainers.viewingBaseBranch', '（主分支内容）')}`;
 						}
 					} else {
-						sourceInfo = `${filePath} ${this.t('maintainers.viewingPRBranch', '（PR分支内容）')}`;
+						sourceInfo = `${this.escapeHtml(filePath)} ${this.t('maintainers.viewingPRBranch', '（PR分支内容）')}`;
 					}
 					fileContentTitle.textContent = sourceInfo;
 					fileContentText.textContent = content;
@@ -962,8 +953,8 @@ class MaintainersPage extends BasePage {
 			const fileContentTitle = this.element.querySelector('#fileContentTitle');
 			const fileContentText = this.element.querySelector('#fileContentText');
 			if (fileContentTitle && fileContentText) {
-				fileContentTitle.textContent = `错误: ${filePath}`;
-				fileContentText.textContent = `加载失败: ${error.message}`;
+				fileContentTitle.textContent = `${this.t('common.error', '错误')}: ${this.escapeHtml(filePath)}`;
+				fileContentText.textContent = `${this.t('common.loadFailed', '加载失败')}: ${this.escapeHtml(error.message)}`;
 			}
 		}
 	}
@@ -973,7 +964,7 @@ class MaintainersPage extends BasePage {
 	 * @param {Object} maintainer - 维护项对象
 	 */
 	async markPRAsMaintaining(maintainer) {
-		if (!this.state.apiConfigured || !this.state.octokit) {
+		if (!this.state.apiConfigured) {
 			return;
 		}
 
@@ -982,17 +973,13 @@ class MaintainersPage extends BasePage {
 			const owner = user.repositoryInfo.owner;
 			const repo = user.repositoryInfo.repo;
 			const prNumber = parseInt(maintainer.id);
-			const currentUser = user.username || user.login || 'maintainer';
+			const currentUser = user.username || 'maintainer';
 
 			// 获取PR作者（提交者）信息，如果没有提交者标签则添加
 			let committerName = null;
 			try {
-				const pr = await this.state.octokit.rest.pulls.get({
-					owner,
-					repo,
-					pull_number: prNumber
-				});
-				committerName = pr.data.user.login;
+				const pr = await window.GitHubService.getPullRequest(owner, repo, prNumber);
+				committerName = pr.user.login;
 			} catch (error) {
 				console.warn('获取PR信息失败:', error);
 			}
@@ -1005,12 +992,7 @@ class MaintainersPage extends BasePage {
 
 			// 添加"maintaining"标签、维护者名字标签（m_用户名）和提交者标签（c_用户名）
 			try {
-				await this.state.octokit.rest.issues.addLabels({
-					owner,
-					repo,
-					issue_number: prNumber,
-					labels: labelsToAdd
-				});
+				await window.GitHubService.addIssueLabels(owner, repo, prNumber, labelsToAdd);
 			} catch (labelError) {
 				// 如果标签不存在或添加失败，只记录警告，继续执行
 				console.warn('添加标签失败（标签可能不存在）:', labelError);

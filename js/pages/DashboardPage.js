@@ -342,15 +342,35 @@ class DashboardPage extends BasePage {
 
 	/**
 	 * 检查并更新用户角色
+	 * @async
 	 */
-	checkAndUpdateUserRole() {
+	async checkAndUpdateUserRole() {
+		// 先刷新权限信息，确保获取最新的角色数据
+		if (window.app && window.app.syncAndUpdateUserPermissions) {
+			try {
+				await window.app.syncAndUpdateUserPermissions();
+			} catch (error) {
+				console.warn('刷新权限信息失败:', error);
+			}
+		}
+
 		const userInfo = window.app.getUserFromStorage();
 		const user = userInfo.user;
 		const currentRole = userInfo.userRole;
 		const currentPermissionInfo = userInfo.permissionInfo;
 
+		// 比较角色数组内容，而不是引用
+		const currentRoles = this.state.permissionInfo?.roles || [];
+		const newRoles = currentPermissionInfo?.roles || [];
+		const rolesChanged = currentRoles.length !== newRoles.length ||
+			!currentRoles.every(role => newRoles.includes(role)) ||
+			!newRoles.every(role => currentRoles.includes(role));
+
+		// 比较角色字符串
+		const roleChanged = this.state.userRole !== currentRole;
+
 		// 如果用户信息、角色或权限信息发生变化，更新状态
-		if (this.state.user !== user || this.state.userRole !== currentRole || this.state.permissionInfo !== currentPermissionInfo) {
+		if (rolesChanged || roleChanged) {
 			this.setState({
 				user: user,
 				userRole: currentRole,
@@ -363,9 +383,10 @@ class DashboardPage extends BasePage {
 
 	/**
 	 * 用于app.js调用的方法，检查并更新用户角色（外部调用）
+	 * @async
 	 */
-	checkAndUpdateUserInfo() {
-		this.checkAndUpdateUserRole();
+	async checkAndUpdateUserInfo() {
+		await this.checkAndUpdateUserRole();
 	}
 
 	/**
@@ -384,6 +405,36 @@ class DashboardPage extends BasePage {
 			});
 		}
 
+		// 绑定StorageService的事件监听
+		this.bindStorageServiceEvents();
+	}
+
+	/**
+	 * 绑定StorageService的事件监听
+	 * @returns {void}
+	 */
+	bindStorageServiceEvents() {
+		// 先调用父类方法（绑定导航菜单更新逻辑）
+		super.bindStorageServiceEvents();
+
+		// 权限变更事件监听 - 添加DashboardPage特定的处理
+		if (window.StorageService && window.StorageService.on) {
+			// DashboardPage特定的权限变更处理
+			const oldHandler = this._permissionChangedHandler;
+			this._permissionChangedHandler = async (data) => {
+				console.log('收到权限变更事件:', data);
+				// 先执行父类的菜单更新逻辑（会刷新权限）
+				if (oldHandler) {
+					await oldHandler(data);
+				}
+				// 再执行DashboardPage特定的逻辑：刷新用户角色显示
+				await this.checkAndUpdateUserRole();
+			};
+
+			// 重新注册更新后的处理器
+			window.StorageService.off('permission-changed', oldHandler);
+			window.StorageService.on('permission-changed', this._permissionChangedHandler);
+		}
 	}
 
 	/**
@@ -491,18 +542,17 @@ class DashboardPage extends BasePage {
 	 */
 	async createContributionApplication(owner, repo, username, email, token) {
 		try {
-			const octokit = new window.Octokit({ auth: token });
+			// 初始化 GitHubService
+			await window.GitHubService.init(token);
 
 			// 创建issue作为贡献申请
 			const issueTitle = `Become a collaborator - ${username}`;
 
 			// 创建issue
-			const { data } = await octokit.rest.issues.create({
-				owner, repo,
+			const issue = await window.GitHubService.createIssue(owner, repo, {
 				title: issueTitle,
 				body: ''
 			});
-			const issue = data;
 
 			return {
 				success: true,
@@ -525,7 +575,9 @@ class DashboardPage extends BasePage {
 	async pollCollaboratorInvitation() {
 		const user = this.state.user;
 
-		const octokit = new window.Octokit({ auth: user.token });
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(user);
+
 		const maxAttempts = 60; // 最多轮询60次，每次间隔5秒，总共5分钟
 		let attempts = 0;
 		const headers = {
@@ -540,11 +592,10 @@ class DashboardPage extends BasePage {
 				attempts++;
 				console.log(`第 ${attempts} 次检查协作者邀请...`);
 
-				// 使用 octokit.request 获取特定仓库的邀请列表
-				const response = await octokit.request('GET /user/repository_invitations', {
+				// 使用 GitHubService.request 获取特定仓库的邀请列表
+				const invitations = await window.GitHubService.request('GET', '/user/repository_invitations', {
 					headers: headers
 				});
-				const invitations = response.data;
 
 				// 由于查询时已经限定了特定仓库，直接获取最新的邀请
 				const repoInvitation = invitations && invitations.length > 0 ? invitations[invitations.length - 1] : null;
@@ -554,12 +605,14 @@ class DashboardPage extends BasePage {
 					console.log(`正在接受邀请 ID: ${repoInvitation.id}`);
 
 					try {
-						// 使用官方推荐的 octokit.request 方法
-						acceptResult = await octokit.request('PATCH /user/repository_invitations/{invitation_id}', {
-							invitation_id: repoInvitation.id,
-							headers: headers
+						// 使用 GitHubService.safeCall 直接调用 octokit.request 以获取完整响应（包括 status）
+						acceptResult = await window.GitHubService.safeCall(async (octokit) => {
+							return await octokit.request('PATCH /user/repository_invitations/{invitation_id}', {
+								invitation_id: repoInvitation.id,
+								headers: headers
+							});
 						});
-						if (acceptResult.status === 204) {
+						if (acceptResult && acceptResult.status === 204) {
 							console.log('接受邀请成功，状态码:', acceptResult.status);
 							await this.pollUserPermissions();
 							return;
@@ -601,7 +654,9 @@ class DashboardPage extends BasePage {
 		const user = this.state.user;
 		const repoInfo = this.getRepositoryInfo();
 
-		const octokit = new window.Octokit({ auth: user.token });
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(user);
+
 		const maxAttempts = 30; // 最多轮询30次，每次间隔1秒，总共30秒
 		let attempts = 0;
 
@@ -612,12 +667,9 @@ class DashboardPage extends BasePage {
 				attempts++;
 
 				// 检查用户是否已经是协作者且有写入权限
-				const repoResult = await octokit.rest.repos.get({
-					owner: repoInfo.owner,
-					repo: repoInfo.repo
-				});
+				const repoData = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo, true);
 
-				const permissions = repoResult.data.permissions;
+				const permissions = repoData.permissions;
 				console.log('用户权限:', permissions);
 
 				if (permissions && permissions.push) {
@@ -656,12 +708,62 @@ class DashboardPage extends BasePage {
 	 * 更新用户角色显示
 	 */
 	updateUserRoleDisplay() {
-		const roleElement = this.element.querySelector('.role-badge');
-		if (roleElement) {
-			// 根据当前角色更新显示
-			const roleInfo = this.getUserRoleInfo();
-			roleElement.textContent = roleInfo.displayName;
-			roleElement.className = `stat-number role-badge ${roleInfo.className}`;
+		if (!this.element) return;
+
+		// 重新渲染用户角色区域
+		const contentElement = this.element.querySelector('.content');
+		if (contentElement) {
+			// 获取用户角色信息
+			const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+			const actualRoles = userRoles.filter(role => role !== 'visitor');
+			const shouldShowApplication = actualRoles.length === 0;
+
+			// 更新用户角色区域
+			const userRolesSection = contentElement.querySelector('.user-roles-section');
+			if (userRolesSection) {
+				if (actualRoles.length > 0) {
+					// 有实际角色，更新显示
+					userRolesSection.outerHTML = this.renderUserRoles();
+				} else {
+					// 没有实际角色，移除用户角色区域
+					userRolesSection.remove();
+				}
+			} else if (actualRoles.length > 0 && !userRolesSection) {
+				// 之前没有用户角色区域，现在需要显示
+				const welcomeSection = contentElement.querySelector('.welcome');
+				if (welcomeSection && welcomeSection.nextSibling) {
+					welcomeSection.insertAdjacentHTML('afterend', this.renderUserRoles());
+				}
+			}
+
+			// 更新申请区域
+			const applicationSection = contentElement.querySelector('.application-section');
+			if (shouldShowApplication && !applicationSection) {
+				// 需要显示申请区域但当前没有
+				const welcomeSection = contentElement.querySelector('.welcome');
+				if (welcomeSection && welcomeSection.nextSibling) {
+					welcomeSection.insertAdjacentHTML('afterend', this.renderApplicationSection());
+					// 重新绑定申请按钮事件
+					const applyBtn = this.element.querySelector('#apply-contribution-btn');
+					if (applyBtn) {
+						applyBtn.addEventListener('click', () => {
+							this.handleApplicationSubmit();
+						});
+					}
+				}
+			} else if (!shouldShowApplication && applicationSection) {
+				// 不需要显示申请区域，移除它
+				applicationSection.remove();
+			}
+
+			// 更新Header中的导航菜单（根据新权限显示/隐藏菜单项）
+			if (this.headerComponent) {
+				const headerElement = this.element.querySelector('header');
+				if (headerElement) {
+					headerElement.outerHTML = this.renderHeader('dashboard', false, null);
+					this.bindHeaderEvents();
+				}
+			}
 		}
 	}
 
@@ -820,6 +922,14 @@ class DashboardPage extends BasePage {
 		if (this.state.modal) {
 			this.state.modal.destroy();
 			this.state.modal = null;
+		}
+
+		// 移除StorageService的事件监听
+		if (window.StorageService && window.StorageService.off) {
+			if (this._permissionChangedHandler) {
+				window.StorageService.off('permission-changed', this._permissionChangedHandler);
+				this._permissionChangedHandler = null;
+			}
 		}
 
 		// 清理事件监听器

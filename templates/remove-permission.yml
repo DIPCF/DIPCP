@@ -1,0 +1,204 @@
+name: Remove Permission
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  remove-permission:
+    runs-on: ubuntu-latest
+    # 只在Issue有"role-removal"标签时触发
+    if: contains(github.event.issue.labels.*.name, 'role-removal')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.COLLABORATOR_TOKEN }}
+          
+      - name: Verify Issue author permissions
+        id: verify_author
+        run: |
+          ISSUE_AUTHOR="${{ github.event.issue.user.login }}"
+          echo "Issue author: $ISSUE_AUTHOR"
+          
+          # 检查 Director（只有Director才有权限移除角色权限）
+          if [ -f ".github/directors.txt" ]; then
+            if grep -q "^$ISSUE_AUTHOR$" ".github/directors.txt"; then
+              AUTHORIZED=true
+              echo "Issue author is a director"
+            else
+              AUTHORIZED=false
+            fi
+          else
+            AUTHORIZED=false
+          fi
+          
+          if [ "$AUTHORIZED" != "true" ]; then
+            echo "❌ Issue author does not have permission to remove role permissions. Only Director can remove role permissions."
+            exit 1
+          fi
+          
+          echo "authorized=$AUTHORIZED" >> $GITHUB_OUTPUT
+          
+      - name: Extract removal details
+        id: extract_details
+        run: |
+          # 从Issue标题提取用户名和角色
+          TITLE="${{ github.event.issue.title }}"
+          echo "Issue title: $TITLE"
+          
+          # 提取要移除权限的用户名
+          if echo "$TITLE" | grep -q "@"; then
+            REMOVED_USER=$(echo "$TITLE" | sed -n 's/.*@\([^[:space:]]*\).*/\1/p' | head -1)
+          fi
+          
+          # 提取角色（使用编号：#1=maintainer, #2=reviewer, #3=director）
+          if echo "$TITLE" | grep -q "#1"; then
+            ROLE="maintainer"
+            FILE=".github/maintainers.txt"
+          elif echo "$TITLE" | grep -q "#2"; then
+            ROLE="reviewer"
+            FILE=".github/reviewers.txt"
+          elif echo "$TITLE" | grep -q "#3"; then
+            ROLE="director"
+            FILE=".github/directors.txt"
+          else
+            ROLE="unknown"
+            FILE=""
+          fi
+          
+          echo "removed_user=$REMOVED_USER" >> $GITHUB_OUTPUT
+          echo "role=$ROLE" >> $GITHUB_OUTPUT
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          
+          echo "Extracted: user=$REMOVED_USER, role=$ROLE, file=$FILE"
+          
+          if [ -z "$REMOVED_USER" ] || [ "$ROLE" = "unknown" ] || [ -z "$FILE" ]; then
+            echo "❌ Failed to extract removal details from issue title"
+            exit 1
+          fi
+      
+      - name: Verify not removing self
+        id: verify_not_self
+        run: |
+          ISSUE_AUTHOR="${{ github.event.issue.user.login }}"
+          REMOVED_USER="${{ steps.extract_details.outputs.removed_user }}"
+          
+          echo "Issue author: $ISSUE_AUTHOR"
+          echo "Removed user: $REMOVED_USER"
+          
+          # 将用户名转换为小写进行比较
+          ISSUE_AUTHOR_LOWER=$(echo "$ISSUE_AUTHOR" | tr '[:upper:]' '[:lower:]')
+          REMOVED_USER_LOWER=$(echo "$REMOVED_USER" | tr '[:upper:]' '[:lower:]')
+          
+          if [ "$ISSUE_AUTHOR_LOWER" = "$REMOVED_USER_LOWER" ]; then
+            echo "❌ Cannot remove own permissions. Director cannot remove their own role permissions."
+            exit 1
+          fi
+          
+          echo "✅ Verified: issue author is not the same as removed user"
+      
+      - name: Configure Git
+        if: steps.extract_details.outputs.file != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Remove user from role file
+        if: steps.extract_details.outputs.file != ''
+        id: remove_user
+        run: |
+          FILE="${{ steps.extract_details.outputs.file }}"
+          USERNAME="${{ steps.extract_details.outputs.removed_user }}"
+          
+          echo "Removing $USERNAME from $FILE"
+          
+          # 检查文件是否存在
+          if [ ! -f "$FILE" ]; then
+            echo "❌ File $FILE does not exist"
+            exit 1
+          fi
+          
+          # 检查用户名是否存在
+          if grep -q "^$USERNAME$" "$FILE"; then
+            # 删除用户（保留空行和其他内容）
+            grep -v "^$USERNAME$" "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+            echo "Removed $USERNAME from $FILE"
+            echo "removed=true" >> $GITHUB_OUTPUT
+          else
+            echo "$USERNAME does not exist in $FILE"
+            echo "removed=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit changes
+        if: steps.extract_details.outputs.file != '' && steps.remove_user.outputs.removed == 'true'
+        run: |
+          git add "${{ steps.extract_details.outputs.file }}"
+          git commit -m "Remove ${{ steps.extract_details.outputs.removed_user }} as ${{ steps.extract_details.outputs.role }}"
+      
+      - name: Push changes
+        if: steps.extract_details.outputs.file != '' && steps.remove_user.outputs.removed == 'true'
+        run: |
+          git push origin HEAD:${{ github.ref }} || git push origin HEAD:main || git push origin HEAD:master
+      
+      - name: Add comment to issue
+        if: steps.extract_details.outputs.file != '' && steps.remove_user.outputs.removed == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ 已移除 @${{ steps.extract_details.outputs.removed_user }} 的 ${{ steps.extract_details.outputs.role }} 权限。`
+            });
+      
+      - name: Add comment if user not found
+        if: steps.extract_details.outputs.file != '' && steps.remove_user.outputs.removed == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `ℹ️ @${{ steps.extract_details.outputs.removed_user }} 在 ${{ steps.extract_details.outputs.role }} 列表中不存在，无需移除。`
+            });
+      
+      - name: Add error comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ 移除权限失败。可能的原因：\n1. 只有Director可以移除角色权限\n2. Director不能移除自己的权限\n3. Issue标题格式不正确（应为：@用户名 角色 #编号）`
+            });
+            
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'not_planned'
+            });
+
+      - name: Close issue on success
+        if: steps.extract_details.outputs.file != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.COLLABORATOR_TOKEN }}
+          script: |
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'completed'
+            });
+

@@ -132,6 +132,7 @@ class DynamicLoader {
 		const dependencyGroups = [
 			// 第一组：基础服务
 			[
+				'js/services/github-service.js',
 				'js/services/storage-service.js',
 				'js/services/theme-service.js'
 			],

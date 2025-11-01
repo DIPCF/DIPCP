@@ -107,18 +107,40 @@ class ProjectDetailPage extends BasePage {
 
 		return `
             <div class="editor-toolbar">
-                <div class="editor-toolbar-left">
-                    ${canEdit ? `
-                        <button class="btn btn-sm" id="createFileBtn">📄 ${this.t('projectDetail.createFile', '创建文件')}</button>
-                        <button class="btn btn-sm" id="createDirBtn">📁 ${this.t('projectDetail.createDirectory', '创建目录')}</button>
-                        <button class="btn btn-sm" id="uploadFileBtn">📤 ${this.t('projectDetail.uploadFile', '上传文件')}</button>
-                    ` : ''}
-                    <button class="btn btn-sm" id="checkUpdateBtn">🔄 ${this.t('projectDetail.checkUpdate', '检查更新')}</button>
-                </div>
-                <div class="editor-toolbar-right">
-                    <button class="btn btn-success btn-sm" id="openBtn" style="display: none;">👁 ${this.t('projectDetail.openFile', '打开')}</button>
-                    ${canEdit ? `<button class="btn btn-danger btn-sm" id="deleteBtn" style="display: none;">🗑️ ${this.t('projectDetail.deleteFile', '删除')}</button>` : ''}
-                </div>
+                ${canEdit ? `
+                    <button class="btn btn-sm" id="createFileBtn" aria-label="${this.tAttr('projectDetail.createFile', '创建文件')}">
+                        <span class="btn-icon">📄</span>
+                        <span class="btn-text">${this.t('projectDetail.createFile', '创建文件')}</span>
+                    </button>
+                    <button class="btn btn-sm" id="createDirBtn" aria-label="${this.tAttr('projectDetail.createDirectory', '创建目录')}">
+                        <span class="btn-icon">📁</span>
+                        <span class="btn-text">${this.t('projectDetail.createDirectory', '创建目录')}</span>
+                    </button>
+                    <button class="btn btn-sm" id="uploadFileBtn" aria-label="${this.tAttr('projectDetail.uploadFile', '上传文件')}">
+                        <span class="btn-icon">📤</span>
+                        <span class="btn-text">${this.t('projectDetail.uploadFile', '上传文件')}</span>
+                    </button>
+                ` : ''}
+                <button class="btn btn-sm" id="checkUpdateBtn" aria-label="${this.tAttr('projectDetail.checkUpdate', '检查更新')}">
+                    <span class="btn-icon">🔄</span>
+                    <span class="btn-text">${this.t('projectDetail.checkUpdate', '检查更新')}</span>
+                </button>
+                <button class="btn btn-success btn-sm" id="openBtn" style="display: none;" aria-label="${this.tAttr('projectDetail.openFile', '打开')}">
+                    <span class="btn-icon">👁</span>
+                    <span class="btn-text">${this.t('projectDetail.openFile', '打开')}</span>
+                </button>
+                <button class="btn btn-success btn-sm" id="viewBtn" style="display: none;" aria-label="${this.tAttr('projectDetail.viewFile', '查看')}">
+                    <span class="btn-icon">👁</span>
+                    <span class="btn-text">${this.t('projectDetail.viewFile', '查看')}</span>
+                </button>
+                <button class="btn btn-success btn-sm" id="cannotViewBtn" style="display: none;" aria-label="${this.tAttr('projectDetail.cannotView', '不可查看')}" disabled>
+                    <span class="btn-icon">🚫</span>
+                    <span class="btn-text">${this.t('projectDetail.cannotView', '不可查看')}</span>
+                </button>
+                ${canEdit ? `<button class="btn btn-danger btn-sm" id="deleteBtn" style="display: none;" aria-label="${this.tAttr('projectDetail.deleteFile', '删除')}">
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">${this.t('projectDetail.deleteFile', '删除')}</span>
+                </button>` : ''}
             </div>
         `;
 	}
@@ -872,6 +894,7 @@ class ProjectDetailPage extends BasePage {
 		}
 
 		// 操作按钮
+		// 打开文件按钮（可编辑文件）
 		const openBtn = this.element.querySelector('#openBtn');
 		if (openBtn) {
 			openBtn.addEventListener('click', () => {
@@ -881,6 +904,17 @@ class ProjectDetailPage extends BasePage {
 			});
 		}
 
+		// 查看文件按钮（只读文件）
+		const viewBtn = this.element.querySelector('#viewBtn');
+		if (viewBtn) {
+			viewBtn.addEventListener('click', () => {
+				if (this.state.selectedFile) {
+					this.handleFileOpen(this.state.selectedFile);
+				}
+			});
+		}
+
+		// 删除文件按钮
 		const deleteBtn = this.element.querySelector('#deleteBtn');
 		if (deleteBtn) {
 			deleteBtn.addEventListener('click', () => {
@@ -944,6 +978,47 @@ class ProjectDetailPage extends BasePage {
 
 		// 绑定成员卡片点击事件
 		this.bindContributorCardEvents();
+
+		// 绑定StorageService的事件监听
+		this.bindStorageServiceEvents();
+	}
+
+	/**
+	 * 绑定StorageService的事件监听
+	 * @returns {void}
+	 */
+	bindStorageServiceEvents() {
+		// 先调用父类方法（绑定导航菜单更新逻辑）
+		super.bindStorageServiceEvents();
+
+		// 权限变更和文件变更事件监听 - 添加ProjectDetailPage特定的处理
+		if (window.StorageService && window.StorageService.on) {
+			// ProjectDetailPage特定的权限变更处理
+			const oldHandler = this._permissionChangedHandler;
+			this._permissionChangedHandler = (data) => {
+				console.log('收到权限变更事件:', data);
+				// 先执行父类的菜单更新逻辑
+				if (oldHandler) {
+					oldHandler(data);
+				}
+				// 再执行ProjectDetailPage特定的逻辑：如果当前正在显示成员列表，强制刷新
+				if (this.state.moduleStates.members) {
+					console.log('成员列表正在显示，刷新成员列表');
+					this.showMembers(true); // true表示强制刷新
+				}
+			};
+
+			this._filesChangedHandler = (data) => {
+				console.log('收到文件变更事件:', data);
+				// 刷新文件树
+				this.loadProjectData();
+			};
+
+			// 重新注册更新后的处理器
+			window.StorageService.off('permission-changed', oldHandler);
+			window.StorageService.on('permission-changed', this._permissionChangedHandler);
+			window.StorageService.on('files-changed', this._filesChangedHandler);
+		}
 	}
 
 	/**
@@ -1122,58 +1197,57 @@ class ProjectDetailPage extends BasePage {
 	 */
 	updateActionButtons() {
 		const openBtn = this.element.querySelector('#openBtn');
+		const viewBtn = this.element.querySelector('#viewBtn');
+		const cannotViewBtn = this.element.querySelector('#cannotViewBtn');
 		const deleteBtn = this.element.querySelector('#deleteBtn');
 
-		if (openBtn) {
-			if (this.state.selectedFile) {
-				if (this.state.selectedFile.type === 'file') {
-					// 获取文件名（优先使用name，如果没有则从path中提取）
-					const fileName = this.state.selectedFile.name || this.state.selectedFile.path.split('/').pop();
+		// 先隐藏所有按钮
+		if (openBtn) openBtn.style.display = 'none';
+		if (viewBtn) viewBtn.style.display = 'none';
+		if (cannotViewBtn) cannotViewBtn.style.display = 'none';
+		if (deleteBtn) deleteBtn.style.display = 'none';
 
-					// 检查文件是否可编辑
-					if (this.isEditableFile(fileName)) {
-						openBtn.style.display = 'block';
-						openBtn.textContent = '👁 ' + this.t('projectDetail.openFile', '打开');
-						openBtn.disabled = false;
-						openBtn.title = this.t('projectDetail.openFile', '打开文件');
-					} else if (this.isViewableFile(fileName)) {
-						openBtn.style.display = 'block';
-						openBtn.textContent = '👁 ' + this.t('projectDetail.viewFile', '查看');
-						openBtn.disabled = false;
-						openBtn.title = this.t('projectDetail.viewFile', '查看文件');
-					} else {
-						// 不可查看的文件，显示提示但禁用按钮
-						openBtn.style.display = 'block';
-						openBtn.textContent = '🚫 ' + this.t('projectDetail.cannotView', '不可查看');
-						openBtn.disabled = true;
-						openBtn.title = this.t('projectDetail.cannotViewFile', '此文件类型不可查看');
-					}
-				} else {
-					// 目录，显示不可查看提示
-					openBtn.style.display = 'block';
-					openBtn.textContent = '🚫 ' + this.t('projectDetail.cannotView', '不可查看');
-					openBtn.disabled = true;
-					openBtn.title = this.t('projectDetail.cannotViewDirectory', '目录不可查看');
-				}
-			} else {
-				openBtn.style.display = 'none';
+		if (!this.state.selectedFile) {
+			return; // 没有选中文件，所有按钮都已隐藏
+		}
+
+		// 处理删除按钮（如果有权限）
+		if (deleteBtn) {
+			const filePath = this.state.selectedFile.path;
+			const isProtectedPath = filePath.startsWith('.github/');
+			if (!isProtectedPath) {
+				deleteBtn.style.display = 'block';
 			}
 		}
 
-		// 只有有编辑权限的用户才显示删除按钮
-		if (deleteBtn) {
-			if (this.state.selectedFile) {
-				// 检查是否是.github目录或其下的文件
-				const filePath = this.state.selectedFile.path;
-				const isProtectedPath = filePath.startsWith('.github/');
+		// 处理打开/查看按钮
+		if (this.state.selectedFile.type === 'file') {
+			// 获取文件名（优先使用name，如果没有则从path中提取）
+			const fileName = this.state.selectedFile.name || this.state.selectedFile.path.split('/').pop();
 
-				if (isProtectedPath) {
-					deleteBtn.style.display = 'none';
-				} else {
-					deleteBtn.style.display = 'block';
+			// 检查文件是否可编辑
+			if (this.isEditableFile(fileName)) {
+				if (openBtn) {
+					openBtn.style.display = 'block';
+					openBtn.disabled = false;
+				}
+			} else if (this.isViewableFile(fileName)) {
+				if (viewBtn) {
+					viewBtn.style.display = 'block';
+					viewBtn.disabled = false;
 				}
 			} else {
-				deleteBtn.style.display = 'none';
+				// 不可查看的文件，显示提示但禁用按钮
+				if (cannotViewBtn) {
+					cannotViewBtn.style.display = 'block';
+					cannotViewBtn.disabled = true;
+				}
+			}
+		} else {
+			// 目录，显示不可查看提示
+			if (cannotViewBtn) {
+				cannotViewBtn.style.display = 'block';
+				cannotViewBtn.disabled = true;
 			}
 		}
 	}
@@ -1330,17 +1404,6 @@ class ProjectDetailPage extends BasePage {
 	 */
 	async showMembers(forceRefresh = false) {
 		console.log('showMembers', forceRefresh);
-		// 如果有缓存且不是强制刷新，直接显示缓存数据
-		if (this.state.membersCache && !forceRefresh) {
-			const content = this.renderContributorsList(this.state.membersCache);
-			this.showInfoPanel(content, this.t('projectDetail.projectMembers', '项目成员'));
-
-			// 绑定成员卡片点击事件
-			setTimeout(() => {
-				this.bindContributorCardEvents();
-			}, 100);
-			return;
-		}
 
 		try {
 			// 设置加载状态
@@ -1367,35 +1430,69 @@ class ProjectDetailPage extends BasePage {
 				throw new Error(this.t('projectDetail.errors.repositoryInfoUnavailable', '仓库信息或访问令牌不可用'));
 			}
 
-			// 从 IndexedDB 读取 collaborators.txt 文件
+			// 从 IndexedDB 读取所有角色文件
 			if (!window.StorageService) {
 				throw new Error('StorageService 不可用');
 			}
 
 			await window.StorageService.initDB();
-			const collaboratorsFile = await window.StorageService._execute('fileCache', 'get', '.github/collaborators.txt');
 
-			if (!collaboratorsFile || !collaboratorsFile.content) {
-				throw new Error('无法读取协作者列表文件');
+			// 定义角色文件列表
+			const roleFiles = [
+				{ path: '.github/directors.txt', role: 'director' },
+				{ path: '.github/reviewers.txt', role: 'reviewer' },
+				{ path: '.github/maintainers.txt', role: 'maintainer' },
+				{ path: '.github/collaborators.txt', role: 'collaborator' }
+			];
+
+			// 收集所有用户名（使用Set去重）
+			const usernameSet = new Set();
+
+			// 读取所有角色文件
+			for (const { path, role } of roleFiles) {
+				try {
+					const fileContent = await window.StorageService._execute('fileCache', 'get', path);
+					if (fileContent && fileContent.content) {
+						const lines = fileContent.content.split('\n');
+						for (const line of lines) {
+							const trimmedLine = line.trim();
+							if (trimmedLine && !trimmedLine.startsWith('#')) {
+								usernameSet.add(trimmedLine);
+							}
+						}
+					}
+				} catch (error) {
+					console.log(`无法读取角色文件 ${path}:`, error.message);
+				}
 			}
 
-			// 解析 collaborators.txt 文件内容（每行一个用户名）
-			const usernames = collaboratorsFile.content
-				.split('\n')
-				.map(line => line.trim())
-				.filter(line => line && !line.startsWith('#'));
+			const usernames = Array.from(usernameSet);
+			console.log('从所有角色文件读取到的用户名:', usernames);
 
-			console.log('从 collaborators.txt 读取到的用户名:', usernames);
+			// 如果没有找到任何成员
+			if (usernames.length === 0) {
+				const emptyContent = `
+					<div class="info-section">
+						<h4>${this.t('projectDetail.projectMembers', '项目成员')}</h4>
+						<div class="empty-message">
+							<p>${this.t('projectDetail.noMembers', '暂无项目成员')}</p>
+						</div>
+					</div>
+				`;
+				this.showInfoPanel(emptyContent, this.t('projectDetail.projectMembers', '项目成员'));
+				this.setState({ membersLoading: false });
+				return;
+			}
+
+			// 初始化 GitHubService
+			await window.GitHubService.initFromUser(user);
 
 			// 获取每个用户的详细信息（头像等）
-			const octokit = new window.Octokit({ auth: user.token });
 			const contributors = [];
 
 			for (const username of usernames) {
 				try {
-					const { data: userData } = await octokit.rest.users.getByUsername({
-						username: username
-					});
+					const userData = await window.GitHubService.getUserByUsername(username);
 					contributors.push({
 						login: userData.login,
 						avatar_url: userData.avatar_url,
@@ -2062,9 +2159,16 @@ class ProjectDetailPage extends BasePage {
 				throw new Error(this.t('projectDetail.errors.userNotLoggedInOrTokenUnavailable', '用户未登录或访问令牌不可用'));
 			}
 
-			const octokit = new window.Octokit({ auth: user.token });
-			const { data: commits } = await octokit.rest.repos.listCommits({
-				owner: repoInfo.owner, repo: repoInfo.repo, per_page: 1
+			// 初始化 GitHubService
+			await window.GitHubService.initFromUser(user);
+
+			const commits = await window.GitHubService.safeCall(async (octokit) => {
+				const { data } = await octokit.rest.repos.listCommits({
+					owner: repoInfo.owner,
+					repo: repoInfo.repo,
+					per_page: 1
+				});
+				return data;
 			});
 			const latestCommit = commits[0];
 
@@ -2504,6 +2608,18 @@ class ProjectDetailPage extends BasePage {
 		if (this.state.modal) {
 			this.state.modal.destroy();
 			this.state.modal = null;
+		}
+
+		// 移除StorageService的事件监听
+		if (window.StorageService && window.StorageService.off) {
+			if (this._permissionChangedHandler) {
+				window.StorageService.off('permission-changed', this._permissionChangedHandler);
+				this._permissionChangedHandler = null;
+			}
+			if (this._filesChangedHandler) {
+				window.StorageService.off('files-changed', this._filesChangedHandler);
+				this._filesChangedHandler = null;
+			}
 		}
 
 		// 清理事件监听器

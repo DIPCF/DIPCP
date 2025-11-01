@@ -71,7 +71,7 @@ class PrivacyPage extends BasePage {
 
 			// 根据语言加载对应的Markdown文件
 			const fileName = `Privacy_Policy_${language}.md`;
-			const filePath = `/docs/${fileName}`;
+			const filePath = window.app ? window.app.getFullPath(`/docs/${fileName}`) : `/docs/${fileName}`;
 
 			// 使用fetch加载Markdown文件
 			const response = await fetch(filePath);

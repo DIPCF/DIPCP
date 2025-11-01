@@ -71,7 +71,7 @@ class TermsPage extends BasePage {
 
 			// 根据语言加载对应的Markdown文件
 			const fileName = `Terms_of_Service_${language}.md`;
-			const filePath = `/docs/${fileName}`;
+			const filePath = window.app ? window.app.getFullPath(`/docs/${fileName}`) : `/docs/${fileName}`;
 
 			// 使用fetch加载Markdown文件
 			const response = await fetch(filePath);

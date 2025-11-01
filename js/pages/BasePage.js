@@ -29,19 +29,96 @@ class BasePage extends Component {
 		}
 	}
 
-	// 辅助方法：获取i18n文本，如果服务不可用则返回默认值
-	t(key, defaultValue = '') {
-		if (window.I18nService && window.I18nService.t) {
-			return window.I18nService.t(key, defaultValue);
+	/**
+	 * 绑定StorageService的事件监听
+	 * 子类如果需要绑定额外的事件，应该重写此方法并在其中调用super.bindStorageServiceEvents()
+	 */
+	bindStorageServiceEvents() {
+		// 权限变更事件监听
+		if (window.StorageService && window.StorageService.on) {
+			// 存储回调函数引用，以便在destroy时移除
+			this._permissionChangedHandler = async (data) => {
+				console.log('收到权限变更事件:', data);
+				// 更新Header中的导航菜单（异步刷新权限并更新）
+				await this.updateNavigationMenu();
+			};
+
+			window.StorageService.on('permission-changed', this._permissionChangedHandler);
 		}
-		return defaultValue;
+	}
+
+	/**
+	 * 更新导航菜单（根据权限变化）
+	 * @async
+	 */
+	async updateNavigationMenu() {
+		if (!this.element || !this.headerComponent) return;
+
+		// 先刷新权限信息，确保获取最新的角色数据
+		if (window.app && window.app.syncAndUpdateUserPermissions) {
+			try {
+				await window.app.syncAndUpdateUserPermissions();
+			} catch (error) {
+				console.warn('刷新权限信息失败:', error);
+			}
+		}
+
+		const headerElement = this.element.querySelector('header');
+		if (headerElement) {
+			// 获取当前页面的参数（如果有）
+			const currentPage = this._currentPage || '';
+			const showUserInfo = this._showUserInfo || false;
+			const user = this._user || null;
+			const onBack = this._onBack || null;
+
+			// 重新渲染Header
+			headerElement.outerHTML = this.renderHeader(currentPage, showUserInfo, user, onBack);
+			this.bindHeaderEvents();
+		}
+	}
+
+	// 辅助方法：获取i18n文本，如果服务不可用则返回默认值
+	// 自动进行HTML转义以防止XSS攻击
+	t(key, defaultValue = '') {
+		let text = defaultValue;
+		if (window.I18nService && window.I18nService.t) {
+			text = window.I18nService.t(key, defaultValue);
+		}
+		// 自动转义HTML，确保安全
+		return this.escapeHtml(text);
+	}
+
+	// 获取i18n文本用于HTML属性（placeholder、value等）
+	tAttr(key, defaultValue = '') {
+		let text = defaultValue;
+		if (window.I18nService && window.I18nService.t) {
+			text = window.I18nService.t(key, defaultValue);
+		}
+		// 使用属性转义（实际上和escapeHtml一样，但语义更清晰）
+		return this.escapeHtmlAttribute(text);
 	}
 
 	// 渲染Header组件
 	renderHeader(currentPage = '', showUserInfo = false, user = null, onBack = null) {
-		// 获取用户权限信息
+		// 保存调用参数，以便后续更新时使用
+		this._currentPage = currentPage;
+		this._showUserInfo = showUserInfo;
+		this._user = user;
+		this._onBack = onBack;
+
+		// 获取用户权限信息（优先使用 permissionInfo.roles，确保是最新的）
 		const userInfo = window.app ? window.app.getUserFromStorage() : null;
-		const userRoles = userInfo ? (userInfo.userRoles || [userInfo.userRole]) : ['visitor'];
+		let userRoles = ['visitor'];
+		if (userInfo) {
+			// 优先从 permissionInfo.roles 获取（这是最新同步的权限）
+			if (userInfo.permissionInfo && userInfo.permissionInfo.roles) {
+				userRoles = userInfo.permissionInfo.roles;
+			} else if (userInfo.userRoles) {
+				userRoles = Array.isArray(userInfo.userRoles) ? userInfo.userRoles : [userInfo.userRoles];
+			} else if (userInfo.userRole) {
+				userRoles = [userInfo.userRole];
+			}
+		}
 
 		// 基础导航项
 		const navigationItems = [
@@ -49,15 +126,15 @@ class BasePage extends Component {
 			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情') }
 		];
 
-		// 只有具有审核权限的用户才显示审核菜单项
-		if (userRoles.includes('reviewer')) {
+		// 只有具有审核权限的用户才显示审核菜单项（owner也具备审核权限）
+		if (userRoles.includes('reviewer') || userRoles.includes('owner')) {
 			navigationItems.push(
 				{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核') },
 			);
 		}
 
-		// 只有具有维护权限的用户才显示维护菜单项
-		if (userRoles.includes('maintainer')) {
+		// 只有具有维护权限的用户才显示维护菜单项（owner也具备维护权限）
+		if (userRoles.includes('maintainer') || userRoles.includes('owner')) {
 			navigationItems.push(
 				{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护') },
 			);
@@ -182,8 +259,9 @@ class BasePage extends Component {
 		}
 
 		try {
-			// 从服务器加载CLA文件
-			const response = await fetch(`/docs/${claFileName}`);
+			// 从服务器加载CLA文件（使用app.getFullPath处理基础路径）
+			const filePath = window.app ? window.app.getFullPath(`/docs/${claFileName}`) : `/docs/${claFileName}`;
+			const response = await fetch(filePath);
 			if (response.ok) {
 				const content = await response.text();
 				return content.replace(/\[PROJECT_NAME\]/g, 'DIPCP');
@@ -196,7 +274,8 @@ class BasePage extends Component {
 			// 如果中文文件加载失败，尝试加载英文文件
 			if (claFileName === 'CLA_zh.md') {
 				try {
-					const response = await fetch('/docs/CLA_en.md');
+					const filePath = window.app ? window.app.getFullPath('/docs/CLA_en.md') : '/docs/CLA_en.md';
+					const response = await fetch(filePath);
 					if (response.ok) {
 						const content = await response.text();
 						return content.replace(/\[PROJECT_NAME\]/g, 'DIPCP');
@@ -237,11 +316,7 @@ class BasePage extends Component {
 			let repoDescription = repoInfo.description || '';
 			if (!repoDescription && repoInfo.owner && repoInfo.repo) {
 				try {
-					const octokitPublic = new window.Octokit();
-					const { data: repoData } = await octokitPublic.rest.repos.get({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo
-					});
+					const repoData = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo, false);
 					repoDescription = repoData.description || '';
 				} catch (e) {
 					console.warn('无法获取仓库描述:', e.message);
@@ -290,16 +365,19 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 			`;
 
 			// 使用GitHub API创建CLA提交Issue
-			const octokit = new window.Octokit({ auth: userInfo.token });
-
 			console.log('🔵 [signCLA] 创建CLA提交Issue...');
-			const { data: issue } = await octokit.rest.issues.create({
-				owner: 'DIPCF',
-				repo: 'Projects',
-				title: issueTitle,
-				body: issueBody
-				// 不添加labels，因为用户可能没有权限创建标签
-			});
+
+			await window.GitHubService.initFromUser(userInfo);
+
+			const issue = await window.GitHubService.createIssue(
+				'DIPCF',
+				'Projects',
+				{
+					title: issueTitle,
+					body: issueBody
+					// 不添加labels，因为用户可能没有权限创建标签
+				}
+			);
 
 			console.log(`CLA提交Issue已创建: #${issue.number}`);
 
@@ -330,23 +408,18 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 	/**
 	 * 获取文件的SHA值（用于更新文件）
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {string} path - 文件路径
 	 * @returns {Promise<string|null>} 文件的SHA值，如果文件不存在返回null
 	 */
-	async getFileSha(octokit, owner, repo, path) {
+	async getFileSha(owner, repo, path) {
 		try {
-			const { data } = await octokit.rest.repos.getContent({
-				owner,
-				repo,
-				path
-			});
-			return data.sha;
+			const content = await window.GitHubService.getRepoContent(owner, repo, path, true);
+			return content.sha;
 		} catch (error) {
 			// 如果文件不存在，返回null
-			if (error.status === 404) {
+			if (error.status === 404 || (error.response && error.response.status === 404)) {
 				return null;
 			}
 			throw error;
@@ -370,6 +443,14 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 	}
 
 	destroy() {
+		// 移除StorageService的事件监听
+		if (window.StorageService && window.StorageService.off) {
+			if (this._permissionChangedHandler) {
+				window.StorageService.off('permission-changed', this._permissionChangedHandler);
+				this._permissionChangedHandler = null;
+			}
+		}
+
 		super.destroy();
 	}
 }

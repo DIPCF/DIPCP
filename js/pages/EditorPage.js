@@ -252,7 +252,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 渲染返回按钮和面包屑
-	 * @param {Function} getText - 文本获取函数
+	 * @param {Function} getText - 文本获取函数（已废弃，使用 this.t() 代替）
 	 * @returns {string} 返回按钮HTML字符串
 	 */
 	renderBackButton(getText) {
@@ -260,15 +260,15 @@ class EditorPage extends BasePage {
             <div class="breadcrumb-container">
                 <div class="breadcrumb">
                     <span class="breadcrumb-item">
-                        📄 <span id="fileName">${this.state.fileName || getText('common.loading', '载入中...')}</span>
+                        📄 <span id="fileName">${this.escapeHtml(this.state.fileName || this.t('common.loading', '载入中...'))}</span>
                     </span>
                 </div>
                 <div class="dropdown">
                     <button class="dropdown-toggle" id="moreInfoBtn">⋯</button>
                     <div class="dropdown-menu" id="moreInfoMenu">
-                        <a href="#" class="dropdown-item" data-section="file-info">${getText('editor.fileInfo', '文件信息')}</a>
-                        <a href="#" class="dropdown-item" data-section="edit-history">${getText('editor.editHistory', '编辑历史')}</a>
-                        <a href="#" class="dropdown-item" data-section="collaboration">${getText('editor.collaboration', '协作信息')}</a>
+                        <a href="#" class="dropdown-item" data-section="file-info">${this.t('editor.fileInfo', '文件信息')}</a>
+                        <a href="#" class="dropdown-item" data-section="edit-history">${this.t('editor.editHistory', '编辑历史')}</a>
+                        <a href="#" class="dropdown-item" data-section="collaboration">${this.t('editor.collaboration', '协作信息')}</a>
                     </div>
                 </div>
             </div>
@@ -277,7 +277,7 @@ class EditorPage extends BasePage {
 
 	/**
 	 * 渲染工具栏
-	 * @param {Function} getText - 文本获取函数
+	 * @param {Function} getText - 文本获取函数（已废弃，使用 this.t() 代替）
 	 * @returns {string} 工具栏HTML字符串
 	 */
 	renderToolbar(getText) {
@@ -288,15 +288,23 @@ class EditorPage extends BasePage {
 
 		return `
             <div class="editor-toolbar">
-                <div class="editor-toolbar-left">
-                    <button class="btn btn-sm" id="saveBtn" disabled style="${this.state.previewMode ? 'display: none;' : ''}">${getText('editor.save', '💾 保存')}</button>
-                    <button class="btn btn-sm ${this.state.previewMode ? 'active' : ''}" id="previewBtn">
-                        ${this.state.previewMode ? getText('editor.edit', '✏️ 编辑') : getText('editor.preview', '👁 预览')}
-                    </button>
-                </div>
-                <div class="editor-toolbar-right">
-					<button class="btn btn-primary btn-sm" id="submitBtn" style="${(this.state.isModified || this.state.hasSubmitted) ? 'display: none;' : ''}">${getText('editor.submitReview', '📤 提交审核')}</button>
-                </div>
+                <button class="btn btn-sm" id="saveBtn" disabled style="${this.state.previewMode ? 'display: none;' : ''}" aria-label="${this.tAttr('editor.save', '保存')}">
+                    <span class="btn-icon">💾</span>
+                    <span class="btn-text">${this.t('editor.save', '保存')}</span>
+                </button>
+                <button class="btn btn-sm ${this.state.previewMode ? 'active' : ''}" id="previewBtn" aria-label="${this.state.previewMode ? this.tAttr('editor.edit', '编辑') : this.tAttr('editor.preview', '预览')}">
+                    ${this.state.previewMode ? `
+                        <span class="btn-icon">✏️</span>
+                        <span class="btn-text">${this.t('editor.edit', '编辑')}</span>
+                    ` : `
+                        <span class="btn-icon">👁</span>
+                        <span class="btn-text">${this.t('editor.preview', '预览')}</span>
+                    `}
+                </button>
+                <button class="btn btn-primary btn-sm" id="submitBtn" style="${(this.state.isModified || this.state.hasSubmitted) ? 'display: none;' : ''}" aria-label="${this.tAttr('editor.submitReview', '提交审核')}">
+                    <span class="btn-icon">📤</span>
+                    <span class="btn-text">${this.t('editor.submitReview', '提交审核')}</span>
+                </button>
             </div>
         `;
 	}
@@ -321,10 +329,10 @@ class EditorPage extends BasePage {
                     </div>
                 </div>
                 <div class="info-panel" id="infoPanel" style="display: ${this.state.showInfoPanel ? 'block' : 'none'};">
-                    <div class="info-panel-header">
-                        <h3 id="infoPanelTitle">${getText('editor.fileInfo', '文件信息')}</h3>
-                        <button class="btn-close" id="closeInfoPanel">×</button>
-                    </div>
+					<div class="info-panel-header">
+						<h3 id="infoPanelTitle">${this.t('editor.fileInfo', '文件信息')}</h3>
+						<button class="btn-close" id="closeInfoPanel">×</button>
+					</div>
                     <div class="info-panel-content" id="infoPanelContent">
                         ${this.state.infoPanelContent || ''}
                     </div>
@@ -345,7 +353,7 @@ class EditorPage extends BasePage {
 
 		return `
 			<div class="editor-panel" id="editorPanel" style="display: ${this.state.previewMode ? 'none' : 'block'};">
-				<textarea id="markdownEditor" placeholder="${getText('editor.ui.loading', '加载中...')}" ${readonly ? 'readonly' : ''}>${this.state.content}</textarea>
+				<textarea id="markdownEditor" placeholder="${this.tAttr('editor.ui.loading', '加载中...')}" ${readonly ? 'readonly' : ''}>${this.escapeHtml(this.state.content)}</textarea>
 			</div>
 			<div class="preview-panel" id="previewPanel" style="display: ${this.state.previewMode ? 'flex' : 'none'};">
 				<div class="preview-content" id="previewContent">
@@ -364,12 +372,12 @@ class EditorPage extends BasePage {
 		return `
 			<div class="image-viewer" id="imageViewer">
 				<div class="image-container">
-					<img id="imageDisplay" src="${this.getImageDataUrl()}" alt="${this.state.fileName}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					<img id="imageDisplay" src="${this.getImageDataUrl()}" alt="${this.escapeHtmlAttribute(this.state.fileName)}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
 				</div>
 				<div class="image-info">
-					<p><strong>${getText('editor.image.fileName', '文件名')}:</strong> ${this.state.fileName}</p>
-					<p><strong>${getText('editor.image.filePath', '路径')}:</strong> ${this.state.filePath}</p>
-					<p><strong>${getText('editor.image.mode', '模式')}:</strong> ${getText('editor.image.viewOnly', '仅查看')}</p>
+					<p><strong>${this.t('editor.image.fileName', '文件名')}:</strong> ${this.escapeHtml(this.state.fileName)}</p>
+					<p><strong>${this.t('editor.image.filePath', '路径')}:</strong> ${this.escapeHtml(this.state.filePath)}</p>
+					<p><strong>${this.t('editor.image.mode', '模式')}:</strong> ${this.t('editor.image.viewOnly', '仅查看')}</p>
 				</div>
 			</div>
 		`;
@@ -437,21 +445,30 @@ class EditorPage extends BasePage {
 
 		return `
             <div class="editor-toolbar">
-                <div class="editor-toolbar-left">
-                    ${!isImageFile ? `
-                        <button class="btn btn-sm" id="saveBtn">💾 ${this.t('editor.save', '保存')}</button>
-                        <button class="btn btn-sm ${this.state.previewMode ? 'active' : ''}" id="previewBtn">
-                            ${this.state.previewMode ? this.t('editor.edit', '编辑') : this.t('editor.preview', '预览')}
-                        </button>
-                    ` : `
-                        <span class="btn btn-sm disabled">👁 ${this.t('editor.image.viewOnly', '仅查看')}</span>
-                    `}
-                </div>
-                <div class="editor-toolbar-right">
-                    ${!isImageFile ? `
-                        <button class="btn btn-primary btn-sm" id="submitBtn">📤 ${this.t('editor.submitReview', '提交审核')}</button>
-                    ` : ''}
-                </div>
+                ${!isImageFile ? `
+                    <button class="btn btn-sm" id="saveBtn" disabled style="${this.state.previewMode ? 'display: none;' : ''}" aria-label="${this.tAttr('editor.save', '保存')}">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text">${this.t('editor.save', '保存')}</span>
+                    </button>
+                    <button class="btn btn-sm ${this.state.previewMode ? 'active' : ''}" id="previewBtn" aria-label="${this.state.previewMode ? this.tAttr('editor.edit', '编辑') : this.tAttr('editor.preview', '预览')}">
+                        ${this.state.previewMode ? `
+                            <span class="btn-icon">✏️</span>
+                            <span class="btn-text">${this.t('editor.edit', '编辑')}</span>
+                        ` : `
+                            <span class="btn-icon">👁</span>
+                            <span class="btn-text">${this.t('editor.preview', '预览')}</span>
+                        `}
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="submitBtn" style="${(this.state.isModified || this.state.hasSubmitted) ? 'display: none;' : ''}" aria-label="${this.tAttr('editor.submitReview', '提交审核')}">
+                        <span class="btn-icon">📤</span>
+                        <span class="btn-text">${this.t('editor.submitReview', '提交审核')}</span>
+                    </button>
+                ` : `
+                    <span class="btn btn-sm disabled" aria-label="${this.tAttr('editor.image.viewOnly', '仅查看')}">
+                        <span class="btn-icon">👁</span>
+                        <span class="btn-text">${this.t('editor.image.viewOnly', '仅查看')}</span>
+                    </span>
+                `}
             </div>
         `;
 	}
@@ -463,11 +480,11 @@ class EditorPage extends BasePage {
 	 */
 	renderPreviewContent(getText) {
 		if (!this.state.content || typeof this.state.content !== 'string') {
-			return `<div class="empty-preview">${getText('editor.noContent', '暂无内容')}</div>`;
+			return `<div class="empty-preview">${this.t('editor.noContent', '暂无内容')}</div>`;
 		}
 
-		// 简单的Markdown渲染
-		return this.state.content
+		// 简单的Markdown渲染（内容已转义）
+		return this.escapeHtml(this.state.content)
 			.replace(/\n/g, '<br>')
 			.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
 			.replace(/  /g, '&nbsp;&nbsp;');
@@ -681,19 +698,27 @@ class EditorPage extends BasePage {
 				const submitBtn = this.element && this.element.querySelector('#submitBtn');
 				if (submitBtn) {
 					submitBtn.disabled = true;
-					submitBtn.textContent = '⏳ ' + this.t('editor.submitting', '正在提交...');
+					// 更新图标和文本，保持按钮结构
+					const iconSpan = submitBtn.querySelector('.btn-icon');
+					const textSpan = submitBtn.querySelector('.btn-text');
+					if (iconSpan) {
+						iconSpan.textContent = '⏳';
+					}
+					if (textSpan) {
+						textSpan.textContent = this.t('editor.submitting', '正在提交...');
+					}
 				}
 
-				// 初始化 Octokit
-				const octokit = new window.Octokit({ auth: user.token });
+				// 初始化 GitHubService
+				await window.GitHubService.initFromUser(user);
 
 				// 获取仓库信息，确认默认分支
-				const { data: repo } = await octokit.rest.repos.get({ owner: repoInfo.owner, repo: repoInfo.repo });
+				const repo = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo, true);
 				const defaultBranch = repo.default_branch || 'main';
 
-				// 目标分支命名：spcp/<username>
-				const safeUser = (user.login || user.username || 'user').replace(/[^a-zA-Z0-9-_]/g, '-');
-				const branchName = `spcp/${safeUser}`;
+				// 目标分支命名：DIPCP/<username>
+				const safeUser = (user.username || 'user').replace(/[^a-zA-Z0-9-_]/g, '-');
+				const branchName = `DIPCP/${safeUser}`;
 
 				// 获取本地工作空间中的所有删除记录
 				const deletionRecords = await window.StorageService.getAllDeletionRecords();
@@ -712,9 +737,7 @@ class EditorPage extends BasePage {
 				const previousMessages = []; // 用于存储之前未审核 PR 的留言（排除有maintaining标签的）
 
 				try {
-					const { data: existingPRs } = await octokit.rest.pulls.list({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
+					const existingPRs = await window.GitHubService.listPullRequests(repoInfo.owner, repoInfo.repo, {
 						state: 'open',
 						head: `${repoInfo.owner}:${branchName}`,
 						base: defaultBranch
@@ -729,10 +752,13 @@ class EditorPage extends BasePage {
 							// 检查 PR 是否有"maintaining"标签
 							let hasMaintainingLabel = false;
 							try {
-								const { data: prLabels } = await octokit.rest.issues.listLabelsOnIssue({
-									owner: repoInfo.owner,
-									repo: repoInfo.repo,
-									issue_number: pr.number
+								const prLabels = await window.GitHubService.safeCall(async (octokit) => {
+									const { data } = await octokit.rest.issues.listLabelsOnIssue({
+										owner: repoInfo.owner,
+										repo: repoInfo.repo,
+										issue_number: pr.number
+									});
+									return data;
 								});
 								hasMaintainingLabel = prLabels.some(label =>
 									label.name.toLowerCase() === 'maintaining'
@@ -757,22 +783,21 @@ class EditorPage extends BasePage {
 
 							try {
 								// 获取 PR 中修改的文件列表
-								const { data: prFiles } = await octokit.rest.pulls.listFiles({
-									owner: repoInfo.owner,
-									repo: repoInfo.repo,
-									pull_number: pr.number
-								});
+								const prFiles = await window.GitHubService.listPullRequestFiles(repoInfo.owner, repoInfo.repo, pr.number);
 
 								// 从旧 PR 的分支中读取这些文件的内容
 								for (const file of prFiles) {
 									if (file.status !== 'removed' && !filesToInclude.has(file.filename)) {
 										try {
 											// 从 PR 的 head 分支（用户分支）读取文件内容
-											const { data: fileContent } = await octokit.rest.repos.getContent({
-												owner: repoInfo.owner,
-												repo: repoInfo.repo,
-												path: file.filename,
-												ref: branchName
+											const fileContent = await window.GitHubService.safeCall(async (octokit) => {
+												const { data } = await octokit.rest.repos.getContent({
+													owner: repoInfo.owner,
+													repo: repoInfo.repo,
+													path: file.filename,
+													ref: branchName
+												});
+												return data;
 											});
 
 											if (fileContent && !Array.isArray(fileContent) && fileContent.content) {
@@ -801,11 +826,13 @@ class EditorPage extends BasePage {
 							console.log(`正在关闭 ${prsToClose.length} 个旧 PR（已排除 ${existingPRs.length - prsToClose.length} 个维护中的 PR）...`);
 							for (const pr of prsToClose) {
 								try {
-									await octokit.rest.pulls.update({
-										owner: repoInfo.owner,
-										repo: repoInfo.repo,
-										pull_number: pr.number,
-										state: 'closed'
+									await window.GitHubService.safeCall(async (octokit) => {
+										await octokit.rest.pulls.update({
+											owner: repoInfo.owner,
+											repo: repoInfo.repo,
+											pull_number: pr.number,
+											state: 'closed'
+										});
 									});
 									console.log(`已关闭 PR #${pr.number}`);
 								} catch (err) {
@@ -821,17 +848,31 @@ class EditorPage extends BasePage {
 				}
 
 				// 获取默认分支最新提交SHA
-				const { data: baseRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${defaultBranch}` });
+				const baseRef = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.git.getRef({
+						owner: repoInfo.owner,
+						repo: repoInfo.repo,
+						ref: `heads/${defaultBranch}`
+					});
+					return data;
+				});
 				const baseSha = baseRef.object.sha;
 
 				// 尝试读取目标分支，不存在则创建
 				let branchExists = true;
 				let branchHeadSha = baseSha; // 保存分支当前的 HEAD SHA
 				try {
-					const { data: branchRef } = await octokit.rest.git.getRef({ owner: repoInfo.owner, repo: repoInfo.repo, ref: `heads/${branchName}` });
+					const branchRef = await window.GitHubService.safeCall(async (octokit) => {
+						const { data } = await octokit.rest.git.getRef({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							ref: `heads/${branchName}`
+						});
+						return data;
+					});
 					branchHeadSha = branchRef.object.sha;
 				} catch (err) {
-					if (err && err.status === 404) {
+					if (err && (err.status === 404 || (err.response && err.response.status === 404))) {
 						branchExists = false;
 					} else {
 						throw err;
@@ -840,16 +881,18 @@ class EditorPage extends BasePage {
 
 				// 如果分支不存在，创建它
 				if (!branchExists) {
-					await octokit.rest.git.createRef({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						ref: `refs/heads/${branchName}`,
-						sha: baseSha
+					await window.GitHubService.safeCall(async (octokit) => {
+						await octokit.rest.git.createRef({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							ref: `refs/heads/${branchName}`,
+							sha: baseSha
+						});
 					});
 				} else {
 					// 由于我们已经从旧 PR 中收集了文件，可以重置分支
-					if (filesToInclude.size > 0) {
-						// 有旧文件需要保留，先重置分支到基线（后面会重新提交所有文件）
+					// 有旧文件需要保留，先重置分支到基线（后面会重新提交所有文件）
+					await window.GitHubService.safeCall(async (octokit) => {
 						await octokit.rest.git.updateRef({
 							owner: repoInfo.owner,
 							repo: repoInfo.repo,
@@ -857,16 +900,7 @@ class EditorPage extends BasePage {
 							sha: baseSha,
 							force: true
 						});
-					} else {
-						// 没有旧文件，保持分支现状或重置到基线
-						await octokit.rest.git.updateRef({
-							owner: repoInfo.owner,
-							repo: repoInfo.repo,
-							ref: `heads/${branchName}`,
-							sha: baseSha,
-							force: true
-						});
-					}
+					});
 				}
 
 				// 将当前编辑的文件也添加到待提交文件列表中
@@ -877,18 +911,21 @@ class EditorPage extends BasePage {
 				if (!filesToInclude.has(filePath)) {
 					let fileSha = undefined;
 					try {
-						const { data: existing } = await octokit.rest.repos.getContent({
-							owner: repoInfo.owner,
-							repo: repoInfo.repo,
-							path: filePath,
-							ref: branchName
+						const existing = await window.GitHubService.safeCall(async (octokit) => {
+							const { data } = await octokit.rest.repos.getContent({
+								owner: repoInfo.owner,
+								repo: repoInfo.repo,
+								path: filePath,
+								ref: branchName
+							});
+							return data;
 						});
 						if (existing && !Array.isArray(existing) && existing.sha) {
 							fileSha = existing.sha;
 						}
 					} catch (err) {
 						// 404 表示文件不存在于该分支，忽略
-						if (err.status !== 404) {
+						if (err.status !== 404 && (!err.response || err.response.status !== 404)) {
 							throw err;
 						}
 					}
@@ -941,30 +978,32 @@ class EditorPage extends BasePage {
 					const firstNonDeletedFile = allFilesToCommit.find(f => !f.isDeleted && f.content !== null);
 					if (firstNonDeletedFile) {
 						const base64Content = btoa(unescape(encodeURIComponent(firstNonDeletedFile.content)));
-						await octokit.rest.repos.createOrUpdateFileContents({
-							owner: repoInfo.owner,
-							repo: repoInfo.repo,
-							path: firstNonDeletedFile.path,
-							message: `Initial commit: ${commitMessage}`,
-							content: base64Content,
-							branch: branchName
+						await window.GitHubService.safeCall(async (octokit) => {
+							await octokit.rest.repos.createOrUpdateFileContents({
+								owner: repoInfo.owner,
+								repo: repoInfo.repo,
+								path: firstNonDeletedFile.path,
+								message: `Initial commit: ${commitMessage}`,
+								content: base64Content,
+								branch: branchName
+							});
 						});
 						console.log(`✅ 已创建第一个文件 ${firstNonDeletedFile.path}，建立初始提交`);
 
 						// 如果还有其他文件，使用批量提交
 						const remainingFiles = allFilesToCommit.filter(f => f.path !== firstNonDeletedFile.path);
 						if (remainingFiles.length > 0) {
-							await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, remainingFiles, commitMessage, branchName);
+							await this.createBatchCommit(repoInfo.owner, repoInfo.repo, remainingFiles, commitMessage, branchName);
 							console.log(`✅ 已批量提交剩余的 ${remainingFiles.length} 个文件（包括 ${filesToDeleteList.length} 个删除）`);
 						}
 					} else {
 						// 如果只有删除操作，也需要创建初始提交（使用批量提交）
-						await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
+						await this.createBatchCommit(repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
 						console.log(`✅ 已批量提交 ${allFilesToCommit.length} 个文件（包括 ${filesToDeleteList.length} 个删除）`);
 					}
 				} else {
 					// 分支已存在，直接使用批量提交所有文件（包括删除的文件）
-					await this.createBatchCommit(octokit, repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
+					await this.createBatchCommit(repoInfo.owner, repoInfo.repo, allFilesToCommit, commitMessage, branchName);
 					console.log(`✅ 已批量提交 ${files.length} 个文件，删除 ${filesToDeleteList.length} 个文件`);
 				}
 
@@ -987,25 +1026,23 @@ class EditorPage extends BasePage {
 						}
 					}
 
-					const { data: newPR } = await octokit.rest.pulls.create({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						title: 'Submit file update',
-						body: prBody,
-						head: branchName,
-						base: defaultBranch
+					const newPR = await window.GitHubService.safeCall(async (octokit) => {
+						const { data } = await octokit.rest.pulls.create({
+							owner: repoInfo.owner,
+							repo: repoInfo.repo,
+							title: 'Submit file update',
+							body: prBody,
+							head: branchName,
+							base: defaultBranch
+						});
+						return data;
 					});
 
 					// 添加提交者名字标签（c_用户名）
 					try {
-						const committerName = user.username || user.login || '';
+						const committerName = user.username || '';
 						if (committerName) {
-							await octokit.rest.issues.addLabels({
-								owner: repoInfo.owner,
-								repo: repoInfo.repo,
-								issue_number: newPR.number,
-								labels: [`c_${committerName}`]
-							});
+							await window.GitHubService.addIssueLabels(repoInfo.owner, repoInfo.repo, newPR.number, [`c_${committerName}`]);
 							console.log(`为 PR #${newPR.number} 添加提交者标签 c_${committerName}`);
 						}
 					} catch (labelError) {
@@ -1042,7 +1079,15 @@ class EditorPage extends BasePage {
 				const submitBtnFinal = this.element && this.element.querySelector('#submitBtn');
 				if (submitBtnFinal) {
 					submitBtnFinal.disabled = false;
-					submitBtnFinal.textContent = this.t('editor.submitReview', '📤 提交审核');
+					// 更新图标和文本，保持按钮结构
+					const iconSpan = submitBtnFinal.querySelector('.btn-icon');
+					const textSpan = submitBtnFinal.querySelector('.btn-text');
+					if (iconSpan) {
+						iconSpan.textContent = '📤';
+					}
+					if (textSpan) {
+						textSpan.textContent = this.t('editor.submitReview', '提交审核');
+					}
 				}
 			}
 		})();
@@ -1105,16 +1150,15 @@ class EditorPage extends BasePage {
 	/**
 	 * 使用git操作批量创建提交
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {Array} files - 文件数组，每个元素包含 {path, content}
 	 * @param {string} message - 提交消息
 	 * @param {string} branchName - 分支名称
 	 */
-	async createBatchCommit(octokit, owner, repo, files, message, branchName) {
+	async createBatchCommit(owner, repo, files, message, branchName) {
 		// 1. 获取当前用户信息
-		const { data: userInfo } = await octokit.rest.users.getAuthenticated();
+		const userInfo = await window.GitHubService.getAuthenticatedUser();
 		const author = {
 			name: userInfo.name || userInfo.login,
 			email: userInfo.email || `${userInfo.login}@users.noreply.github.com`,
@@ -1122,18 +1166,24 @@ class EditorPage extends BasePage {
 		};
 
 		// 2. 获取分支最新的提交SHA
-		const { data: refData } = await octokit.rest.git.getRef({
-			owner,
-			repo,
-			ref: `heads/${branchName}`
+		const refData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.getRef({
+				owner,
+				repo,
+				ref: `heads/${branchName}`
+			});
+			return data;
 		});
 		const baseTreeSHA = refData.object.sha;
 
 		// 3. 获取基础tree的SHA
-		const { data: commitData } = await octokit.rest.git.getCommit({
-			owner,
-			repo,
-			commit_sha: baseTreeSHA
+		const commitData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.getCommit({
+				owner,
+				repo,
+				commit_sha: baseTreeSHA
+			});
+			return data;
 		});
 		const treeSha = commitData.tree.sha;
 
@@ -1144,18 +1194,21 @@ class EditorPage extends BasePage {
 				// 对于删除操作，需要获取当前分支中该文件的 SHA
 				let fileSha = null;
 				try {
-					const { data: existingFile } = await octokit.rest.repos.getContent({
-						owner,
-						repo,
-						path: file.path,
-						ref: `heads/${branchName}`
+					const existingFile = await window.GitHubService.safeCall(async (octokit) => {
+						const { data } = await octokit.rest.repos.getContent({
+							owner,
+							repo,
+							path: file.path,
+							ref: `heads/${branchName}`
+						});
+						return data;
 					});
 					if (existingFile && !Array.isArray(existingFile) && existingFile.sha) {
 						fileSha = existingFile.sha;
 					}
 				} catch (err) {
 					// 如果文件不存在（404），说明已经删除，跳过
-					if (err.status !== 404) {
+					if (err.status !== 404 && (!err.response || err.response.status !== 404)) {
 						console.warn(`获取文件 ${file.path} 的 SHA 失败:`, err);
 					}
 				}
@@ -1177,11 +1230,14 @@ class EditorPage extends BasePage {
 				const blobContent = btoa(unescape(encodeURIComponent(file.content)));
 
 				// 创建blob
-				const { data: blobData } = await octokit.rest.git.createBlob({
-					owner,
-					repo,
-					content: blobContent,
-					encoding: 'base64'
+				const blobData = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.git.createBlob({
+						owner,
+						repo,
+						content: blobContent,
+						encoding: 'base64'
+					});
+					return data;
 				});
 
 				return {
@@ -1197,43 +1253,53 @@ class EditorPage extends BasePage {
 		const validTreeItems = treeItems.filter(item => item !== null);
 
 		// 5. 创建新的tree（包含添加、修改和删除的文件）
-		const { data: treeData } = await octokit.rest.git.createTree({
-			owner,
-			repo,
-			base_tree: treeSha,
-			tree: validTreeItems
+		const treeData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.createTree({
+				owner,
+				repo,
+				base_tree: treeSha,
+				tree: validTreeItems
+			});
+			return data;
 		});
 
 		// 6. 创建新的commit
-		const { data: commit } = await octokit.rest.git.createCommit({
-			owner,
-			repo,
-			message: message,
-			tree: treeData.sha,
-			parents: [baseTreeSHA],
-			author: author,
-			committer: author
+		const commit = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.createCommit({
+				owner,
+				repo,
+				message: message,
+				tree: treeData.sha,
+				parents: [baseTreeSHA],
+				author: author,
+				committer: author
+			});
+			return data;
 		});
 
 		// 7. 更新引用（使用 force，因为我们已经重置了分支或这是新的提交）
 		try {
-			await octokit.rest.git.updateRef({
-				owner,
-				repo,
-				ref: `heads/${branchName}`,
-				sha: commit.sha,
-				force: false // 首先尝试非强制更新（fast-forward）
-			});
-		} catch (error) {
-			// 如果不是 fast-forward，使用强制更新
-			if (error.status === 422 && error.message && error.message.includes('not a fast forward')) {
-				console.warn('非 fast-forward 更新，使用强制更新');
+			await window.GitHubService.safeCall(async (octokit) => {
 				await octokit.rest.git.updateRef({
 					owner,
 					repo,
 					ref: `heads/${branchName}`,
 					sha: commit.sha,
-					force: true
+					force: false // 首先尝试非强制更新（fast-forward）
+				});
+			});
+		} catch (error) {
+			// 如果不是 fast-forward，使用强制更新
+			if (error.status === 422 && error.message && error.message.includes('not a fast forward')) {
+				console.warn('非 fast-forward 更新，使用强制更新');
+				await window.GitHubService.safeCall(async (octokit) => {
+					await octokit.rest.git.updateRef({
+						owner,
+						repo,
+						ref: `heads/${branchName}`,
+						sha: commit.sha,
+						force: true
+					});
 				});
 			} else {
 				throw error;
@@ -1272,7 +1338,16 @@ class EditorPage extends BasePage {
 		const saveBtn = this.element.querySelector('#saveBtn');
 		if (saveBtn) {
 			saveBtn.disabled = !this.state.isModified;
-			saveBtn.textContent = this.state.isModified ? '💾 保存*' : '💾 保存';
+			// 更新图标和文本，保持按钮结构
+			const iconSpan = saveBtn.querySelector('.btn-icon');
+			const textSpan = saveBtn.querySelector('.btn-text');
+			if (iconSpan) {
+				iconSpan.textContent = '💾';
+			}
+			if (textSpan) {
+				const saveText = this.t('editor.save', '保存');
+				textSpan.textContent = this.state.isModified ? `${saveText}*` : saveText;
+			}
 		}
 
 		// 同时更新提交按钮的显示
@@ -1332,7 +1407,16 @@ class EditorPage extends BasePage {
 		}
 
 		if (previewBtn) {
-			previewBtn.textContent = previewMode ? '✏️ 编辑' : '👁 预览';
+			const iconSpan = previewBtn.querySelector('.btn-icon');
+			const textSpan = previewBtn.querySelector('.btn-text');
+			if (iconSpan) {
+				iconSpan.textContent = previewMode ? '✏️' : '👁';
+			}
+			if (textSpan) {
+				textSpan.textContent = previewMode ? this.t('editor.edit', '编辑') : this.t('editor.preview', '预览');
+			}
+			// 更新 aria-label
+			previewBtn.setAttribute('aria-label', previewMode ? this.tAttr('editor.edit', '编辑') : this.tAttr('editor.preview', '预览'));
 			previewBtn.classList.toggle('active', previewMode);
 		}
 
@@ -1481,11 +1565,11 @@ class EditorPage extends BasePage {
 		const fileInfo = `
 			<div class="info-item">
 				<label>${this.t('editor.infoPanel.fileName', '文件名')}:</label>
-				<span>${this.state.fileName || 'README.md'}</span>
+				<span>${this.escapeHtml(this.state.fileName || 'README.md')}</span>
 			</div>
 			<div class="info-item">
 				<label>${this.t('editor.infoPanel.filePath', '文件路径')}:</label>
-				<span>${this.state.filePath || '/README.md'}</span>
+				<span>${this.escapeHtml(this.state.filePath || '/README.md')}</span>
 			</div>
 			<div class="info-item">
 				<label>${this.t('editor.infoPanel.fileSize', '文件大小')}:</label>

@@ -107,7 +107,7 @@ class LoginPage extends BasePage {
 		const options = window.I18nService.supportedLanguages.map(lang => {
 			const isSelected = this.state.language === lang ? 'selected' : '';
 			const displayName = window.I18nService.getLanguageDisplayName(lang);
-			return `<option value="${lang}" ${isSelected}>${displayName}</option>`;
+			return `<option value="${this.escapeHtmlAttribute(lang)}" ${isSelected}>${this.escapeHtml(displayName)}</option>`;
 		}).join('');
 
 		return `
@@ -128,18 +128,24 @@ class LoginPage extends BasePage {
             <div class="form-group">
                 <div class="input-with-help">
                     <input type="text" id="github-username" 
-                        placeholder="${this.t('login.placeholders.githubUsername')}" 
-                        value="${this.state.formData.username}" required>
+                        placeholder="${this.tAttr('login.placeholders.githubUsername')}" 
+                        value="${this.escapeHtmlAttribute(this.state.formData.username)}" required>
                     <button type="button" class="help-button" id="register-help-btn">${this.t('login.howToRegister')}</button>
+                </div>
+                <div class="form-hint" style="color: red; font-weight: bold; margin-top: 0.5rem; font-size: 0.9rem;">
+                    ${this.t('login.hint.createNewUser')}
                 </div>
             </div>
 
             <div class="form-group">
                 <div class="input-with-help">
                     <input type="password" id="access-token" 
-                        placeholder="${this.t('login.placeholders.accessToken')}" 
-                        value="${this.state.formData.accessToken}" required>
+                        placeholder="${this.tAttr('login.placeholders.accessToken')}" 
+                        value="${this.escapeHtmlAttribute(this.state.formData.accessToken)}" required>
                     <button type="button" class="help-button" id="token-help-btn">${this.t('login.howToGetToken')}</button>
+                </div>
+                <div class="form-hint" style="color: red; font-weight: bold; margin-top: 0.5rem; font-size: 0.9rem;">
+                    ${this.t('login.hint.tokenLocalOnly')}
                 </div>
             </div>
         `;
@@ -185,7 +191,7 @@ class LoginPage extends BasePage {
 		this.element.innerHTML = '';
 		this.element.appendChild(this.render());
 		this.bindEvents();
-		
+
 		// 为 #app 添加类名，用于应用登录页面特定的样式
 		const appContainer = document.getElementById('app');
 		if (appContainer) {
@@ -413,24 +419,26 @@ class LoginPage extends BasePage {
 		console.log('验证GitHub Access Token...');
 		let userInfo;
 
-		// 使用Octokit验证用户
-		const octokit = new window.Octokit({ auth: formData.accessToken });
-		let data;
+		// 使用GitHubService验证用户
 		try {
-			const response = await octokit.rest.users.getAuthenticated();
-			data = response.data;
+			// 先初始化GitHubService
+			await window.GitHubService.init(formData.accessToken);
+
+			// 获取认证用户信息
+			const data = await window.GitHubService.getAuthenticatedUser();
+
+			userInfo = {
+				username: data.login,
+				email: data.email,
+				avatarUrl: data.avatar_url,
+				name: data.name
+			};
 		} catch (error) {
 			if (error.status === 401) {
 				throw new Error(this.t('login.validation.invalidToken', 'GitHub Access Token无效或已过期，请检查您的Token是否正确'));
 			}
 			throw error;
 		}
-		userInfo = {
-			username: data.login,
-			email: data.email,
-			avatarUrl: data.avatar_url,
-			name: data.name
-		};
 
 		// 验证用户名是否匹配
 		if (userInfo.username !== formData.username) {
@@ -488,15 +496,15 @@ class LoginPage extends BasePage {
 		switch (state) {
 			case 'loading':
 				loginBtn.disabled = true;
-				loginBtn.innerHTML = `⏳ ${message}`;
+				loginBtn.innerHTML = `⏳ ${this.escapeHtml(message)}`;
 				break;
 			case 'success':
 				loginBtn.disabled = true;
-				loginBtn.innerHTML = `✅ ${message}`;
+				loginBtn.innerHTML = `✅ ${this.escapeHtml(message)}`;
 				break;
 			case 'error':
 				loginBtn.disabled = true;
-				loginBtn.innerHTML = `❌ ${message}`;
+				loginBtn.innerHTML = `❌ ${this.escapeHtml(message)}`;
 				break;
 			default:
 				loginBtn.disabled = false;
@@ -551,7 +559,7 @@ class LoginPage extends BasePage {
 		if (appContainer) {
 			appContainer.classList.remove('has-login-page');
 		}
-		
+
 		// 清理资源
 		if (this.element) {
 			this.element.innerHTML = '';

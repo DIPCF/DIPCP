@@ -138,7 +138,7 @@ class RepositorySelectionPage extends BasePage {
 			console.error('加载 Projects.json 失败:', error);
 			this.setState({
 				projectsLoading: false,
-				projectsError: error.message
+				projectsError: this.escapeHtml(error.message)
 			});
 
 			// 如果当前选项卡是 existing，更新内容以显示错误
@@ -217,15 +217,18 @@ class RepositorySelectionPage extends BasePage {
             <div class="tabs">
                 <button class="tab-button ${this.state.selectedTab === 'recent' ? 'active' : ''}" 
                         data-tab="recent">
-                    ${this.t('repositorySelection.tabs.recent', '最近访问仓库')}
+                    <span class="tab-icon">🕒</span>
+                    <span class="tab-text">${this.t('repositorySelection.tabs.recent', '最近访问仓库')}</span>
                 </button>
                 <button class="tab-button ${this.state.selectedTab === 'existing' ? 'active' : ''}" 
                         data-tab="existing">
-                    ${this.t('repositorySelection.tabs.existing', '选择现有仓库')}
+                    <span class="tab-icon">📁</span>
+                    <span class="tab-text">${this.t('repositorySelection.tabs.existing', '选择现有仓库')}</span>
                 </button>
                 <button class="tab-button ${this.state.selectedTab === 'create' ? 'active' : ''}" 
                         data-tab="create">
-                    ${this.t('repositorySelection.tabs.create', '创建新仓库')}
+                    <span class="tab-icon">➕</span>
+                    <span class="tab-text">${this.t('repositorySelection.tabs.create', '创建新仓库')}</span>
                 </button>
             </div>
         `;
@@ -299,7 +302,7 @@ class RepositorySelectionPage extends BasePage {
                 <div class="repository-history">
                     <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
                     <div class="error-message">
-                        <p>${this.t('repositorySelection.existing.error', '加载失败')}: ${this.state.projectsError}</p>
+                        <p>${this.t('repositorySelection.existing.error', '加载失败')}: ${this.escapeHtml(this.state.projectsError)}</p>
                         <button class="retry-btn" id="retry-load-projects">${this.t('repositorySelection.existing.retry', '重试')}</button>
                     </div>
                 </div>
@@ -316,11 +319,11 @@ class RepositorySelectionPage extends BasePage {
 		}
 
 		const projectItems = this.state.projectsList.map((project, index) => `
-            <div class="history-item clickable" data-owner="${project.owner}" data-repo="${project.repo}" data-url="${project.repository}">
+            <div class="history-item clickable" data-owner="${this.escapeHtmlAttribute(project.owner)}" data-repo="${this.escapeHtmlAttribute(project.repo)}" data-url="${this.escapeHtmlAttribute(project.repository)}">
                 <div class="repo-info">
-                    <h4>${project.owner}/${project.repo}</h4>
-                    <p class="repo-description">${project.description || this.t('repositorySelection.existing.noDescription', '无描述')}</p>
-                    ${project.createdAt ? `<p class="last-accessed">${this.t('repositorySelection.existing.createdAt', '创建时间')}: ${this.formatDate(project.createdAt)}</p>` : ''}
+                    <h4>${this.escapeHtml(project.owner)}/${this.escapeHtml(project.repo)}</h4>
+                    <p class="repo-description">${this.escapeHtml(project.description || this.t('repositorySelection.existing.noDescription', '无描述'))}</p>
+                    ${project.createdAt ? `<p class="last-accessed">${this.t('repositorySelection.existing.createdAt', '创建时间')}: ${this.escapeHtml(this.formatDate(project.createdAt))}</p>` : ''}
                 </div>
             </div>
         `).join('');
@@ -329,7 +332,7 @@ class RepositorySelectionPage extends BasePage {
             <div class="repository-history">
                 <div class="repository-history-header">
                     <h3>${this.t('repositorySelection.existing.title', '可用仓库列表')}</h3>
-                    <button class="refresh-btn" id="refresh-projects-btn" title="${this.t('common.refresh', '刷新')}">
+                    <button class="refresh-btn" id="refresh-projects-btn" title="${this.tAttr('common.refresh', '刷新')}">
                         <span class="refresh-icon">🔄</span>
                     </button>
                 </div>
@@ -355,11 +358,11 @@ class RepositorySelectionPage extends BasePage {
 		}
 
 		const historyItems = this.state.repositoryHistory.map(repo => `
-            <div class="history-item clickable" data-owner="${repo.owner}" data-repo="${repo.repo}">
+            <div class="history-item clickable" data-owner="${this.escapeHtmlAttribute(repo.owner)}" data-repo="${this.escapeHtmlAttribute(repo.repo)}">
                 <div class="repo-info">
-                    <h4>${repo.owner}/${repo.repo}</h4>
-                    <p class="repo-description">${repo.description || this.t('repositorySelection.history.noDescription', '无描述')}</p>
-                    <p class="last-accessed">${this.t('repositorySelection.history.lastAccessed', '最后访问')}: ${this.formatDate(repo.lastAccessed)}</p>
+                    <h4>${this.escapeHtml(repo.owner)}/${this.escapeHtml(repo.repo)}</h4>
+                    <p class="repo-description">${this.escapeHtml(repo.description || this.t('repositorySelection.history.noDescription', '无描述'))}</p>
+                    <p class="last-accessed">${this.t('repositorySelection.history.lastAccessed', '最后访问')}: ${this.escapeHtml(this.formatDate(repo.lastAccessed))}</p>
                 </div>
             </div>
         `).join('');
@@ -385,8 +388,8 @@ class RepositorySelectionPage extends BasePage {
                 <div class="form-group">
                     <label for="repository-url">${this.t('repositorySelection.urlInput.label', 'GitHub仓库URL')}</label>
                     <input type="url" id="repository-url" 
-                        placeholder="${this.t('repositorySelection.urlInput.placeholder', 'https://github.com/owner/repo')}" 
-                        value="${this.state.formData.repositoryUrl}">
+                        placeholder="${this.tAttr('repositorySelection.urlInput.placeholder', 'https://github.com/owner/repo')}" 
+                        value="${this.escapeHtmlAttribute(this.state.formData.repositoryUrl)}">
                     <p class="help-text">${this.t('repositorySelection.urlInput.help', '请输入完整的GitHub仓库地址')}</p>
                 </div>
             </div>
@@ -405,20 +408,20 @@ class RepositorySelectionPage extends BasePage {
                     <div class="form-group">
                         <label for="new-repo-owner">${this.t('repositorySelection.create.ownerLabel', '仓库所有者')}</label>
                         <input type="text" id="new-repo-owner" 
-                            placeholder="${this.t('repositorySelection.create.ownerPlaceholder', '用户名或组织名，留空则在个人账户下创建')}" 
-                            value="${this.state.formData.newRepoOwner || ''}">
+                            placeholder="${this.tAttr('repositorySelection.create.ownerPlaceholder', '用户名或组织名，留空则在个人账户下创建')}" 
+                            value="${this.escapeHtmlAttribute(this.state.formData.newRepoOwner || '')}">
                     </div>
                     <div class="form-group">
                         <label for="new-repo-name">${this.t('repositorySelection.create.nameLabel', '仓库名称')}</label>
                         <input type="text" id="new-repo-name" 
-                            placeholder="${this.t('repositorySelection.create.namePlaceholder', '英文数字，100字符以内')}" 
-                            value="${this.state.formData.newRepoName}" required>
+                            placeholder="${this.tAttr('repositorySelection.create.namePlaceholder', '英文数字，100字符以内')}" 
+                            value="${this.escapeHtmlAttribute(this.state.formData.newRepoName)}" required>
                     </div>
                     <div class="form-group">
                         <label for="new-repo-description">${this.t('repositorySelection.create.descriptionLabel', '仓库描述')}</label>
                         <textarea id="new-repo-description" 
-                            placeholder="${this.t('repositorySelection.create.descriptionPlaceholder', '仓库的简短描述，350字符以内')}" 
-                            rows="3">${this.state.formData.newRepoDescription}</textarea>
+                            placeholder="${this.tAttr('repositorySelection.create.descriptionPlaceholder', '仓库的简短描述，350字符以内')}" 
+                            rows="3">${this.escapeHtml(this.state.formData.newRepoDescription)}</textarea>
                     </div>
                 </div>
                 ${this.renderContinueButton()}
@@ -817,8 +820,7 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	async checkRepositoryType(owner, repo) {
 		try {
-			const octokit = new window.Octokit();
-			const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
+			const repoInfo = await window.GitHubService.getRepo(owner, repo, false);
 			return repoInfo.owner.type === 'Organization';
 		} catch (error) {
 			if (error.status === 404) {
@@ -900,8 +902,7 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	async getRepositoryDescription(owner, repo) {
 		try {
-			const octokit = new window.Octokit();
-			const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
+			const repoInfo = await window.GitHubService.getRepo(owner, repo, false);
 			return repoInfo.description || '';
 		} catch (error) {
 			return '';
@@ -919,20 +920,22 @@ class RepositorySelectionPage extends BasePage {
 			throw new Error(this.t('repositorySelection.errors.ownerRequired', '请输入组织名'));
 		}
 
-		const octokit = new window.Octokit({ auth: this.state.userInfo.token });
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(this.state.userInfo);
 
 		try {
 			// 首先尝试获取用户信息
-			const { data: userData } = await octokit.rest.users.getByUsername({
-				username: owner
-			});
+			const userData = await window.GitHubService.getUserByUsername(owner);
 
 			// 检查是否为组织
 			if (userData.type === 'Organization') {
 				// 检查用户是否有权限在该组织下创建仓库
-				const { data: membership } = await octokit.rest.orgs.checkMembershipForUser({
-					org: owner,
-					username: this.state.userInfo.username
+				const membership = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.orgs.checkMembershipForUser({
+						org: owner,
+						username: this.state.userInfo.username
+					});
+					return data;
 				});
 
 				return {
@@ -970,7 +973,8 @@ class RepositorySelectionPage extends BasePage {
 			throw new Error(this.t('repositorySelection.errors.notLoggedIn', '请先登录'));
 		}
 
-		const octokit = new window.Octokit({ auth: this.state.userInfo.token });
+		// 初始化 GitHubService
+		await window.GitHubService.initFromUser(this.state.userInfo);
 
 		try {
 			// 验证所有者
@@ -983,24 +987,28 @@ class RepositorySelectionPage extends BasePage {
 			if (ownerInfo.type === 'organization') {
 				// 在组织下创建仓库
 				console.log('🔵 [createRepository] 在组织下创建仓库:', ownerInfo.login);
-				const { data } = await octokit.rest.repos.createInOrg({
-					org: ownerInfo.login,
-					name,
-					description,
-					private: visibility === 'private',
-					auto_init: true
+				repo = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.repos.createInOrg({
+						org: ownerInfo.login,
+						name,
+						description,
+						private: visibility === 'private',
+						auto_init: true
+					});
+					return data;
 				});
-				repo = data;
 			} else {
 				// 在用户个人账户下创建仓库
 				console.log('🔵 [createRepository] 在用户账户下创建仓库');
-				const { data } = await octokit.rest.repos.createForAuthenticatedUser({
-					name,
-					description,
-					private: visibility === 'private',
-					auto_init: true
+				repo = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.repos.createForAuthenticatedUser({
+						name,
+						description,
+						private: visibility === 'private',
+						auto_init: true
+					});
+					return data;
 				});
-				repo = data;
 			}
 			console.log('✅ [createRepository] 仓库创建成功:', { owner: repo.owner.login, repo: repo.name });
 
@@ -1078,10 +1086,10 @@ class RepositorySelectionPage extends BasePage {
 						// 更新同步进度
 						if (error) {
 							console.error('❌ [proceedToProject] 同步文件时出错:', error);
-							this.updateContinueButtonState('loading', `同步出错: ${error.message}`);
+							this.updateContinueButtonState('loading', `${this.t('repositorySelection.syncError', '同步出错')}: ${this.escapeHtml(error.message)}`);
 						} else {
 							console.log(`🔵 [proceedToProject] 同步进度: ${progress}% (${processed}/${total})`);
-							const progressText = `正在同步文件... ${progress}% (${processed}/${total})`;
+							const progressText = `${this.t('repositorySelection.syncing', '正在同步文件...')} ${progress}% (${processed}/${total})`;
 							this.updateContinueButtonState('loading', progressText);
 						}
 					}
@@ -1095,11 +1103,11 @@ class RepositorySelectionPage extends BasePage {
 			// 获取并缓存Discussions分类列表（访客也需要）
 			console.log('🔵 [proceedToProject] 缓存Discussions分类列表...');
 			try {
-				// 访客可以使用无auth的octokit查询公开仓库
-				const octokit = this.state.userInfo && this.state.userInfo.token
-					? new window.Octokit({ auth: this.state.userInfo.token })
-					: new window.Octokit();
-				await this.cacheDiscussionCategories(octokit, repoInfo.owner, repoInfo.repo);
+				// 初始化 GitHubService（如果有token则使用，否则使用公开API）
+				if (this.state.userInfo && this.state.userInfo.token) {
+					await window.GitHubService.initFromUser(this.state.userInfo);
+				}
+				await this.cacheDiscussionCategories(repoInfo.owner, repoInfo.repo);
 			} catch (error) {
 				console.warn('⚠️ [proceedToProject] 缓存分类列表失败:', error);
 				// 不阻止流程继续
@@ -1121,7 +1129,7 @@ class RepositorySelectionPage extends BasePage {
 			}
 		} catch (error) {
 			console.error('❌ [proceedToProject] 同步文件失败:', error);
-			this.updateContinueButtonState('error', `同步失败: ${error.message}`);
+			this.updateContinueButtonState('error', `${this.t('repositorySelection.syncFailed', '同步失败')}: ${this.escapeHtml(error.message)}`);
 
 			// 即使同步失败，也允许用户继续到项目页面
 			setTimeout(() => {
@@ -1154,15 +1162,15 @@ class RepositorySelectionPage extends BasePage {
 		switch (state) {
 			case 'loading':
 				continueBtn.disabled = true;
-				continueBtn.innerHTML = `⏳ ${message}`;
+				continueBtn.innerHTML = `⏳ ${this.escapeHtml(message)}`;
 				break;
 			case 'success':
 				continueBtn.disabled = true;
-				continueBtn.innerHTML = `✅ ${message}`;
+				continueBtn.innerHTML = `✅ ${this.escapeHtml(message)}`;
 				break;
 			case 'error':
 				continueBtn.disabled = true;
-				continueBtn.innerHTML = `❌ ${message}`;
+				continueBtn.innerHTML = `❌ ${this.escapeHtml(message)}`;
 				break;
 			default:
 				continueBtn.disabled = false;
@@ -1193,7 +1201,10 @@ class RepositorySelectionPage extends BasePage {
 	 */
 	async setupRepository(owner, repo, token, repositoryCreationTime = null) {
 		console.log('🔵 [setupRepository] 开始设置仓库:', { owner, repo, repositoryCreationTime });
-		const octokit = new window.Octokit({ auth: token });
+
+		// 初始化 GitHubService
+		await window.GitHubService.init(token);
+
 		// 如果没有传入时间，使用当前时间（兼容旧代码）
 		if (!repositoryCreationTime) {
 			repositoryCreationTime = new Date().toISOString();
@@ -1204,49 +1215,49 @@ class RepositorySelectionPage extends BasePage {
 			// 1. 批量创建所有初始文件（工作流、CODEOWNERS、POINT系统、角色定义）
 			console.log('🔵 [setupRepository] 步骤1: 创建初始文件...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.initialFiles', '正在创建初始文件...'));
-			await this.setupInitialFiles(octokit, owner, repo, token, repositoryCreationTime);
+			await this.setupInitialFiles(owner, repo, token, repositoryCreationTime);
 			console.log('✅ [setupRepository] 步骤1完成');
 
 			// 2. 设置分支保护
 			console.log('🔵 [setupRepository] 步骤2: 设置分支保护...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.branchProtection', '正在设置分支保护...'));
-			await this.setupBranchProtection(octokit, owner, repo);
+			await this.setupBranchProtection(owner, repo);
 			console.log('✅ [setupRepository] 步骤2完成');
 
 			// 3. 设置Actions权限
 			console.log('🔵 [setupRepository] 步骤3: 设置Actions权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.actionsPermissions', '正在设置Actions权限...'));
-			await this.setupActionsPermissions(octokit, owner, repo);
+			await this.setupActionsPermissions(owner, repo);
 			console.log('✅ [setupRepository] 步骤3完成');
 
 			// 4. 设置Workflow权限
 			console.log('🔵 [setupRepository] 步骤4: 设置Workflow权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.workflowPermissions', '正在设置Workflow权限...'));
-			await this.setupWorkflowPermissions(octokit, owner, repo);
+			await this.setupWorkflowPermissions(owner, repo);
 			console.log('✅ [setupRepository] 步骤4完成');
 
 			// 5. 创建Secrets
 			console.log('🔵 [setupRepository] 步骤5: 创建Secrets...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.secrets', '正在创建Secrets...'));
-			await this.setupSecrets(octokit, owner, repo, token);
+			await this.setupSecrets(owner, repo, token);
 			console.log('✅ [setupRepository] 步骤5完成');
 
 			// 6. 设置团队权限
 			console.log('🔵 [setupRepository] 步骤6: 设置团队权限...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.teamPermissions', '正在设置团队权限...'));
-			await this.setupTeamPermissions(octokit, owner, repo);
+			await this.setupTeamPermissions(owner, repo);
 			console.log('✅ [setupRepository] 步骤6完成');
 
 			// 7. 启用Discussions功能
 			console.log('🔵 [setupRepository] 步骤7: 启用Discussions...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.discussions', '正在启用Discussions...'));
-			await this.setupDiscussions(octokit, owner, repo);
+			await this.setupDiscussions(owner, repo);
 			console.log('✅ [setupRepository] 步骤7完成');
 
 			// 8. 获取并缓存Discussions分类列表
 			console.log('🔵 [setupRepository] 步骤8: 缓存Discussions分类列表...');
 			this.updateContinueButtonState('loading', this.t('login.settingUp.cachingCategories', '正在缓存分类列表...'));
-			await this.cacheDiscussionCategories(octokit, owner, repo);
+			await this.cacheDiscussionCategories(owner, repo);
 			console.log('✅ [setupRepository] 步骤8完成');
 
 			console.log('✅ [setupRepository] 所有设置完成！');
@@ -1261,12 +1272,11 @@ class RepositorySelectionPage extends BasePage {
 	 * 批量创建所有初始文件（一次性提交）
 	 * 包括：CODEOWNERS、POINT系统文件、角色定义文件、GitHub Actions工作流
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {string} token - GitHub访问令牌
 	 */
-	async setupInitialFiles(octokit, owner, repo, token, repositoryCreationTime = null) {
+	async setupInitialFiles(owner, repo, token, repositoryCreationTime = null) {
 		console.log('正在准备批量创建初始文件...');
 		// 使用传入的仓库创建时间，如果没有则使用当前时间（兼容旧代码）
 		const time = repositoryCreationTime || new Date().toISOString();
@@ -1324,12 +1334,14 @@ ${this.state.userInfo.username},1000,1000
 		const workflows = [
 			'auto-approve-collaborators.yml',
 			'accept-invitation.yml',
+			'remove-permission.yml',
 			'grant-points.yml'
 		];
 
 		const workflowPaths = [
 			'.github/workflows/auto-approve-collaborators.yml',
 			'.github/workflows/accept-invitation.yml',
+			'.github/workflows/remove-permission.yml',
 			'.github/workflows/grant-points.yml'
 		];
 
@@ -1350,7 +1362,6 @@ ${this.state.userInfo.username},1000,1000
 		// 5. 批量创建所有文件（一次性提交）
 		try {
 			await this.batchCreateOrUpdateFiles(
-				octokit,
 				owner,
 				repo,
 				allFiles,
@@ -1371,8 +1382,9 @@ ${this.state.userInfo.username},1000,1000
 	 * @throws {Error} 如果文件加载失败
 	 */
 	async loadFileTemplate(path) {
-		// 从服务器加载文件
-		const response = await fetch(`/templates/${path}`);
+		// 从服务器加载文件（使用app.getFullPath处理基础路径）
+		const filePath = window.app ? window.app.getFullPath(`/templates/${path}`) : `/templates/${path}`;
+		const response = await fetch(filePath);
 		if (response.ok) {
 			return await response.text();
 		} else {
@@ -1382,21 +1394,23 @@ ${this.state.userInfo.username},1000,1000
 
 	/**
 	 * 批量创建或更新文件（一次性提交）
-	 * @param {Object} octokit - GitHub API 客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名
 	 * @param {Array} files - 文件数组，每个元素包含 {path, content}
 	 * @param {string} message - 提交消息
 	 */
-	async batchCreateOrUpdateFiles(octokit, owner, repo, files, message) {
+	async batchCreateOrUpdateFiles(owner, repo, files, message) {
 		// 检查仓库是否为空
 		let isEmptyRepo = false;
 
 		try {
-			const { data: refData } = await octokit.rest.git.getRef({
-				owner,
-				repo,
-				ref: 'heads/main'
+			await window.GitHubService.safeCall(async (octokit) => {
+				const { data: refData } = await octokit.rest.git.getRef({
+					owner,
+					repo,
+					ref: 'heads/main'
+				});
+				return refData;
 			});
 		} catch (error) {
 			if (error.status === 404 || error.status === 409) {
@@ -1412,12 +1426,14 @@ ${this.state.userInfo.username},1000,1000
 
 			if (files.length > 0) {
 				// 创建第一个文件
-				await octokit.rest.repos.createOrUpdateFileContents({
-					owner,
-					repo,
-					path: files[0].path,
-					message: `Initial commit: ${message}`,
-					content: btoa(unescape(encodeURIComponent(files[0].content)))
+				await window.GitHubService.safeCall(async (octokit) => {
+					await octokit.rest.repos.createOrUpdateFileContents({
+						owner,
+						repo,
+						path: files[0].path,
+						message: `Initial commit: ${message}`,
+						content: btoa(unescape(encodeURIComponent(files[0].content)))
+					});
 				});
 
 				console.log(`✅ 已创建第一个文件 ${files[0].path}，建立初始提交`);
@@ -1428,23 +1444,23 @@ ${this.state.userInfo.username},1000,1000
 					console.log(`继续为剩余的 ${remainingFiles.length} 个文件创建提交`);
 
 					// 使用git操作批量提交剩余文件
-					await this.createBatchCommit(octokit, owner, repo, remainingFiles, message);
+					await this.createBatchCommit(owner, repo, remainingFiles, message);
 				}
 			}
 			return 'created';
 		}
 
 		// 非空仓库使用git操作批量提交所有文件
-		await this.createBatchCommit(octokit, owner, repo, files, message);
+		await this.createBatchCommit(owner, repo, files, message);
 		return 'created';
 	}
 
 	/**
 	 * 使用git操作批量创建提交
 	 */
-	async createBatchCommit(octokit, owner, repo, files, message) {
+	async createBatchCommit(owner, repo, files, message) {
 		// 1. 获取当前用户信息
-		const { data: userInfo } = await octokit.rest.users.getAuthenticated();
+		const userInfo = await window.GitHubService.getAuthenticatedUser();
 		const author = {
 			name: userInfo.name || userInfo.login,
 			email: userInfo.email || `${userInfo.login}@users.noreply.github.com`,
@@ -1452,18 +1468,24 @@ ${this.state.userInfo.username},1000,1000
 		};
 
 		// 2. 获取最新的提交SHA
-		const { data: refData } = await octokit.rest.git.getRef({
-			owner,
-			repo,
-			ref: 'heads/main'
+		const refData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.getRef({
+				owner,
+				repo,
+				ref: 'heads/main'
+			});
+			return data;
 		});
 		const baseTreeSHA = refData.object.sha;
 
 		// 3. 获取基础tree的SHA
-		const { data: commitData } = await octokit.rest.git.getCommit({
-			owner,
-			repo,
-			commit_sha: baseTreeSHA
+		const commitData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.getCommit({
+				owner,
+				repo,
+				commit_sha: baseTreeSHA
+			});
+			return data;
 		});
 		const treeSha = commitData.tree.sha;
 
@@ -1472,11 +1494,14 @@ ${this.state.userInfo.username},1000,1000
 			const blobContent = btoa(unescape(encodeURIComponent(file.content)));
 
 			// 创建blob
-			const { data: blobData } = await octokit.rest.git.createBlob({
-				owner,
-				repo,
-				content: blobContent,
-				encoding: 'base64'
+			const blobData = await window.GitHubService.safeCall(async (octokit) => {
+				const { data } = await octokit.rest.git.createBlob({
+					owner,
+					repo,
+					content: blobContent,
+					encoding: 'base64'
+				});
+				return data;
 			});
 
 			return {
@@ -1488,30 +1513,38 @@ ${this.state.userInfo.username},1000,1000
 		}));
 
 		// 5. 创建新的tree
-		const { data: treeData } = await octokit.rest.git.createTree({
-			owner,
-			repo,
-			base_tree: treeSha,
-			tree: treeItems
+		const treeData = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.createTree({
+				owner,
+				repo,
+				base_tree: treeSha,
+				tree: treeItems
+			});
+			return data;
 		});
 
 		// 6. 创建新的commit
-		const { data: commit } = await octokit.rest.git.createCommit({
-			owner,
-			repo,
-			message: message,
-			tree: treeData.sha,
-			parents: [baseTreeSHA],
-			author: author,
-			committer: author
+		const commit = await window.GitHubService.safeCall(async (octokit) => {
+			const { data } = await octokit.rest.git.createCommit({
+				owner,
+				repo,
+				message: message,
+				tree: treeData.sha,
+				parents: [baseTreeSHA],
+				author: author,
+				committer: author
+			});
+			return data;
 		});
 
 		// 7. 更新引用
-		await octokit.rest.git.updateRef({
-			owner,
-			repo,
-			ref: 'heads/main',
-			sha: commit.sha
+		await window.GitHubService.safeCall(async (octokit) => {
+			await octokit.rest.git.updateRef({
+				owner,
+				repo,
+				ref: 'heads/main',
+				sha: commit.sha
+			});
 		});
 	}
 
@@ -1519,11 +1552,10 @@ ${this.state.userInfo.username},1000,1000
 	 * 设置分支保护规则
 	 * 启用CODEOWNERS审查要求，保护受保护的文件
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupBranchProtection(octokit, owner, repo) {
+	async setupBranchProtection(owner, repo) {
 		const protectionRules = {
 			required_status_checks: {
 				strict: false,        // 不要求分支是最新的，允许协作者创建分支
@@ -1538,44 +1570,52 @@ ${this.state.userInfo.username},1000,1000
 			restrictions: null        // 不限制推送用户，让协作者可以推送
 		};
 
-		await octokit.rest.repos.updateBranchProtection({
-			owner, repo, branch: 'main',
-			...protectionRules
+		await window.GitHubService.safeCall(async (octokit) => {
+			await octokit.rest.repos.updateBranchProtection({
+				owner, repo, branch: 'main',
+				...protectionRules
+			});
 		});
 	}
 
 	/**
 	 * 设置Actions权限
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupActionsPermissions(octokit, owner, repo) {
-		await octokit.rest.actions.setGithubActionsPermissionsRepository({
-			owner, repo,
-			enabled: true,
-			allowed_actions: 'all'
+	async setupActionsPermissions(owner, repo) {
+		await window.GitHubService.safeCall(async (octokit) => {
+			await octokit.rest.actions.setGithubActionsPermissionsRepository({
+				owner, repo,
+				enabled: true,
+				allowed_actions: 'all'
+			});
 		});
 	}
 
 	/**
 	 * 设置Workflow权限
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupWorkflowPermissions(octokit, owner, repo) {
+	async setupWorkflowPermissions(owner, repo) {
 		try {
 			// 先获取当前权限设置
-			const { data: currentActionsPermissions } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions', {
-				owner, repo
+			const currentActionsPermissions = await window.GitHubService.safeCall(async (octokit) => {
+				const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions', {
+					owner, repo
+				});
+				return data;
 			});
 			console.log('🔍 当前Actions权限设置:', currentActionsPermissions);
 
-			const { data: currentWorkflowPermissions } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions/workflow', {
-				owner, repo
+			const currentWorkflowPermissions = await window.GitHubService.safeCall(async (octokit) => {
+				const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/permissions/workflow', {
+					owner, repo
+				});
+				return data;
 			});
 			console.log('🔍 当前Workflow权限设置:', currentWorkflowPermissions);
 
@@ -1592,7 +1632,9 @@ ${this.state.userInfo.username},1000,1000
 					allowed_actions: 'all'
 				};
 				console.log('🔄 设置Actions权限参数:', actionsPermissions);
-				await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions', actionsPermissions);
+				await window.GitHubService.safeCall(async (octokit) => {
+					await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions', actionsPermissions);
+				});
 				console.log('✅ Actions权限设置成功');
 
 				// 设置Workflow权限
@@ -1602,7 +1644,9 @@ ${this.state.userInfo.username},1000,1000
 					can_approve_pull_request_reviews: true
 				};
 				console.log('🔄 设置Workflow权限参数:', workflowPermissions);
-				await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions/workflow', workflowPermissions);
+				await window.GitHubService.safeCall(async (octokit) => {
+					await octokit.request('PUT /repos/{owner}/{repo}/actions/permissions/workflow', workflowPermissions);
+				});
 				console.log('✅ Workflow权限设置成功');
 			} else {
 				console.log('ℹ️ 所有权限已正确设置，跳过更新');
@@ -1617,16 +1661,18 @@ ${this.state.userInfo.username},1000,1000
 	/**
 	 * 创建GitHub Secrets
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {string} token - GitHub访问令牌
 	 */
-	async setupSecrets(octokit, owner, repo, token) {
+	async setupSecrets(owner, repo, token) {
 		try {
 			// 获取公钥
-			const { data: publicKeyData } = await octokit.rest.actions.getRepoPublicKey({
-				owner, repo
+			const publicKeyData = await window.GitHubService.safeCall(async (octokit) => {
+				const { data } = await octokit.rest.actions.getRepoPublicKey({
+					owner, repo
+				});
+				return data;
 			});
 
 			console.log('🔑 获取到公钥:', publicKeyData.key_id);
@@ -1637,19 +1683,24 @@ ${this.state.userInfo.username},1000,1000
 			// 使用Web Crypto API进行正确的加密
 			const encryptedValue = await this.encryptSecret(secretValue, publicKeyData.key);
 
-			await octokit.rest.actions.createOrUpdateRepoSecret({
-				owner, repo,
-				secret_name: 'COLLABORATOR_TOKEN',
-				encrypted_value: encryptedValue,
-				key_id: publicKeyData.key_id
+			await window.GitHubService.safeCall(async (octokit) => {
+				await octokit.rest.actions.createOrUpdateRepoSecret({
+					owner, repo,
+					secret_name: 'COLLABORATOR_TOKEN',
+					encrypted_value: encryptedValue,
+					key_id: publicKeyData.key_id
+				});
 			});
 
 			console.log('✅ COLLABORATOR_TOKEN secret创建成功');
 
 			// 验证secret是否创建成功
 			try {
-				const { data: secrets } = await octokit.rest.actions.listRepoSecrets({
-					owner, repo
+				const secrets = await window.GitHubService.safeCall(async (octokit) => {
+					const { data } = await octokit.rest.actions.listRepoSecrets({
+						owner, repo
+					});
+					return data;
 				});
 				console.log('🔍 当前仓库的secrets:', secrets.secrets.map(s => s.name));
 			} catch (verifyError) {
@@ -1700,11 +1751,10 @@ ${this.state.userInfo.username},1000,1000
 	/**
 	 * 设置团队权限
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupTeamPermissions(octokit, owner, repo) {
+	async setupTeamPermissions(owner, repo) {
 		try {
 			// 定义需要创建的团队（根据4个角色：所有者、审核委员、维护者、贡献者）
 			const teams = [
@@ -1730,9 +1780,11 @@ ${this.state.userInfo.username},1000,1000
 					// 检查团队是否已存在
 					let teamExists = false;
 					try {
-						await octokit.rest.teams.getByName({
-							org: owner,
-							team_slug: team.name
+						await window.GitHubService.safeCall(async (octokit) => {
+							await octokit.rest.teams.getByName({
+								org: owner,
+								team_slug: team.name
+							});
 						});
 						teamExists = true;
 						console.log(`✅ 团队 ${team.name} 已存在`);
@@ -1745,22 +1797,26 @@ ${this.state.userInfo.username},1000,1000
 
 					// 如果团队不存在，创建团队
 					if (!teamExists) {
-						const { data: createdTeam } = await octokit.rest.teams.create({
-							org: owner,
-							name: team.name,
-							description: team.description,
-							privacy: 'closed'
+						await window.GitHubService.safeCall(async (octokit) => {
+							const { data: createdTeam } = await octokit.rest.teams.create({
+								org: owner,
+								name: team.name,
+								description: team.description,
+								privacy: 'closed'
+							});
+							console.log(`✅ 创建团队 ${team.name} 成功`);
 						});
-						console.log(`✅ 创建团队 ${team.name} 成功`);
 					}
 
 					// 设置团队仓库权限
-					await octokit.rest.teams.addOrUpdateRepoPermissionsInOrg({
-						org: owner,
-						team_slug: team.name,
-						owner: owner,
-						repo: repo,
-						permission: team.permission
+					await window.GitHubService.safeCall(async (octokit) => {
+						await octokit.rest.teams.addOrUpdateRepoPermissionsInOrg({
+							org: owner,
+							team_slug: team.name,
+							owner: owner,
+							repo: repo,
+							permission: team.permission
+						});
 					});
 
 					console.log(`✅ 设置团队 ${team.name} 权限为 ${team.permission}`);
@@ -1772,7 +1828,7 @@ ${this.state.userInfo.username},1000,1000
 			}
 
 			// 设置分支保护规则，只允许审核委员合并到main分支
-			await this.setupBranchProtectionForTeams(octokit, owner, repo);
+			await this.setupBranchProtectionForTeams(owner, repo);
 
 		} catch (error) {
 			console.error('❌ 设置团队权限失败:', error);
@@ -1783,34 +1839,35 @@ ${this.state.userInfo.username},1000,1000
 	/**
 	 * 为团队设置分支保护规则
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 组织名称
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupBranchProtectionForTeams(octokit, owner, repo) {
+	async setupBranchProtectionForTeams(owner, repo) {
 		try {
 			// 设置main分支保护规则
-			await octokit.rest.repos.updateBranchProtection({
-				owner: owner,
-				repo: repo,
-				branch: 'main',
-				required_status_checks: {
-					strict: true,
-					contexts: []
-				},
-				enforce_admins: false,
-				required_pull_request_reviews: {
-					required_approving_review_count: 1,
-					dismiss_stale_reviews: true,
-					require_code_owner_reviews: true
-				},
-				restrictions: {
-					users: [],
-					teams: ['reviewers'], // 只有审核委员可以合并
-					apps: []
-				},
-				allow_force_pushes: false,
-				allow_deletions: false
+			await window.GitHubService.safeCall(async (octokit) => {
+				await octokit.rest.repos.updateBranchProtection({
+					owner: owner,
+					repo: repo,
+					branch: 'main',
+					required_status_checks: {
+						strict: true,
+						contexts: []
+					},
+					enforce_admins: false,
+					required_pull_request_reviews: {
+						required_approving_review_count: 1,
+						dismiss_stale_reviews: true,
+						require_code_owner_reviews: true
+					},
+					restrictions: {
+						users: [],
+						teams: ['reviewers'], // 只有审核委员可以合并
+						apps: []
+					},
+					allow_force_pushes: false,
+					allow_deletions: false
+				});
 			});
 
 			console.log('✅ 设置main分支保护规则成功 - 只有审核委员可以合并');
@@ -1824,19 +1881,15 @@ ${this.state.userInfo.username},1000,1000
 	/**
 	 * 启用Discussions功能
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async setupDiscussions(octokit, owner, repo) {
+	async setupDiscussions(owner, repo) {
 		try {
 			console.log('🔧 正在启用Discussions...');
 
 			// 获取仓库信息以获取repository ID
-			const { data: repoInfo } = await octokit.rest.repos.get({
-				owner,
-				repo
-			});
+			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
 
 			const repositoryId = repoInfo.node_id; // node_id就是GitHub的ID格式
 
@@ -1846,7 +1899,7 @@ ${this.state.userInfo.username},1000,1000
 			}
 
 			// 使用GraphQL API启用Discussions
-			await octokit.graphql(`
+			await window.GitHubService.graphql(`
 				mutation EnableDiscussions($repoId: ID!) {
 					updateRepository(input: {
 						repositoryId: $repoId,
@@ -1875,16 +1928,15 @@ ${this.state.userInfo.username},1000,1000
 	/**
 	 * 获取并缓存Discussions分类列表
 	 * @async
-	 * @param {Object} octokit - GitHub API客户端
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 */
-	async cacheDiscussionCategories(octokit, owner, repo) {
+	async cacheDiscussionCategories(owner, repo) {
 		try {
 			console.log('🔧 正在获取Discussions分类列表...');
 
 			// 获取Discussions分类列表
-			const categoriesResult = await octokit.graphql(`
+			const categoriesResult = await window.GitHubService.graphql(`
 				query GetDiscussionCategories($owner: String!, $name: String!) {
 					repository(owner: $owner, name: $name) {
 						discussionCategories(first: 10) {

@@ -9,8 +9,14 @@ class Header extends Component {
 			title: props.title || 'DIPCP',
 			currentPage: props.currentPage || '',
 			navigationItems: props.navigationItems || [],
+			menuOpen: false, // 移动端菜单开关状态
 		};
 		this.checkInterval = null;
+		this.overlayElement = null; // 遮罩层元素引用
+		this.overlayTimeout = null; // 遮罩层隐藏的延迟定时器
+		this.overlayClickHandler = null; // 遮罩层点击事件处理器引用
+		this._toggleButtonHandler = null; // 菜单切换按钮事件处理器引用
+		this._navItemHandlers = new Map(); // 导航项事件处理器映射
 	}
 
 	render() {
@@ -19,10 +25,15 @@ class Header extends Component {
 		header.innerHTML = `
             <div class="header-left">
                 <h1 class="logo">${this.state.title}</h1>
-                <nav class="nav-menu">
+                <nav class="nav-menu ${this.state.menuOpen ? 'nav-menu-open' : ''}">
                     ${this.renderNavigationItems()}
                 </nav>
             </div>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+                <span class="nav-toggle-icon"></span>
+                <span class="nav-toggle-icon"></span>
+                <span class="nav-toggle-icon"></span>
+            </button>
         `;
 		return header;
 	}
@@ -60,6 +71,8 @@ class Header extends Component {
 		if (navMenu) {
 			navMenu.innerHTML = this.renderNavigationItems();
 			this.bindEvents();
+			// 更新菜单的显示状态
+			this.updateMenuVisibility();
 		}
 	}
 
@@ -107,10 +120,178 @@ class Header extends Component {
 			}
 		}
 
+		// 绑定移动端菜单切换按钮（先移除旧的事件监听器，防止重复绑定）
+		const navToggle = this.element.querySelector('#nav-toggle');
+		if (navToggle) {
+			// 如果已经绑定过，先移除
+			if (this._toggleButtonHandler) {
+				navToggle.removeEventListener('click', this._toggleButtonHandler);
+			}
+			// 创建新的事件处理器并保存引用
+			this._toggleButtonHandler = () => {
+				this.toggleMenu();
+			};
+			navToggle.addEventListener('click', this._toggleButtonHandler);
+		}
+
+		// 点击导航项后关闭菜单（移动端）
+		const navItems = this.element.querySelectorAll('.nav-item');
+		navItems.forEach((item, index) => {
+			// 如果已经绑定过，先移除
+			if (this._navItemHandlers.has(index)) {
+				item.removeEventListener('click', this._navItemHandlers.get(index));
+			}
+			// 创建新的事件处理器并保存引用
+			const handler = () => {
+				// 使用媒体查询判断是否为移动端，而不是直接检查窗口宽度
+				if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+					this.setState({ menuOpen: false });
+					this.updateMenuVisibility(false);
+				}
+			};
+			this._navItemHandlers.set(index, handler);
+			item.addEventListener('click', handler);
+		});
+
+		// 清理已不存在的导航项的事件处理器引用
+		const existingIndices = new Set(Array.from({ length: navItems.length }, (_, i) => i));
+		for (const [index] of this._navItemHandlers) {
+			if (!existingIndices.has(index)) {
+				this._navItemHandlers.delete(index);
+			}
+		}
+
+		// 遮罩层的事件在 updateMenuVisibility() 中绑定，这里不需要重复绑定
+
 		// 只在第一次绑定时启动定期检查未读通知
 		if (!this._pollingStarted) {
 			this._pollingStarted = true;
 			this.startCheckingUnreadMentions();
+		}
+	}
+
+	/**
+	 * 切换移动端菜单显示/隐藏
+	 */
+	toggleMenu() {
+		const wasOpen = this.state.menuOpen;
+		const newMenuOpen = !wasOpen;
+		this.setState({ menuOpen: newMenuOpen });
+		// 使用新状态值更新菜单可见性
+		this.updateMenuVisibility(newMenuOpen);
+
+		// 如果菜单打开，添加 body 点击监听；如果关闭，移除监听
+		if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+			if (newMenuOpen) {
+				// 菜单刚打开，添加遮罩层点击监听
+				setTimeout(() => {
+					const handleBodyClick = (e) => {
+						const navMenu = this.element?.querySelector('.nav-menu');
+						const navToggle = this.element?.querySelector('.nav-toggle');
+
+						// 如果点击的不是菜单或按钮，关闭菜单
+						if (navMenu && navMenu.classList.contains('nav-menu-open')) {
+							if (!navMenu.contains(e.target) &&
+								!navToggle?.contains(e.target)) {
+								this.setState({ menuOpen: false });
+								this.updateMenuVisibility(false);
+								document.body.removeEventListener('click', handleBodyClick, true);
+								this._bodyClickHandler = null;
+							}
+						}
+					};
+
+					document.body.addEventListener('click', handleBodyClick, true);
+					this._bodyClickHandler = handleBodyClick;
+				}, 100);
+			} else if (this._bodyClickHandler) {
+				// 菜单关闭，移除监听
+				document.body.removeEventListener('click', this._bodyClickHandler, true);
+				this._bodyClickHandler = null;
+			}
+		}
+	}
+
+	/**
+	 * 更新菜单的显示/隐藏状态（通过CSS类控制，不重新渲染）
+	 * @param {boolean} menuOpen - 菜单是否打开（可选，默认使用 this.state.menuOpen）
+	 */
+	updateMenuVisibility(menuOpen = null) {
+		if (!this.element) return;
+
+		// 使用传入的值，如果没有传入则使用 state 中的值
+		const shouldMenuOpen = menuOpen !== null ? menuOpen : this.state.menuOpen;
+
+		// 清除之前的延迟隐藏定时器
+		if (this.overlayTimeout) {
+			clearTimeout(this.overlayTimeout);
+			this.overlayTimeout = null;
+		}
+
+		const navMenu = this.element.querySelector('.nav-menu');
+
+		// 更新菜单显示状态
+		if (navMenu) {
+			if (shouldMenuOpen) {
+				navMenu.classList.add('nav-menu-open');
+			} else {
+				navMenu.classList.remove('nav-menu-open');
+			}
+		}
+
+		// 每次都从 DOM 中查找遮罩层，确保使用正确的引用
+		// 同时清理可能存在的重复遮罩层
+		const existingOverlays = document.querySelectorAll('.nav-menu-overlay');
+
+		// 如果存在多个遮罩层，只保留第一个，删除其他的
+		if (existingOverlays.length > 1) {
+			for (let i = 1; i < existingOverlays.length; i++) {
+				existingOverlays[i].remove();
+			}
+		}
+
+		// 使用第一个（也是唯一的）遮罩层
+		this.overlayElement = existingOverlays.length > 0 ? existingOverlays[0] : null;
+
+		// 更新遮罩层显示状态（无动画，直接显示/隐藏）
+		if (shouldMenuOpen) {
+			// 如果需要显示，确保遮罩层存在
+			if (!this.overlayElement) {
+				this.overlayElement = document.createElement('div');
+				this.overlayElement.className = 'nav-menu-overlay';
+				document.body.appendChild(this.overlayElement);
+
+				// 绑定点击事件（只在创建时绑定一次）
+				this.overlayClickHandler = () => {
+					if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+						this.setState({ menuOpen: false });
+						this.updateMenuVisibility(false);
+					}
+				};
+				this.overlayElement.addEventListener('click', this.overlayClickHandler);
+			}
+
+			// 清除之前的隐藏定时器（如果存在）
+			if (this.overlayTimeout) {
+				clearTimeout(this.overlayTimeout);
+				this.overlayTimeout = null;
+			}
+
+			// 直接显示遮罩层
+			this.overlayElement.style.display = 'block';
+			this.overlayElement.classList.add('active');
+		} else {
+			// 清除之前的隐藏定时器（如果存在）
+			if (this.overlayTimeout) {
+				clearTimeout(this.overlayTimeout);
+				this.overlayTimeout = null;
+			}
+
+			// 直接隐藏遮罩层（如果存在）
+			if (this.overlayElement) {
+				this.overlayElement.style.display = 'none';
+				this.overlayElement.classList.remove('active');
+			}
 		}
 	}
 
@@ -172,14 +353,11 @@ class Header extends Component {
 				return;
 			}
 
-			const octokit = new window.Octokit({ auth: currentUser.token });
+			// 初始化 GitHubService
+			await window.GitHubService.initFromUser(currentUser);
 
 			// 获取main分支的最新提交SHA
-			const { data: branchData } = await octokit.rest.repos.getBranch({
-				owner: repoInfo.owner,
-				repo: repoInfo.repo,
-				branch: 'main'
-			});
+			const branchData = await window.GitHubService.getBranch(repoInfo.owner, repoInfo.repo, 'main', true);
 
 			const latestCommitSha = branchData.commit.sha;
 
@@ -256,7 +434,7 @@ class Header extends Component {
 				return;
 			}
 
-			const currentUsername = currentUser.login || currentUser.username;
+			const currentUsername = currentUser.username;
 			if (!currentUsername) {
 				return;
 			}
@@ -266,29 +444,31 @@ class Header extends Component {
 				return;
 			}
 
-			const octokit = new window.Octokit({ auth: currentUser.token });
+			// 初始化 GitHubService
+			await window.GitHubService.initFromUser(currentUser);
+
 			const username = currentUsername.toLowerCase();
 
 			// 检查 Discussions
 			try {
-				const result = await octokit.graphql(`
-					query GetRecentDiscussions($owner: String!, $name: String!) {
-						repository(owner: $owner, name: $name) {
-							discussions(first: 10, orderBy: {field: CREATED_AT, direction: DESC}) {
-								edges {
-									node {
-										number
-										title
-										body
-										author {
-											login
-										}
+				const result = await window.GitHubService.graphql(`
+				query GetRecentDiscussions($owner: String!, $name: String!) {
+					repository(owner: $owner, name: $name) {
+						discussions(first: 10, orderBy: {field: CREATED_AT, direction: DESC}) {
+							edges {
+								node {
+									number
+									title
+									body
+									author {
+										login
 									}
 								}
 							}
 						}
 					}
-				`, {
+				}
+			`, {
 					owner: repoInfo.owner,
 					name: repoInfo.repo
 				});
@@ -328,16 +508,12 @@ class Header extends Component {
 
 			// 检查 Issues
 			try {
-				const issuesResult = await octokit.rest.issues.listForRepo({
-					owner: repoInfo.owner,
-					repo: repoInfo.repo,
+				const issues = await window.GitHubService.listIssues(repoInfo.owner, repoInfo.repo, {
 					state: 'open',
 					sort: 'updated',
 					direction: 'desc',
 					per_page: 20
-				});
-
-				const issues = issuesResult.data || [];
+				}, true);
 				const unreadIssues = [];
 
 				issues.forEach(issue => {

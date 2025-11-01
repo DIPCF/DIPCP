@@ -79,12 +79,11 @@ class DiscussionsPage extends BasePage {
 			searchQuery: '',
 			sortBy: 'latest', // latest, hottest, replies
 			// API 状态
-			apiConfigured: false,
-			octokit: null
+			apiConfigured: false
 		};
 
-		// 初始化 Octokit（如果可用）
-		this.initOctokit();
+		// 初始化 GitHub 服务（如果可用）
+		this.initGitHubService();
 	}
 
 	/**
@@ -116,32 +115,24 @@ class DiscussionsPage extends BasePage {
 	}
 
 	/**
-	 * 初始化 Octokit
+	 * 初始化 GitHub 服务
 	 */
-	initOctokit() {
+	async initGitHubService() {
 		try {
-			// 检查Octokit是否可用
-			if (typeof Octokit === 'undefined') {
-				console.warn('Octokit 未加载');
-				this.state.apiConfigured = false;
-				return;
-			}
-
-			// 从用户信息获取token
 			if (!this.state.user || !this.state.user.token) {
 				console.warn('用户未登录或没有token');
 				this.state.apiConfigured = false;
 				return;
 			}
 
-			const token = this.state.user.token;
+			const initialized = await window.GitHubService.initFromUser(this.state.user);
+			this.state.apiConfigured = initialized;
 
-			// 创建Octokit实例
-			this.state.octokit = new Octokit({ auth: token });
-			this.state.apiConfigured = true;
-			console.log('Octokit 初始化成功');
+			if (initialized) {
+				console.log('GitHub 服务初始化成功');
+			}
 		} catch (error) {
-			console.error('初始化 Octokit 失败:', error);
+			console.error('初始化 GitHub 服务失败:', error);
 			this.state.apiConfigured = false;
 		}
 	}
@@ -207,9 +198,9 @@ class DiscussionsPage extends BasePage {
 				<div class="toolbar-actions">
 					<input type="text" 
 						class="search-input" 
-						placeholder="${this.t('discussions.searchPlaceholder', '搜索讨论...')}" 
+						placeholder="${this.tAttr('discussions.searchPlaceholder', '搜索讨论...')}" 
 						id="discussionsSearch"
-						value="${this.state.searchQuery}">
+						value="${this.escapeHtmlAttribute(this.state.searchQuery)}">
 					<select class="sort-select" id="discussionsSort">
 						<option value="latest" ${this.state.sortBy === 'latest' ? 'selected' : ''}>
 							${this.t('discussions.sort.latest', '最新')}
@@ -390,7 +381,7 @@ class DiscussionsPage extends BasePage {
 	 * @returns {boolean} 是否有未读@mention
 	 */
 	hasUnreadMentionForDiscussion(discussion) {
-		if (!this.state.user || !this.state.user.login) {
+		if (!this.state.user || !this.state.user.username) {
 			return false;
 		}
 
@@ -425,7 +416,7 @@ class DiscussionsPage extends BasePage {
 		const discussion = this.state.selectedDiscussion;
 		const timeAgo = this.getTimeAgo(discussion.created_at);
 		const author = discussion.author || { login: 'Unknown' };
-		const isAuthor = this.state.user && author.login === this.state.user.login;
+		const isAuthor = this.state.user && author.login === this.state.user.username;
 		// 检查是否有关闭权限（发起者或所有者）
 		const canClose = isAuthor || (this.state.user && this.state.user.permissionInfo &&
 			(this.state.user.permissionInfo.role === 'owner' || this.state.user.permissionInfo.role === 'director'));
@@ -499,9 +490,9 @@ class DiscussionsPage extends BasePage {
 							<textarea 
 								class="comment-input" 
 								id="replyTextInput"
-								placeholder="${this.t('discussions.addReply', '添加回复...')}"
+								placeholder="${this.tAttr('discussions.addReply', '添加回复...')}"
 								rows="4"
-								${this.state.submittingReply ? 'disabled' : ''}>${this.state.replyText}</textarea>
+								${this.state.submittingReply ? 'disabled' : ''}>${this.escapeHtml(this.state.replyText)}</textarea>
 							<button class="btn btn-primary" id="submitReplyBtn" ${this.state.submittingReply ? 'disabled' : ''}>
 								${this.state.submittingReply ? this.t('common.submitting', '提交中...') : this.t('discussions.submitReply', '提交回复')}
 							</button>
@@ -539,7 +530,7 @@ class DiscussionsPage extends BasePage {
 	renderCommentCard(comment) {
 		const timeAgo = this.getTimeAgo(comment.created_at);
 		const author = comment.author || comment.user || { login: 'Unknown' };
-		const isAuthor = this.state.user && author.login === this.state.user.login;
+		const isAuthor = this.state.user && author.login === this.state.user.username;
 
 		return `
 			<div class="comment-card" data-comment-id="${comment.id}">
@@ -622,15 +613,15 @@ class DiscussionsPage extends BasePage {
 							<input type="text" 
 								class="form-control" 
 								id="newDiscussionTitleInput"
-								value="${this.escapeHtml(this.state.newDiscussionTitle)}"
-								placeholder="${this.t('discussions.titlePlaceholder', '输入讨论标题...')}">
+								value="${this.escapeHtmlAttribute(this.state.newDiscussionTitle)}"
+								placeholder="${this.tAttr('discussions.titlePlaceholder', '输入讨论标题...')}">
 						</div>
 						<div class="form-group">
 							<label>${this.t('discussions.categoryLabel', '分类')}</label>
 							<select class="form-control" id="newDiscussionCategoryInput">
 								${this.state.categories.map(cat => `
-									<option value="${cat.id}" ${cat.id === this.state.newDiscussionCategory ? 'selected' : ''}>
-										${cat.emoji} ${cat.description}
+									<option value="${this.escapeHtmlAttribute(cat.id)}" ${cat.id === this.state.newDiscussionCategory ? 'selected' : ''}>
+										${cat.emoji} ${this.escapeHtml(cat.description)}
 									</option>
 								`).join('')}
 							</select>
@@ -640,7 +631,7 @@ class DiscussionsPage extends BasePage {
 							<textarea class="form-control" 
 								id="newDiscussionBodyInput"
 								rows="8"
-								placeholder="${this.t('discussions.contentPlaceholder', '输入讨论内容（支持Markdown格式）...')}">${this.escapeHtml(this.state.newDiscussionBody)}</textarea>
+								placeholder="${this.tAttr('discussions.contentPlaceholder', '输入讨论内容（支持Markdown格式）...')}">${this.escapeHtml(this.state.newDiscussionBody)}</textarea>
 						</div>
 					</div>
 					<div class="modal-footer">
@@ -695,14 +686,19 @@ class DiscussionsPage extends BasePage {
 	 * 挂载组件
 	 * @param {HTMLElement} container - 容器元素
 	 */
-	mount(container) {
+	async mount(container) {
 		super.mount(container);
 
 		// 绑定事件
 		this.bindEvents();
 
+		// 确保 GitHub 服务初始化完成
+		if (!this.state.apiConfigured) {
+			await this.initGitHubService();
+		}
+
 		// 加载讨论数据
-		this.loadDiscussions();
+		await this.loadDiscussions();
 	}
 
 	/**
@@ -932,7 +928,14 @@ class DiscussionsPage extends BasePage {
 			btn.addEventListener('click', (e) => {
 				const action = btn.dataset.action;
 				const commentId = btn.dataset.commentId;
-				this.handleLikeComment(action, commentId);
+				if (action === 'edit-comment') {
+					// TODO: 实现编辑评论功能
+					alert(this.t('discussions.featureNotImplemented', '该功能尚未实现'));
+				} else if (action === 'delete-comment') {
+					this.handleDeleteComment(commentId);
+				} else if (action === 'like-comment') {
+					this.handleLikeComment(commentId);
+				}
 			});
 		});
 
@@ -956,7 +959,7 @@ class DiscussionsPage extends BasePage {
 		try {
 			this.setState({ loading: true });
 
-			if (!this.state.apiConfigured || !this.state.octokit) {
+			if (!this.state.apiConfigured) {
 				throw new Error('GitHub API 未配置');
 			}
 
@@ -994,7 +997,7 @@ class DiscussionsPage extends BasePage {
 			}
 
 			// 使用GraphQL获取讨论列表
-			const result = await this.state.octokit.graphql(`
+			const result = await window.GitHubService.graphql(`
 				query GetDiscussions($owner: String!, $name: String!) {
 					repository(owner: $owner, name: $name) {
 						discussions(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -1164,7 +1167,7 @@ class DiscussionsPage extends BasePage {
 			}
 
 			// 从 GitHub 加载完整讨论详情
-			if (this.state.apiConfigured && this.state.octokit) {
+			if (this.state.apiConfigured) {
 				await this.loadDiscussionDetails(discussion);
 			}
 
@@ -1200,7 +1203,7 @@ class DiscussionsPage extends BasePage {
 			if (!owner || !repo) return;
 
 			// 使用GraphQL获取讨论详情和评论
-			const result = await this.state.octokit.graphql(`
+			const result = await window.GitHubService.graphql(`
 				query GetDiscussion($owner: String!, $name: String!, $number: Int!) {
 					repository(owner: $owner, name: $name) {
 						discussion(number: $number) {
@@ -1293,7 +1296,7 @@ class DiscussionsPage extends BasePage {
 		}
 
 		try {
-			if (!this.state.apiConfigured || !this.state.octokit) {
+			if (!this.state.apiConfigured) {
 				throw new Error('GitHub API 未配置');
 			}
 
@@ -1334,7 +1337,7 @@ class DiscussionsPage extends BasePage {
 		const discussionNumber = this.state.selectedDiscussion.number;
 
 		// 使用GraphQL提交回复
-		await this.state.octokit.graphql(`
+		await window.GitHubService.graphql(`
 			mutation AddDiscussionComment($discussionId: ID!, $body: String!) {
 				addDiscussionComment(input: {
 					discussionId: $discussionId
@@ -1386,7 +1389,7 @@ class DiscussionsPage extends BasePage {
 			this.setState({ creatingDiscussion: true });
 			this.updateModalButtons();
 
-			if (!this.state.apiConfigured || !this.state.octokit) {
+			if (!this.state.apiConfigured) {
 				throw new Error('GitHub API 未配置');
 			}
 
@@ -1455,10 +1458,7 @@ class DiscussionsPage extends BasePage {
 		// 首先需要获取仓库ID和分类ID
 		try {
 			// 获取仓库信息以获取repository ID
-			const { data: repoInfo } = await this.state.octokit.rest.repos.get({
-				owner,
-				repo
-			});
+			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
 
 			const repositoryId = repoInfo.node_id;
 
@@ -1481,7 +1481,7 @@ class DiscussionsPage extends BasePage {
 			categoryId = targetCategory ? targetCategory.id : categories[0].id;
 
 			// 使用GraphQL创建讨论
-			const discussion = await this.state.octokit.graphql(`
+			const discussion = await window.GitHubService.graphql(`
 				mutation CreateDiscussion($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 					createDiscussion(input: {
 						repositoryId: $repoId
@@ -1544,7 +1544,7 @@ class DiscussionsPage extends BasePage {
 		if (!categories) {
 			console.log('缓存中未找到分类列表，正在查询GitHub API...');
 			// 使用GraphQL获取分类列表
-			const result = await this.state.octokit.graphql(`
+			const result = await window.GitHubService.graphql(`
 				query GetRepository($owner: String!, $name: String!) {
 					repository(owner: $owner, name: $name) {
 						id
@@ -1648,7 +1648,7 @@ class DiscussionsPage extends BasePage {
 					const discussionNumber = this.state.selectedDiscussion.number;
 
 					// 使用GraphQL锁定讨论
-					const result = await this.state.octokit.graphql(`
+					const result = await window.GitHubService.graphql(`
 					mutation LockDiscussion($discussionId: ID!) {
 						lockLockable(input: {
 							lockableId: $discussionId
@@ -1696,7 +1696,7 @@ class DiscussionsPage extends BasePage {
 			}
 
 			// 使用GraphQL添加reaction到讨论
-			await this.state.octokit.graphql(`
+			await window.GitHubService.graphql(`
 			mutation AddReaction($subjectId: ID!) {
 				addReaction(input: {
 					subjectId: $subjectId
@@ -1748,7 +1748,7 @@ class DiscussionsPage extends BasePage {
 	async handleLikeComment(commentId) {
 		try {
 			// 检查是否已经登录并配置了API
-			if (!this.state.apiConfigured || !this.state.octokit) {
+			if (!this.state.apiConfigured) {
 				alert(this.t('discussions.featureNotImplemented', '该功能尚未实现'));
 				return;
 			}
@@ -1759,7 +1759,7 @@ class DiscussionsPage extends BasePage {
 
 			// GitHub Discussions的评论支持添加reaction
 			// 使用GraphQL添加THUMBS_UP reaction到评论
-			await this.state.octokit.graphql(`
+			await window.GitHubService.graphql(`
 				mutation AddReactionToDiscussionComment($commentId: ID!) {
 					addReaction(input: {
 						subjectId: $commentId
@@ -1875,18 +1875,6 @@ class DiscussionsPage extends BasePage {
 		} else {
 			return date.toLocaleDateString();
 		}
-	}
-
-	/**
-	 * 工具方法：转义HTML
-	 * @param {string} text - 原始文本
-	 * @returns {string} 转义后的文本
-	 */
-	escapeHtml(text) {
-		if (!text) return '';
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
 	}
 
 	/**
