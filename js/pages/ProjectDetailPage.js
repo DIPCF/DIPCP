@@ -1610,7 +1610,7 @@ class ProjectDetailPage extends BasePage {
 		// 显示输入模态框让用户输入文件名
 		this.showInputModal(
 			this.t('projectDetail.fileOperations.modalTitles.createFile', '创建文件'),
-			this.t('projectDetail.fileOperations.enterFileName', '请输入文件名（如无扩展名将自动添加.txt）:'),
+			this.t('projectDetail.fileOperations.enterFileName', '请输入文件名（如无扩展名将自动添加.md）:'),
 			this.t('projectDetail.fileOperations.defaultFileName', 'new-file'),
 			this.t('projectDetail.fileOperations.defaultFileName', 'new-file'),
 			async (fileName) => {
@@ -1623,10 +1623,10 @@ class ProjectDetailPage extends BasePage {
 					return;
 				}
 
-				// 如果没有扩展名，默认添加.txt
+				// 如果没有扩展名，默认添加.md
 				let finalFileName = fileName;
 				if (!fileName.includes('.')) {
-					finalFileName = fileName + '.txt';
+					finalFileName = fileName + '.md';
 				}
 
 				try {

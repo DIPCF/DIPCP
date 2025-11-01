@@ -235,7 +235,7 @@
 		"confirmDelete": "Are you sure you want to delete this file?",
 		"enterFileName": "Please enter file name",
 		"fileOperations": {
-			"enterFileName": "Please enter file name (.txt will be added if no extension):",
+			"enterFileName": "Please enter file name (.md will be added if no extension):",
 			"defaultFileName": "new-file",
 			"fileNameInvalid": "Invalid file name! Please use letters, numbers, underscores, hyphens and dots.",
 			"fileExists": "File already exists!",

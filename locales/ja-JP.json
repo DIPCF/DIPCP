@@ -235,7 +235,7 @@
 		"confirmDelete": "このファイルを削除してもよろしいですか？",
 		"enterFileName": "ファイル名を入力してください",
 		"fileOperations": {
-			"enterFileName": "ファイル名を入力してください（拡張子がない場合は.txtが追加されます）:",
+			"enterFileName": "ファイル名を入力してください（拡張子がない場合は.mdが追加されます）:",
 			"defaultFileName": "new-file",
 			"fileNameInvalid": "無効なファイル名です！文字、数字、アンダースコア、ハイフン、ドットを使用してください。",
 			"fileExists": "ファイルが既に存在します！",

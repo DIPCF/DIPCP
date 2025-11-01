@@ -234,7 +234,7 @@
 		"confirmDelete": "确认删除此文件吗？",
 		"enterFileName": "请输入文件名",
 		"fileOperations": {
-			"enterFileName": "请输入文件名（如无扩展名将自动添加.txt）:",
+			"enterFileName": "请输入文件名（如无扩展名将自动添加.md）:",
 			"defaultFileName": "new-file",
 			"fileNameInvalid": "文件名无效！请使用字母、数字、下划线、连字符和点号。",
 			"fileExists": "文件已存在！",
