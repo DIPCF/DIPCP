@@ -51,7 +51,10 @@
 		"remove": "Remove",
 		"actions": "Actions",
 		"preview": "Preview",
-		"processing": "Processing..."
+		"processing": "Processing...",
+		"loadFailed": "Load Failed",
+		"rateLimitExceeded": "GitHub API rate limit exceeded, please retry after {{hours}} hours {{minutes}} minutes",
+		"serviceNotInitialized": "GitHub service not initialized, please login first"
 	},
 	"navigation": {
 		"dashboard": "Dashboard",
@@ -67,10 +70,11 @@
 		"pageTitle": "Login - DIPCP",
 		"subtitle": "Decentralized Intellectual Property Collaboration Platform",
 		"whyChoose": "Why Choose DIPCP?",
-		"feature1": "✅ Zero Ops Cost, No Server Required",
-		"feature2": "✅ Zero Learning Cost, Open and Use",
-		"feature3": "✅ Zero Barrier, Only GitHub Account Required",
-		"feature4": "✅ Completely Transparent, Fully Traceable",
+		"feature1": "✅ Forever Free!",
+		"feature2": "✅ Write stories with friends, hosted by the Foundation shared copyright",
+		"feature3": "✅ Earn points based on contributions, allocate copyright benefits proportionally",
+		"feature4": "✅ Point records are completely transparent, fully traceable",
+		"feature5": "✅ Build the largest collaborative IP creation community in the world",
 		"repositoryUrl": "Repository URL",
 		"loginButton": "Login",
 		"loggingIn": "Logging in...",
@@ -78,16 +82,11 @@
 			"githubUsername": "GitHub username",
 			"accessToken": "GitHub Access Token (not password!)"
 		},
-		"howToRegister": "How to Register",
 		"howToGetToken": "How to Get Token",
 		"hint": {
-			"createNewUser": "It is strongly recommended to register a new user.",
-			"tokenLocalOnly": "Tokens are saved locally and will not be uploaded to the server."
+			"tokenLocalOnly": "It is strongly recommended to register a new user. Tokens are saved locally and will not be uploaded to the server."
 		},
-		"registerHelpTitle": "How to Register a GitHub Account",
-		"registerHelpContent": "<h3>Step 1: Visit GitHub</h3><p>Open your browser and go to <a href='https://github.com' target='_blank'>https://github.com</a></p><br><h3>Step 2: Click Sign Up</h3><p>Click the <strong>Sign up</strong> button in the top right corner of GitHub homepage</p><br><h3>Step 3: Fill Registration Info</h3><p>• Enter username<br>• Enter email address<br>• Set password<br>• Verify you're not a robot</p><br><h3>Step 4: Verify Email</h3><p>Check your email and click the verification link sent by GitHub</p><br><h3>Step 5: Complete Registration</h3><p>After verification, you can start using your GitHub account!</p>",
-		"tokenHelpTitle": "How to Get GitHub Personal Access Token",
-		"tokenHelpContent": "<h3>Quick Token Access</h3><p>Go directly to: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>Generate Steps</h3><p>• Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• Fill Note: DIPCP Application<br>• Select Expiration: <strong>Recommend 'Never' (no expiration)</strong><br>• <strong>Important: Check ALL permission options (select all)</strong><br>• Click <strong>Generate token</strong></p><br><h3>Copy Token</h3><p>• <strong>Copy and save the token immediately</strong> (only shown once)<br>• Paste the token into the Token field on login page</p><br><p><strong>Note:</strong> Token is only shown once, please save it carefully!</p>",
+		"registerHelpContent": "<h3>Step 1: Visit GitHub</h3><p>Open your browser and go to <a href='https://github.com' target='_blank'>https://github.com</a></p><br><h3>Step 2: Click Sign Up</h3><p>Click the <strong>Sign up</strong> button in the top right corner of GitHub homepage</p><br><h3>Step 3: Fill Registration Info</h3><p>• Enter username<br>• Enter email address<br>• Set password<br>• Verify you're not a robot</p><br><h3>Step 4: Verify Email</h3><p>Check your email and click the verification link sent by GitHub</p><br><h3>Step 5: Get Token</h3><p>Go directly to: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>Generate Steps</h3><p>• Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• Fill Note: DIPCP Application<br>• Select Expiration: <strong>Recommend 'Never' (no expiration)</strong><br>• <strong>Important: Check ALL permission options (select all)</strong><br>• Click <strong>Generate token</strong></p><br><h3>Copy Token</h3><p>• <strong>Copy and save the token immediately</strong> (only shown once)<br>• Paste the token into the Token field on login page</p><br><p><strong>Note:</strong> Token is only shown once, please save it carefully!</p>",
 		"terms": "By logging in, you agree to our",
 		"termsLink": "Terms of Service",
 		"and": "and",
@@ -212,6 +211,7 @@
 		"creator": "Creator",
 		"description": "Description",
 		"contributors": "Contributors",
+		"collaborators": "Number of Collaborators",
 		"lastUpdated": "Last Updated",
 		"status": "Status",
 		"noMembers": "No project members",
@@ -501,11 +501,20 @@
 		"viewDetails": "View Details",
 		"reviewSuccess": "Review completed",
 		"reviewFailed": "Review failed",
-		"noReviews": "No reviews available",
+		"noReviews": "No pending scoring content",
+		"comments": "Comments",
+		"noComments": "No comments",
+		"commentPlaceholder": "Add comment...",
+		"status": {
+			"merged": "Merged"
+		},
 		"notImplemented": {
 			"approve": "Approve functionality not implemented",
 			"reject": "Reject functionality not implemented",
 			"comment": "Add comment functionality not implemented"
+		},
+		"errors": {
+			"apiNotConfigured": "GitHub API not configured"
 		}
 	},
 	"maintainers": {
@@ -566,6 +575,18 @@
 	},
 	"settings": {
 		"title": "Settings",
+		"star": {
+			"title": "Support Project",
+			"description": "If this project has been helpful to you, please consider starring the GitHub repository to support our work!",
+			"button": "Star DIPCF/DIPCP",
+			"processing": "Processing...",
+			"success": "Thank you for your support! Successfully starred the repository.",
+			"currentStars": "Current stars: ⭐ {count}",
+			"error": {
+				"notLoggedIn": "Please login first",
+				"failed": "Failed to star: {error}"
+			}
+		},
 		"language": "Language Settings",
 		"account": "Account Settings",
 		"notifications": "Notification Settings",
@@ -647,6 +668,12 @@
 				"workflowRunning": "GitHub Actions workflow is running...",
 				"acceptingInvitation": "Accepting collaborator invitation...",
 				"finalizing": "Finalizing setup..."
+			},
+			"error": {
+				"rateLimitLow": "Your GitHub API rate limit is 60 requests/hour, which is the base limit for new users. GitHub typically needs 1-2 days to increase your rate limit. Please wait 1-2 days before trying again, after which your rate limit will increase to 5000 requests/hour.",
+				"insufficientPermissions": "Application submission failed: Insufficient permissions. Your Token may not have sufficient permissions to create Issues in the GitHub repository. Please check your Token permission settings.",
+				"authenticationFailed": "Application submission failed: Authentication failed. Please check if your GitHub Token is valid.",
+				"general": "Application submission failed: {errorMessage}"
 			}
 		},
 		"userRole": {
@@ -1044,7 +1071,7 @@
 		"title": "Contributor License Agreement",
 		"content": "As a contributor to the DIPCP platform, you need to sign a Contributor License Agreement to transfer intellectual property ownership completely to the DIPCF Foundation. The foundation will uniformly manage and be responsible for the maintenance and operation of intellectual property. Please read through before signing the agreement.",
 		"realNameLabel": "Please enter your real name",
-		"realNamePlaceholder": "Please enter your real name (for legal documents)",
+		"realNamePlaceholder": "Your real name as a signature",
 		"agree": "Agree and Sign",
 		"disagree": "Disagree",
 		"rejected": "User refused to sign CLA agreement",

@@ -15,7 +15,6 @@ class LoginPage extends BasePage {
 		this.state = {
 			language: window.I18nService ? window.I18nService.currentLanguage : 'zh-CN',
 			formData: {
-				username: '',
 				accessToken: ''
 			},
 			loading: false,
@@ -80,6 +79,7 @@ class LoginPage extends BasePage {
                     <li>${this.t('login.feature2')}</li>
                     <li>${this.t('login.feature3')}</li>
                     <li>${this.t('login.feature4')}</li>
+                    <li>${this.t('login.feature5')}</li>
                 </ul>
             </div>
         `;
@@ -125,18 +125,6 @@ class LoginPage extends BasePage {
 	 */
 	renderFormGroups() {
 		return `
-            <div class="form-group">
-                <div class="input-with-help">
-                    <input type="text" id="github-username" 
-                        placeholder="${this.tAttr('login.placeholders.githubUsername')}" 
-                        value="${this.escapeHtmlAttribute(this.state.formData.username)}" required>
-                    <button type="button" class="help-button" id="register-help-btn">${this.t('login.howToRegister')}</button>
-                </div>
-                <div class="form-hint" style="color: red; font-weight: bold; margin-top: 0.5rem; font-size: 0.9rem;">
-                    ${this.t('login.hint.createNewUser')}
-                </div>
-            </div>
-
             <div class="form-group">
                 <div class="input-with-help">
                     <input type="password" id="access-token" 
@@ -218,14 +206,6 @@ class LoginPage extends BasePage {
 		if (loginBtn) {
 			loginBtn.addEventListener('click', () => {
 				this.handleLogin();
-			});
-		}
-
-		// 注册帮助按钮
-		const registerHelpBtn = this.element.querySelector('#register-help-btn');
-		if (registerHelpBtn) {
-			registerHelpBtn.addEventListener('click', () => {
-				this.showRegisterHelp();
 			});
 		}
 
@@ -336,8 +316,8 @@ class LoginPage extends BasePage {
 		modal.setState({
 			show: true,
 			type: 'info',
-			title: this.t('login.tokenHelpTitle'),
-			message: this.t('login.tokenHelpContent'),
+			title: this.t('login.howToGetToken'),
+			message: this.t('login.registerHelpContent', '', true),
 			showCancel: false,
 			confirmText: this.t('common.close')
 		});
@@ -368,11 +348,9 @@ class LoginPage extends BasePage {
 		if (this.element) {
 			// 保存当前表单值
 			const formData = { ...this.state.formData };
-			const githubUsername = this.element.querySelector('#github-username');
 			const accessToken = this.element.querySelector('#access-token');
 			const repositoryUrl = this.element.querySelector('#repository-url');
 
-			if (githubUsername) formData.username = githubUsername.value;
 			if (accessToken) formData.accessToken = accessToken.value;
 			if (repositoryUrl) formData.repositoryUrl = repositoryUrl.value;
 
@@ -384,10 +362,6 @@ class LoginPage extends BasePage {
 			this.element.appendChild(this.render());
 
 			// 恢复表单值
-			if (formData.username) {
-				const usernameInput = this.element.querySelector('#github-username');
-				if (usernameInput) usernameInput.value = formData.username;
-			}
 			if (formData.accessToken) {
 				const tokenInput = this.element.querySelector('#access-token');
 				if (tokenInput) tokenInput.value = formData.accessToken;
@@ -411,7 +385,7 @@ class LoginPage extends BasePage {
 	 */
 	async performLogin(formData) {
 		// 验证必填字段
-		if (!formData || !formData.username || !formData.accessToken) {
+		if (!formData || !formData.accessToken) {
 			throw new Error(this.t('login.validation.formInvalid', '请填写所有必填字段'));
 		}
 
@@ -433,18 +407,26 @@ class LoginPage extends BasePage {
 				avatarUrl: data.avatar_url,
 				name: data.name
 			};
+
+			// 获取API速率限制额度
+			const rateLimitLimit = window.GitHubService.getRateLimitLimit();
+			if (rateLimitLimit) {
+				// 根据限额设置默认同步间隔
+				// 60 = 未认证，设为100秒；5000 = 认证，设为30秒
+				const defaultSyncInterval = rateLimitLimit === 60 ? 100 : 30;
+
+				// 检查是否已设置过同步间隔，如果已设置则不覆盖
+				const existingInterval = localStorage.getItem('dipcp-sync-interval');
+				if (!existingInterval) {
+					localStorage.setItem('dipcp-sync-interval', defaultSyncInterval.toString());
+					console.log(`API限额: ${rateLimitLimit}/小时，已设置默认同步间隔: ${defaultSyncInterval}秒`);
+				}
+			}
 		} catch (error) {
 			if (error.status === 401) {
 				throw new Error(this.t('login.validation.invalidToken', 'GitHub Access Token无效或已过期，请检查您的Token是否正确'));
 			}
 			throw error;
-		}
-
-		// 验证用户名是否匹配
-		if (userInfo.username !== formData.username) {
-			throw new Error(this.t('login.validation.usernameMismatch', `用户名不匹配：Token对应的用户是"${userInfo.username}"，但您输入的是"${formData.username}"`)
-				.replace('{tokenUser}', userInfo.username)
-				.replace('{inputUser}', formData.username));
 		}
 
 		// 保存用户信息
@@ -518,7 +500,6 @@ class LoginPage extends BasePage {
 	 */
 	saveCredentials(formData) {
 		const credentials = {
-			username: formData.username,
 			accessToken: formData.accessToken,
 			savedAt: new Date().toISOString()
 		};
@@ -537,7 +518,6 @@ class LoginPage extends BasePage {
 				const credentials = JSON.parse(savedCredentials);
 				this.setState({
 					formData: {
-						username: credentials.username || '',
 						accessToken: credentials.accessToken || ''
 					}
 				});

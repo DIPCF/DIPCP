@@ -254,17 +254,17 @@ class MaintainersPage extends BasePage {
 		const maintainer = this.state.selectedMaintainer;
 		return `
             <div class="maintainer-detail">
-				<div class="maintainer-detail-header" style="margin-bottom: 1rem;">
+				<div class="maintainer-detail-header" style="margin-bottom: 0.625rem;">
                     <h2 style="margin: 0;">${this.escapeHtml(maintainer.author)} - ${this.escapeHtml(maintainer.date)}</h2>
                 </div>
                 <div class="maintainer-detail-content">
-                    <div class="maintainer-content" style="margin-bottom: 1rem;">
-                        <div class="content-preview" style="white-space: pre-wrap; color: var(--text-primary); padding: 0.75rem; background: var(--bg-secondary, var(--bg-primary)); border: 1px solid var(--border-primary); border-radius: 4px;">
+                    <div class="maintainer-content" style="margin-bottom: 0.625rem;">
+                        <div class="content-preview" style="color: var(--text-primary); padding: 0.625rem; background: var(--bg-secondary, var(--bg-primary)); border: 1px solid var(--border-primary); border-radius: 4px;">
                             ${this.escapeHtml(maintainer.content)}
                         </div>
                     </div>
                     ${maintainer.files && maintainer.files.length > 0 ? `
-                    <div class="maintainer-files" style="margin-bottom: 1rem;">
+                    <div class="maintainer-files" style="margin-bottom: 0.625rem;">
                         <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">文件列表</h3>
                         <div class="files-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
                             ${maintainer.files.map((file, index) => {
@@ -279,13 +279,22 @@ class MaintainersPage extends BasePage {
                             `;
 		}).join('')}
                         </div>
-                        <div id="fileContentDisplay" style="display: none; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-secondary, var(--bg-primary));">
+                        <div id="fileContentDisplay" style="display: none; margin-top: 0.5rem; padding: 0.625rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-secondary, var(--bg-primary));">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <strong id="fileContentTitle" style="color: var(--text-primary);"></strong>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    <button id="switchToBaseBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">${this.t('maintainers.viewBaseBranch', '查看主分支')}</button>
-                                    <button id="switchToHeadBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">${this.t('maintainers.viewPRBranch', '查看PR分支')}</button>
-                                    <button id="closeFileContent" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">${this.t('common.close', '关闭')}</button>
+                                    <button id="switchToBaseBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">
+                                        <span class="btn-icon">🌿</span>
+                                        <span class="btn-text">${this.t('maintainers.viewBaseBranch', '查看主分支')}</span>
+                                    </button>
+                                    <button id="switchToHeadBtn" style="display: none; padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-size: 0.85em;">
+                                        <span class="btn-icon">🌳</span>
+                                        <span class="btn-text">${this.t('maintainers.viewPRBranch', '查看PR分支')}</span>
+                                    </button>
+                                    <button id="closeFileContent" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">
+                                        <span class="btn-icon">✖️</span>
+                                        <span class="btn-text">${this.t('common.close', '关闭')}</span>
+                                    </button>
                                 </div>
                             </div>
                             <pre id="fileContentText" style="white-space: pre-wrap; word-wrap: break-word; color: var(--text-primary); margin: 0; max-height: 400px; overflow-y: auto;"></pre>
@@ -293,7 +302,7 @@ class MaintainersPage extends BasePage {
                     </div>
                     ` : ''}
                     <div class="maintainer-comments">
-                        <div class="comment-form" style="margin-bottom: 1rem;">
+                        <div class="comment-form" style="margin-bottom: 0.625rem;">
                             <textarea id="commentText" placeholder="${this.tAttr('maintainers.commentPlaceholder', '添加评论...')}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; resize: vertical; font-family: inherit; margin-bottom: 0.5rem;"></textarea>
                         </div>
                         <div class="maintainer-detail-actions" style="display: flex; align-items: center; gap: 0.5rem;">
@@ -732,7 +741,7 @@ class MaintainersPage extends BasePage {
 	async createDiscussion(owner, repo, author, body, prNumber, titlePrefix = '❌') {
 		try {
 			// 获取仓库ID
-			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
+			const repoInfo = await window.GitHubService.getRepo(owner, repo);
 			const repositoryId = repoInfo.node_id;
 
 			// 从本地存储获取categories列表（全局共享的缓存）
@@ -923,14 +932,26 @@ class MaintainersPage extends BasePage {
 					if (switchToBaseBtn && switchToHeadBtn) {
 						// 只有非删除的文件才显示切换按钮（删除的文件只能查看主分支）
 						if (!isDeleted) {
+							// 检查文件状态，判断是否是新文件
+							const maintainer = this.state.selectedMaintainer;
+							const file = maintainer?.files?.find(f => f.path === filePath);
+							const isNewFile = file?.status === 'added';
+
 							if (showFromBase) {
 								// 当前显示主分支，显示切换到PR分支按钮
 								switchToBaseBtn.style.display = 'none';
 								switchToHeadBtn.style.display = 'inline-block';
 							} else {
-								// 当前显示PR分支，显示切换到主分支按钮
-								switchToBaseBtn.style.display = 'inline-block';
-								switchToHeadBtn.style.display = 'none';
+								// 当前显示PR分支，检查主分支是否存在
+								if (!isNewFile) {
+									// 不是新文件，显示切换到主分支按钮
+									switchToBaseBtn.style.display = 'inline-block';
+									switchToHeadBtn.style.display = 'none';
+								} else {
+									// 新文件在主分支不存在，不显示切换按钮
+									switchToBaseBtn.style.display = 'none';
+									switchToHeadBtn.style.display = 'none';
+								}
 							}
 						} else {
 							// 删除的文件不显示切换按钮

@@ -689,6 +689,14 @@ class DIPCPApp {
 			if (this.currentPage && this.currentPage.checkAndUpdateUserInfo) {
 				this.currentPage.checkAndUpdateUserInfo();
 			}
+
+			// 权限同步后，确保导航菜单的可见性正确应用
+			if (this.currentPage && this.currentPage.applyNavigationVisibility) {
+				// 延迟调用，确保DOM完全更新
+				setTimeout(() => {
+					this.currentPage.applyNavigationVisibility();
+				}, 200);
+			}
 		}
 	}
 

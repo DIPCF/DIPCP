@@ -25,7 +25,9 @@ class RepositorySelectionPage extends BasePage {
 			userInfo: null,
 			projectsList: [], // 从 Projects.json 获取的仓库列表
 			projectsLoading: false, // 是否正在加载仓库列表
-			projectsError: null // 加载错误信息
+			projectsError: null, // 加载错误信息
+			currentLoadingItem: null, // 当前正在加载的项目项元素
+			currentLoadingIndicator: null // 当前正在加载的项目项的加载指示器
 		};
 
 		// 确保主题在RepositorySelectionPage渲染时被应用
@@ -277,8 +279,6 @@ class RepositorySelectionPage extends BasePage {
 		return `
             <div class="tab-content">
                 ${this.renderProjectsList()}
-                ${this.renderRepositoryUrlInput()}
-                ${this.renderContinueButton()}
             </div>
         `;
 	}
@@ -465,6 +465,11 @@ class RepositorySelectionPage extends BasePage {
 		const tabButtons = this.element.querySelectorAll('.tab-button');
 		tabButtons.forEach(button => {
 			button.addEventListener('click', (e) => {
+				// 如果正在处理中，阻止切换选项卡
+				if (this.state.loading || button.disabled) {
+					return;
+				}
+
 				const tab = e.currentTarget.dataset.tab;
 				this.setState({ selectedTab: tab });
 				// 更新选项卡样式
@@ -477,18 +482,110 @@ class RepositorySelectionPage extends BasePage {
 		// 历史记录和项目列表选择（整个区域可点击）
 		const historyItems = this.element.querySelectorAll('.history-item.clickable');
 		historyItems.forEach(item => {
-			item.addEventListener('click', (e) => {
+			item.addEventListener('click', async (e) => {
+				// 如果正在加载，阻止重复点击
+				if (this.state.loading) {
+					return;
+				}
+
+				// 检查元素是否已被禁用
+				if (item.style.pointerEvents === 'none') {
+					return;
+				}
+
 				const owner = item.dataset.owner;
 				const repo = item.dataset.repo;
 				const url = item.dataset.url; // 项目列表中的项有 data-url 属性
 
-				if (url) {
-					// 从项目列表选择，使用完整的 URL
-					this.selectRepositoryFromProjects(owner, repo, url);
-				} else {
-					// 从历史记录选择
-					this.selectRepositoryFromHistory(owner, repo);
+				// 构建仓库URL
+				const repositoryUrl = url || `https://github.com/${owner}/${repo}`;
+
+				// 设置仓库URL到表单数据
+				this.setState({
+					formData: {
+						...this.state.formData,
+						repositoryUrl: repositoryUrl
+					}
+				});
+
+				// 高亮选中的项
+				const allItems = this.element.querySelectorAll('.history-item');
+				allItems.forEach(i => {
+					i.classList.remove('selected');
+					if (i.dataset.owner === owner && i.dataset.repo === repo) {
+						i.classList.add('selected');
+					}
+				});
+
+				// 先改变点击项目的光标状态为等待
+				item.style.cursor = 'wait';
+				item.style.opacity = '1'; // 恢复点击项的不透明度，让它更突出
+
+				// 在当前项目项中显示加载状态
+				const loadingIndicator = document.createElement('span');
+				loadingIndicator.className = 'loading-indicator';
+				loadingIndicator.textContent = '⏳ ' + this.t('repositorySelection.continue.loading', '处理中...');
+				loadingIndicator.style.marginLeft = '10px';
+				loadingIndicator.style.color = 'var(--primary-color, #0366d6)';
+				loadingIndicator.style.fontWeight = 'bold';
+				const repoInfo = item.querySelector('.repo-info');
+				if (repoInfo) {
+					repoInfo.appendChild(loadingIndicator);
 				}
+
+				// 保存当前加载的项目项和指示器引用，以便在同步进度中更新
+				this.setState({
+					currentLoadingItem: item,
+					currentLoadingIndicator: loadingIndicator
+				});
+
+				// 禁用所有可点击项，防止重复点击（但要排除当前点击的项目项，保持其可交互以显示等待光标）
+				const allClickableItems = this.element.querySelectorAll('.history-item.clickable');
+				allClickableItems.forEach(i => {
+					if (i !== item) {
+						i.style.pointerEvents = 'none';
+						i.style.cursor = 'not-allowed';
+						i.style.opacity = '0.6';
+					}
+				});
+
+				// 在整个文档或容器上设置等待光标，确保鼠标悬停时显示
+				const container = this.element.closest('.dashboard') || this.element;
+				if (container) {
+					container.style.cursor = 'wait';
+				}
+
+				// 禁用选项卡按钮
+				this.disableTabButtons(true);
+
+				// 直接打开项目详情页
+				try {
+					await this.handleExistingRepository();
+				} catch (error) {
+					console.error('打开项目失败:', error);
+					this.showError(error.message);
+
+					// 移除加载指示器
+					loadingIndicator.remove();
+
+					// 恢复容器光标
+					const container = this.element.closest('.dashboard') || this.element;
+					if (container) {
+						container.style.cursor = '';
+					}
+
+					// 出错时恢复所有可点击项的状态
+					const allClickableItems = this.element.querySelectorAll('.history-item.clickable');
+					allClickableItems.forEach(i => {
+						i.style.pointerEvents = '';
+						i.style.cursor = '';
+						i.style.opacity = '';
+					});
+
+					// 恢复选项卡按钮
+					this.disableTabButtons(false);
+				}
+				// 注意：如果成功，会导航到其他页面，所以不需要恢复状态
 			});
 		});
 
@@ -505,6 +602,10 @@ class RepositorySelectionPage extends BasePage {
 		const refreshBtn = this.element.querySelector('#refresh-projects-btn');
 		if (refreshBtn) {
 			refreshBtn.addEventListener('click', () => {
+				// 如果正在处理中，阻止刷新
+				if (this.state.loading || refreshBtn.disabled) {
+					return;
+				}
 				this.loadProjectsList(true); // 强制重新加载
 			});
 		}
@@ -626,6 +727,8 @@ class RepositorySelectionPage extends BasePage {
 		try {
 			this.setState({ loading: true });
 			this.updateContinueButtonState('loading', this.t('repositorySelection.continue.loading', '处理中...'));
+			// 禁用选项卡按钮
+			this.disableTabButtons(true);
 
 			if (this.state.selectedTab === 'existing' || this.state.selectedTab === 'recent') {
 				await this.handleExistingRepository();
@@ -635,6 +738,8 @@ class RepositorySelectionPage extends BasePage {
 		} catch (error) {
 			this.showError(error.message);
 			this.updateContinueButtonState('default', this.t('repositorySelection.continue.button', '继续'));
+			// 恢复选项卡按钮
+			this.disableTabButtons(false);
 		} finally {
 			this.setState({ loading: false });
 		}
@@ -1074,7 +1179,10 @@ class RepositorySelectionPage extends BasePage {
 		try {
 			// 开始同步文件
 			console.log('🔵 [proceedToProject] 开始同步文件...');
-			this.updateContinueButtonState('loading', this.t('repositorySelection.syncing', '正在同步文件...'));
+			const syncingText = this.t('repositorySelection.syncing', '正在同步文件...');
+			this.updateContinueButtonState('loading', syncingText);
+			// 同时更新项目栏中的加载指示器
+			this.updateLoadingIndicator(syncingText);
 
 			// 使用StorageService同步仓库数据
 			if (window.StorageService && this.state.userInfo && this.state.userInfo.token) {
@@ -1086,11 +1194,16 @@ class RepositorySelectionPage extends BasePage {
 						// 更新同步进度
 						if (error) {
 							console.error('❌ [proceedToProject] 同步文件时出错:', error);
-							this.updateContinueButtonState('loading', `${this.t('repositorySelection.syncError', '同步出错')}: ${this.escapeHtml(error.message)}`);
+							const errorText = `${this.t('repositorySelection.syncError', '同步出错')}: ${this.escapeHtml(error.message)}`;
+							this.updateContinueButtonState('loading', errorText);
+							// 同时更新项目栏中的加载指示器
+							this.updateLoadingIndicator(errorText);
 						} else {
 							console.log(`🔵 [proceedToProject] 同步进度: ${progress}% (${processed}/${total})`);
 							const progressText = `${this.t('repositorySelection.syncing', '正在同步文件...')} ${progress}% (${processed}/${total})`;
 							this.updateContinueButtonState('loading', progressText);
+							// 同时更新项目栏中的加载指示器
+							this.updateLoadingIndicator(progressText);
 						}
 					}
 				);
@@ -1098,7 +1211,10 @@ class RepositorySelectionPage extends BasePage {
 
 			// 同步完成
 			console.log('✅ [proceedToProject] 文件同步完成');
-			this.updateContinueButtonState('success', this.t('repositorySelection.continue.success', '处理完成！'));
+			const successText = this.t('repositorySelection.continue.success', '处理完成！');
+			this.updateContinueButtonState('success', successText);
+			// 同时更新项目栏中的加载指示器
+			this.updateLoadingIndicator(successText);
 
 			// 获取并缓存Discussions分类列表（访客也需要）
 			console.log('🔵 [proceedToProject] 缓存Discussions分类列表...');
@@ -1107,7 +1223,6 @@ class RepositorySelectionPage extends BasePage {
 				if (this.state.userInfo && this.state.userInfo.token) {
 					await window.GitHubService.initFromUser(this.state.userInfo);
 				}
-				await this.cacheDiscussionCategories(repoInfo.owner, repoInfo.repo);
 			} catch (error) {
 				console.warn('⚠️ [proceedToProject] 缓存分类列表失败:', error);
 				// 不阻止流程继续
@@ -1121,7 +1236,9 @@ class RepositorySelectionPage extends BasePage {
 			});
 
 
-			// 跳转到项目详情页面
+			// 跳转到项目详情页面前，恢复光标状态
+			this.restoreCursorState();
+
 			console.log('🔵 [proceedToProject] 正在跳转到项目详情页面...');
 			if (window.app && window.app.navigateTo) {
 				window.app.navigateTo('/project-detail');
@@ -1129,18 +1246,91 @@ class RepositorySelectionPage extends BasePage {
 			}
 		} catch (error) {
 			console.error('❌ [proceedToProject] 同步文件失败:', error);
-			this.updateContinueButtonState('error', `${this.t('repositorySelection.syncFailed', '同步失败')}: ${this.escapeHtml(error.message)}`);
+			const errorText = `${this.t('repositorySelection.syncFailed', '同步失败')}: ${this.escapeHtml(error.message)}`;
+			this.updateContinueButtonState('error', errorText);
+			// 同时更新项目栏中的加载指示器
+			this.updateLoadingIndicator(errorText);
 
 			// 即使同步失败，也允许用户继续到项目页面
 			setTimeout(() => {
 				this.updateContinueButtonState('success', this.t('repositorySelection.continue.success', '处理完成！'));
 				setTimeout(() => {
+					// 跳转前恢复光标状态
+					this.restoreCursorState();
 					console.log('🔵 [proceedToProject] 错误恢复：跳转到项目页面...');
 					if (window.app && window.app.navigateTo) {
 						window.app.navigateTo('/project-detail');
 					}
 				}, 1000);
 			}, 2000);
+		}
+	}
+
+	/**
+	 * 禁用或启用选项卡按钮和刷新按钮
+	 * @param {boolean} disabled - 是否禁用
+	 */
+	disableTabButtons(disabled) {
+		const tabButtons = this.element?.querySelectorAll('.tab-button');
+		if (tabButtons) {
+			tabButtons.forEach(btn => {
+				if (disabled) {
+					btn.disabled = true;
+					btn.style.pointerEvents = 'none';
+					btn.style.opacity = '0.6';
+					btn.style.cursor = 'not-allowed';
+				} else {
+					btn.disabled = false;
+					btn.style.pointerEvents = '';
+					btn.style.opacity = '';
+					btn.style.cursor = '';
+				}
+			});
+		}
+
+		// 同时禁用/启用刷新按钮
+		const refreshBtn = this.element?.querySelector('#refresh-projects-btn');
+		if (refreshBtn) {
+			if (disabled) {
+				refreshBtn.disabled = true;
+				refreshBtn.style.pointerEvents = 'none';
+				refreshBtn.style.opacity = '0.6';
+				refreshBtn.style.cursor = 'not-allowed';
+			} else {
+				refreshBtn.disabled = false;
+				refreshBtn.style.pointerEvents = '';
+				refreshBtn.style.opacity = '';
+				refreshBtn.style.cursor = '';
+			}
+		}
+	}
+
+	/**
+	 * 恢复光标状态
+	 */
+	restoreCursorState() {
+		const container = this.element?.closest('.dashboard') || this.element;
+		if (container) {
+			container.style.cursor = '';
+		}
+		// 同时恢复所有项目项的光标
+		const allItems = this.element?.querySelectorAll('.history-item.clickable');
+		if (allItems) {
+			allItems.forEach(i => {
+				i.style.cursor = '';
+			});
+		}
+		// 恢复选项卡按钮
+		this.disableTabButtons(false);
+	}
+
+	/**
+	 * 更新加载指示器（项目栏中的加载状态）
+	 * @param {string} message - 加载消息
+	 */
+	updateLoadingIndicator(message) {
+		if (this.state.currentLoadingIndicator) {
+			this.state.currentLoadingIndicator.textContent = '⏳ ' + message;
 		}
 	}
 
@@ -1889,7 +2079,7 @@ ${this.state.userInfo.username},1000,1000
 			console.log('🔧 正在启用Discussions...');
 
 			// 获取仓库信息以获取repository ID
-			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
+			const repoInfo = await window.GitHubService.getRepo(owner, repo);
 
 			const repositoryId = repoInfo.node_id; // node_id就是GitHub的ID格式
 
@@ -1921,58 +2111,6 @@ ${this.state.userInfo.username},1000,1000
 		} catch (error) {
 			console.error('❌ 启用Discussions失败:', error);
 			// 不抛出错误，因为Discussions不是关键功能，不应该阻止其他设置
-			console.log('⚠️ 继续执行后续设置...');
-		}
-	}
-
-	/**
-	 * 获取并缓存Discussions分类列表
-	 * @async
-	 * @param {string} owner - 仓库所有者
-	 * @param {string} repo - 仓库名称
-	 */
-	async cacheDiscussionCategories(owner, repo) {
-		try {
-			console.log('🔧 正在获取Discussions分类列表...');
-
-			// 获取Discussions分类列表
-			const categoriesResult = await window.GitHubService.graphql(`
-				query GetDiscussionCategories($owner: String!, $name: String!) {
-					repository(owner: $owner, name: $name) {
-						discussionCategories(first: 10) {
-							edges {
-								node {
-									id
-									name
-								}
-							}
-						}
-					}
-				}
-			`, {
-				owner: owner,
-				name: repo
-			});
-
-			const categories = categoriesResult.repository.discussionCategories.edges.map(edge => edge.node);
-
-			if (categories.length === 0) {
-				console.warn('⚠️ 未找到任何Discussions分类');
-				return;
-			}
-
-			// 保存到本地存储
-			const cacheKey = `dipcp-discussion-categories-${owner}-${repo}`;
-			try {
-				localStorage.setItem(cacheKey, JSON.stringify(categories));
-				console.log(`✅ 已缓存 ${categories.length} 个Discussions分类`);
-			} catch (error) {
-				console.warn('⚠️ 保存分类列表到缓存失败:', error);
-			}
-
-		} catch (error) {
-			console.error('❌ 获取Discussions分类列表失败:', error);
-			// 不抛出错误，因为分类列表缓存不是关键功能，不应该阻止其他设置
 			console.log('⚠️ 继续执行后续设置...');
 		}
 	}

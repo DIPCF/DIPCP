@@ -51,7 +51,10 @@
 		"remove": "削除",
 		"actions": "アクション",
 		"preview": "プレビュー",
-		"processing": "処理中..."
+		"processing": "処理中...",
+		"loadFailed": "読み込みに失敗しました",
+		"rateLimitExceeded": "GitHub APIレート制限に達しました。{{hours}}時間{{minutes}}分後に再試行してください",
+		"serviceNotInitialized": "GitHubサービスが初期化されていません。まずログインしてください"
 	},
 	"navigation": {
 		"dashboard": "ダッシュボード",
@@ -67,10 +70,11 @@
 		"pageTitle": "ログイン - DIPCP",
 		"subtitle": "分散化IP協作プラットフォーム",
 		"whyChoose": "なぜDIPCPを選ぶのか？",
-		"feature1": "✅ ゼロ運用コスト、サーバー不要",
-		"feature2": "✅ ゼロ学習コスト、開いて使用",
-		"feature3": "✅ ゼロ障壁、GitHubアカウントのみ必要",
-		"feature4": "✅ 完全透明、完全追跡可能",
+		"feature1": "✅ 永遠に無料！",
+		"feature2": "✅ 友達と一緒に物語を書き、ファンデーションが共有版権を管理",
+		"feature3": "✅ 貢献に応じてポイントを獲得し、版権収益を按分分配",
+		"feature4": "✅ ポイント記録が完全に透明、完全に追跡可能",
+		"feature5": "✅ 世界最大の共同IP創作コミュニティを構築",
 		"githubUsername": "GitHubユーザー名",
 		"loginButton": "ログイン",
 		"loggingIn": "ログイン中...",
@@ -78,16 +82,11 @@
 			"githubUsername": "GitHubユーザー名",
 			"accessToken": "GitHubアクセストークン（パスワードではありません！）"
 		},
-		"howToRegister": "登録方法",
 		"howToGetToken": "トークン取得方法",
 		"hint": {
-			"createNewUser": "新しいユーザーを登録することを強く推奨します。",
-			"tokenLocalOnly": "トークンはローカルに保存され、サーバーにアップロードされることはありません。"
+			"tokenLocalOnly": "新しいユーザーを登録することを強く推奨します。トークンはローカルに保存され、サーバーにアップロードされることはありません。"
 		},
-		"registerHelpTitle": "GitHubアカウント登録方法",
-		"registerHelpContent": "<h3>ステップ1: GitHubにアクセス</h3><p>ブラウザを開いて <a href='https://github.com' target='_blank'>https://github.com</a> にアクセス</p><br><h3>ステップ2: サインアップをクリック</h3><p>GitHubホームページの右上角の <strong>Sign up</strong> ボタンをクリック</p><br><h3>ステップ3: 登録情報を入力</h3><p>• ユーザー名を入力<br>• メールアドレスを入力<br>• パスワードを設定<br>• ロボットでないことを確認</p><br><h3>ステップ4: メール確認</h3><p>メールを確認し、GitHubから送信された確認リンクをクリック</p><br><h3>ステップ5: 登録完了</h3><p>確認後、GitHubアカウントの使用を開始できます！</p>",
-		"tokenHelpTitle": "GitHubアクセストークン取得方法",
-		"tokenHelpContent": "<h3>トークンへの直接アクセス</h3><p>直接アクセス: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>生成手順</h3><p>• <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong> をクリック<br>• Noteを入力: DIPCP Application<br>• 有効期限を選択: <strong>「Never」（無期限）を推奨</strong><br>• <strong>重要: すべての権限オプションをチェック（すべて選択）</strong><br>• <strong>Generate token</strong> をクリック</p><br><h3>トークンをコピー</h3><p>• <strong>トークンをすぐにコピーして保存</strong>（一度しか表示されません）<br>• ログインページのトークンフィールドに貼り付け</p><br><p><strong>注意:</strong> トークンは一度しか表示されないため、慎重に保存してください！</p>",
+		"registerHelpContent": "<h3>ステップ1: GitHubにアクセス</h3><p>ブラウザを開いて <a href='https://github.com' target='_blank'>https://github.com</a> にアクセス</p><br><h3>ステップ2: サインアップをクリック</h3><p>GitHubホームページの右上角の <strong>Sign up</strong> ボタンをクリック</p><br><h3>ステップ3: 登録情報を入力</h3><p>• ユーザー名を入力<br>• メールアドレスを入力<br>• パスワードを設定<br>• ロボットでないことを確認</p><br><h3>ステップ4: メール確認</h3><p>メールを確認し、GitHubから送信された確認リンクをクリック</p><br><h3>ステップ5:トークン取得</h3><p>直接アクセス: <a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>生成手順</h3><p>• <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong> をクリック<br>• Noteを入力: DIPCP Application<br>• 有効期限を選択: <strong>「Never」（無期限）を推奨</strong><br>• <strong>重要: すべての権限オプションをチェック（すべて選択）</strong><br>• <strong>Generate token</strong> をクリック</p><br><h3>トークンをコピー</h3><p>• <strong>トークンをすぐにコピーして保存</strong>（一度しか表示されません）<br>• ログインページのトークンフィールドに貼り付け</p><br><p><strong>注意:</strong> トークンは一度しか表示されないため、慎重に保存してください！</p>",
 		"terms": "ログインすることで、以下の内容に同意したものとみなします",
 		"termsLink": "利用規約",
 		"and": "および",
@@ -212,6 +211,7 @@
 		"creator": "作成者",
 		"description": "説明",
 		"contributors": "貢献者",
+		"collaborators": "コラボレーター人数",
 		"lastUpdated": "最終更新",
 		"status": "ステータス",
 		"noMembers": "プロジェクトメンバーがいません",
@@ -501,11 +501,20 @@
 		"viewDetails": "詳細表示",
 		"reviewSuccess": "レビュー完了",
 		"reviewFailed": "レビューに失敗しました",
-		"noReviews": "レビューが利用できません",
+		"noReviews": "スコアリング待ちのコンテンツがありません",
+		"comments": "コメント",
+		"noComments": "コメントがありません",
+		"commentPlaceholder": "コメント追加...",
+		"status": {
+			"merged": "マージ済み"
+		},
 		"notImplemented": {
 			"approve": "承認機能は実装されていません",
 			"reject": "却下機能は実装されていません",
 			"comment": "コメント追加機能は実装されていません"
+		},
+		"errors": {
+			"apiNotConfigured": "GitHub APIが設定されていません"
 		}
 	},
 	"maintainers": {
@@ -566,6 +575,18 @@
 	},
 	"settings": {
 		"title": "設定",
+		"star": {
+			"title": "プロジェクトをサポート",
+			"description": "このプロジェクトが役に立った場合は、GitHub リポジトリにスターを付けて私たちの仕事をサポートしてください！",
+			"button": "DIPCF/DIPCP にスターを付ける",
+			"processing": "処理中...",
+			"success": "ご支援ありがとうございます！リポジトリへのスターが正常に追加されました。",
+			"currentStars": "現在のスター数：⭐ {count}",
+			"error": {
+				"notLoggedIn": "まずログインしてください",
+				"failed": "スターの追加に失敗しました：{error}"
+			}
+		},
 		"language": "言語設定",
 		"account": "アカウント設定",
 		"notifications": "通知設定",
@@ -646,6 +667,12 @@
 				"workflowRunning": "GitHub Actionsワークフローが実行中...",
 				"acceptingInvitation": "コラボレーター招待を受け入れ中...",
 				"finalizing": "セットアップを完了中..."
+			},
+			"error": {
+				"rateLimitLow": "GitHub APIのレート制限が60リクエスト/時間です。これは新規ユーザーの基本制限です。GitHubは通常1-2日でレート制限を引き上げる必要があります。1-2日待ってから再度お試しください。その後、レート制限は5000リクエスト/時間に増加します。",
+				"insufficientPermissions": "応募の送信に失敗しました：権限不足。トークンにGitHubリポジトリでIssueを作成するための十分な権限がない可能性があります。トークンの権限設定を確認してください。",
+				"authenticationFailed": "応募の送信に失敗しました：認証に失敗しました。GitHubトークンが有効かどうか確認してください。",
+				"general": "応募の送信に失敗しました：{errorMessage}"
 			}
 		},
 		"userRole": {
@@ -1043,7 +1070,7 @@
 		"title": "コントリビューターライセンス契約",
 		"content": "DIPCPプラットフォームの貢献者として、知的財産権の所有権を完全にDIPCF財団に移転するためのコントリビューターライセンス契約に署名する必要があります。財団が統一管理し、知的財産権の維持と運営を担当します。全文を読んだ後、契約に署名してください。",
 		"realNameLabel": "実名を入力してください",
-		"realNamePlaceholder": "実名を入力してください（法的文書用）",
+		"realNamePlaceholder": "署名者の実名",
 		"agree": "同意して署名",
 		"disagree": "同意しない",
 		"rejected": "ユーザーがCLA契約の署名を拒否しました",

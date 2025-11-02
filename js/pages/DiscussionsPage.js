@@ -1031,6 +1031,13 @@ class DiscussionsPage extends BasePage {
 				name: repo
 			});
 
+			if (!result) {
+				console.error('GraphQL请求返回undefined');
+				this.setState({ discussions: [], loading: false });
+				this.updateDiscussionsList();
+				return;
+			}
+
 			const discussions = result.repository?.discussions?.edges || [];
 
 			// 处理GitHub返回的讨论数据
@@ -1458,7 +1465,7 @@ class DiscussionsPage extends BasePage {
 		// 首先需要获取仓库ID和分类ID
 		try {
 			// 获取仓库信息以获取repository ID
-			const repoInfo = await window.GitHubService.getRepo(owner, repo, true);
+			const repoInfo = await window.GitHubService.getRepo(owner, repo);
 
 			const repositoryId = repoInfo.node_id;
 

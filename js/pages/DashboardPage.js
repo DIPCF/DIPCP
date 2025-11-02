@@ -59,6 +59,12 @@ class DashboardPage extends BasePage {
 	 * @returns {HTMLElement} 渲染后的DOM元素
 	 */
 	render() {
+		// 判断是否有实际角色（非访客）
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+		// 过滤掉 visitor 角色，只检查实际角色
+		const actualRoles = userRoles.filter(role => role !== 'visitor');
+		const hasActualRole = actualRoles.length > 0;
+
 		const container = document.createElement('div');
 		container.className = 'dashboard';
 		container.innerHTML = `
@@ -67,8 +73,8 @@ class DashboardPage extends BasePage {
 				${this.renderWelcome()}
 				${this.renderApplicationSection()}
 				${this.renderUserRoles()}
-				${this.renderStatsGrid()}
-				${this.renderRecentActivity()}
+				${hasActualRole ? this.renderStatsGrid() : ''}
+				${hasActualRole ? this.renderRecentActivity() : ''}
 			</div>
 		`;
 		return container;
@@ -133,20 +139,22 @@ class DashboardPage extends BasePage {
 	initModal() {
 		if (!this.state.modal) {
 			this.state.modal = new Modal();
-			const modalElement = this.state.modal.render();
-			document.body.appendChild(modalElement);
-			this.state.modal.element = modalElement;
-			this.state.modal.bindEvents();
+			// 初始化时不需要立即渲染，等到真正需要显示时再渲染
 		} else {
 			// 如果模态框已存在，确保它被正确显示
 			if (this.state.modal.element && this.state.modal.element.parentNode) {
 				// 模态框已经在DOM中，不需要重新添加
 			} else {
-				// 模态框不在DOM中，重新添加
-				const modalElement = this.state.modal.render();
-				document.body.appendChild(modalElement);
-				this.state.modal.element = modalElement;
-				this.state.modal.bindEvents();
+				// 模态框不在DOM中，需要重新渲染和添加
+				// 只有在 show 为 true 时才渲染
+				if (this.state.modal.state.show) {
+					const modalElement = this.state.modal.render();
+					if (modalElement) {
+						document.body.appendChild(modalElement);
+						this.state.modal.element = modalElement;
+						this.state.modal.bindEvents();
+					}
+				}
 			}
 		}
 	}
@@ -444,15 +452,28 @@ class DashboardPage extends BasePage {
 		// 更新申请板块显示正在审核状态
 		const applicationSection = this.element.querySelector('.application-section');
 		if (applicationSection) {
-			applicationSection.innerHTML = `
-				<div class="application-reviewing">
+			// 隐藏原申请表单
+			const applicationCard = applicationSection.querySelector('.application-card');
+			if (applicationCard) {
+				applicationCard.style.display = 'none';
+			}
+
+			// 检查是否已经有审核状态元素，如果没有则创建
+			let reviewingElement = applicationSection.querySelector('.application-reviewing');
+			if (!reviewingElement) {
+				reviewingElement = document.createElement('div');
+				reviewingElement.className = 'application-reviewing';
+				reviewingElement.innerHTML = `
 					<div class="reviewing-icon spinning">⏳</div>
 					<div class="reviewing-content">
 						<h3>${this.t('dashboard.application.reviewing.title', '正在审核中')}</h3>
 						<p>${this.t('dashboard.application.reviewing.message', '您的申请正在处理中，大约需要15秒...')}</p>
 					</div>
-				</div>
-			`;
+				`;
+				applicationSection.appendChild(reviewingElement);
+			}
+			// 显示审核状态
+			reviewingElement.style.display = '';
 		}
 	}
 
@@ -463,8 +484,27 @@ class DashboardPage extends BasePage {
 	async handleApplicationSubmit() {
 		const user = this.state.user;
 		const repoInfo = this.parseGitHubUrl(user.repositoryUrl);
-		// 1. 显示正在申请·状态
+		// 显示正在申请·状态
 		this.showReviewingStatus();
+		// 1. 检查API访问限额
+		await window.GitHubService.initFromUser(user);
+		const rateLimitInfo = await window.GitHubService.checkRateLimit();
+		console.log('rateLimitInfo:', rateLimitInfo);
+
+		// 如果限额是60，说明GitHub还未提升访问限额，提示用户等待
+		if (rateLimitInfo.limit === 60) {
+			// 隐藏审核状态显示，恢复申请表单（通过display控制，不重渲染）
+			const applicationSection = this.element.querySelector('.application-section');
+			if (applicationSection) {
+				// 隐藏审核状态
+				const reviewingElement = applicationSection.querySelector('.application-reviewing');
+				if (reviewingElement) {
+					reviewingElement.style.display = 'none';
+				}
+			}
+			this.showError(this.t('dashboard.application.error.rateLimitLow'));
+			return;
+		}
 		await this.showCLAAgreement(repoInfo, user,
 			async () => {
 				console.log('✅ [CLA Callback] CLA签署成功，开始创建仓库...');
@@ -473,6 +513,10 @@ class DashboardPage extends BasePage {
 					await this.applyContribution();
 					// 3. 开始轮询工作流状态
 					await this.pollCollaboratorInvitation();
+					// 4. 缓存Discussions分类列表
+					await this.cacheDiscussionCategories(repoInfo.owner, repoInfo.repo);
+					// 5. 设置同步间隔为30秒
+					localStorage.setItem('dipcp-sync-interval', 30);
 				} catch (error) {
 					// 根据错误类型显示不同的消息
 					if (error.message.includes('403')) {
@@ -667,7 +711,7 @@ class DashboardPage extends BasePage {
 				attempts++;
 
 				// 检查用户是否已经是协作者且有写入权限
-				const repoData = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo, true);
+				const repoData = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo);
 
 				const permissions = repoData.permissions;
 				console.log('用户权限:', permissions);
@@ -762,6 +806,35 @@ class DashboardPage extends BasePage {
 				if (headerElement) {
 					headerElement.outerHTML = this.renderHeader('dashboard', false, null);
 					this.bindHeaderEvents();
+				}
+			}
+
+			// 如果用户获得了实际角色，显示统计网格和最近活动
+			if (actualRoles.length > 0) {
+				// 检查是否已经有统计网格和最近活动组件
+				const statsGrid = contentElement.querySelector('.stats-grid');
+				const recentActivity = contentElement.querySelector('.recent-activity');
+
+				// 添加统计网格（如果不存在）
+				if (!statsGrid) {
+					const userRolesSection = contentElement.querySelector('.user-roles-section');
+					if (userRolesSection) {
+						userRolesSection.insertAdjacentHTML('afterend', this.renderStatsGrid());
+					}
+				}
+
+				// 添加最近活动（如果不存在）
+				if (!recentActivity) {
+					const statsGrid = contentElement.querySelector('.stats-grid');
+					if (statsGrid) {
+						statsGrid.insertAdjacentHTML('afterend', this.renderRecentActivity());
+					} else {
+						// 如果没有统计网格，放在用户角色区域后面
+						const userRolesSection = contentElement.querySelector('.user-roles-section');
+						if (userRolesSection) {
+							userRolesSection.insertAdjacentHTML('afterend', this.renderRecentActivity());
+						}
+					}
 				}
 			}
 		}

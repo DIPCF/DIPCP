@@ -53,7 +53,6 @@ class ProjectDetailPage extends BasePage {
 			<main class="project-detail-main">
 				${this.renderBreadcrumb()}
 				${this.renderToolbar()}
-				${this.renderProjectInfo()}
 				${this.renderMainContent()}
 			</main>
 		`;
@@ -87,8 +86,6 @@ class ProjectDetailPage extends BasePage {
                     <div class="dropdown-menu" id="moreInfoMenu">
                         <a href="#" class="dropdown-item" data-section="project-info">${this.t('projectDetail.projectInfo', '项目信息')}</a>
                         <a href="#" class="dropdown-item" data-section="members">${this.t('projectDetail.projectMembers', '项目成员')}</a>
-                        <a href="#" class="dropdown-item" data-section="activity">${this.t('projectDetail.recentActivity', '最近活动')}</a>
-                        <a href="#" class="dropdown-item" data-section="pending">${this.t('projectDetail.pendingReviews', '待审核内容')}</a>
                     </div>
                 </div>
             </div>
@@ -102,8 +99,10 @@ class ProjectDetailPage extends BasePage {
 	renderToolbar() {
 		// 根据用户角色决定显示哪些按钮
 		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
-		const actualRoles = userRoles.filter(role => role !== 'visitor');
-		const canEdit = actualRoles.length > 0; // 只要有实际角色就可以编辑
+		const isVisitor = userRoles.length === 0 || (userRoles.length === 1 && userRoles[0] === 'visitor');
+		if (isVisitor) {
+			return '';
+		}
 
 		return `
             <div class="editor-toolbar">
@@ -146,34 +145,29 @@ class ProjectDetailPage extends BasePage {
 	}
 
 	/**
-	 * 渲染项目信息卡片
+	 * 渲染项目信息内容（用于信息面板显示）
+	 * @param {Object} data - 项目信息数据
 	 * @returns {string} 项目信息HTML字符串
 	 */
-	renderProjectInfo() {
-		const isVisible = this.state.moduleStates.projectInfo;
+	renderProjectInfoContent(data = {}) {
 		return `
-            <div class="project-info-card" id="project-info-section" style="display: ${isVisible ? 'block' : 'none'};">
-                <h3>${this.t('projectDetail.projectInfo', '项目信息')}</h3>
+            <div class="info-section">
                 <div class="info-grid">
                     <div class="info-item">
                         <label>${this.t('projectDetail.creator', '创建者')}:</label>
-                        <span id="creator">${this.state.project?.creator || this.t('common.loading', '载入中...')}</span>
+                        <span id="creator">${data.creator || this.t('common.loading', '载入中...')}</span>
                     </div>
                     <div class="info-item">
                         <label>${this.t('projectDetail.description', '描述')}:</label>
-                        <span id="description">${this.state.project?.description || this.t('common.loading', '载入中...')}</span>
+                        <span id="description">${data.description || this.t('common.loading', '载入中...')}</span>
                     </div>
                     <div class="info-item">
-                        <label>${this.t('projectDetail.contributors', '贡献者')}:</label>
-                        <span id="contributors">${this.state.project?.contributors || this.t('common.loading', '载入中...')}</span>
+                        <label>${this.t('projectDetail.collaborators', '协作者人数')}:</label>
+                        <span id="contributors">${data.contributors !== undefined ? data.contributors : this.t('common.loading', '载入中...')}</span>
                     </div>
                     <div class="info-item">
                         <label>${this.t('projectDetail.lastUpdated', '最后更新')}:</label>
-                        <span id="lastUpdated">${this.state.project?.lastUpdated || this.t('common.loading', '载入中...')}</span>
-                    </div>
-                    <div class="info-item">
-                        <label>${this.t('projectDetail.status', '状态')}:</label>
-                        <span class="status active" id="status">${this.state.project?.status || this.t('common.loading', '载入中...')}</span>
+                        <span id="lastUpdated">${data.lastUpdated || this.t('common.loading', '载入中...')}</span>
                     </div>
                 </div>
             </div>
@@ -249,18 +243,14 @@ class ProjectDetailPage extends BasePage {
 			const cached = localStorage.getItem('dipcp-project-module-states');
 			const states = cached ? JSON.parse(cached) : {
 				projectInfo: false,
-				members: false,
-				activity: false,
-				pending: false
+				members: false
 			};
 			return states;
 		} catch (error) {
 			console.error('加载模块状态缓存失败:', error);
 			return {
 				projectInfo: false,
-				members: false,
-				activity: false,
-				pending: false
+				members: false
 			};
 		}
 	}
@@ -387,12 +377,6 @@ class ProjectDetailPage extends BasePage {
 			}
 			if (this.state.moduleStates.members) {
 				this.showMembers();
-			}
-			if (this.state.moduleStates.activity) {
-				this.showActivity();
-			}
-			if (this.state.moduleStates.pending) {
-				this.showPendingReviews();
 			}
 		}, 100);
 	}
@@ -861,6 +845,11 @@ class ProjectDetailPage extends BasePage {
 
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
+
+		// 延迟再次应用导航可见性，确保DOM完全渲染
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 0);
 		// 绑定文件项事件
 		this.bindFileItemEvents();
 
@@ -949,10 +938,6 @@ class ProjectDetailPage extends BasePage {
 					this.toggleProjectInfo();
 				} else if (section === 'members') {
 					this.toggleMembers();
-				} else if (section === 'activity') {
-					this.toggleActivity();
-				} else if (section === 'pending') {
-					this.togglePendingReviews();
 				}
 			});
 		});
@@ -964,10 +949,8 @@ class ProjectDetailPage extends BasePage {
 				// 检查当前显示的是哪个模块，并调用相应的hide方法
 				if (this.state.moduleStates.members) {
 					this.hideMembers();
-				} else if (this.state.moduleStates.activity) {
-					this.hideActivity();
-				} else if (this.state.moduleStates.pending) {
-					this.hidePendingReviews();
+				} else if (this.state.moduleStates.projectInfo) {
+					this.hideProjectInfo();
 				} else {
 					// 默认关闭信息面板
 					this.setState({ showInfoPanel: false });
@@ -1173,11 +1156,49 @@ class ProjectDetailPage extends BasePage {
 
 		// 重新获取文件项并绑定事件
 		const newFileItems = this.element.querySelectorAll('.file-item');
+
+		// 判断是否为访客
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+		const isVisitor = userRoles.length === 0 || (userRoles.length === 1 && userRoles[0] === 'visitor');
+
 		newFileItems.forEach(item => {
 			item.addEventListener('click', (e) => {
 				const path = e.currentTarget.dataset.path;
 				const type = e.currentTarget.dataset.type;
 
+				// 如果是访客，执行直接操作
+				if (isVisitor) {
+					if (type === 'dir') {
+						// 文件夹：直接展开/折叠
+						// 从文件列表中查找文件夹信息，判断是否有子项
+						const dirInfo = this.state.files.find(f => f.path === path && f.type === 'dir');
+						const hasChildren = dirInfo && dirInfo.children && dirInfo.children.length > 0;
+
+						// 也可以从 dir-toggle 元素获取
+						const dirToggle = e.currentTarget.querySelector('.dir-toggle');
+						const hasChildrenFromToggle = dirToggle ? dirToggle.dataset.hasChildren === 'true' : false;
+
+						if (hasChildren || hasChildrenFromToggle) {
+							// 切换折叠状态
+							const newCollapsedDirs = new Set(this.state.collapsedDirs);
+							if (newCollapsedDirs.has(path)) {
+								newCollapsedDirs.delete(path);
+							} else {
+								newCollapsedDirs.add(path);
+							}
+							this.setState({ collapsedDirs: newCollapsedDirs });
+							this.updateFileListDOM(this.state.files);
+						}
+					} else {
+						// 文件：直接打开
+						const fullFileInfo = this.state.files.find(f => f.path === path);
+						const selectedFile = fullFileInfo || { path, type, name: path.split('/').pop() };
+						this.handleFileOpen(selectedFile);
+					}
+					return;
+				}
+
+				// 非访客：选中文件/文件夹，如果是文件夹也执行展开/折叠
 				// 更新选中状态
 				newFileItems.forEach(f => f.classList.remove('selected'));
 				e.currentTarget.classList.add('selected');
@@ -1186,6 +1207,30 @@ class ProjectDetailPage extends BasePage {
 				const fullFileInfo = this.state.files.find(f => f.path === path);
 				const selectedFile = fullFileInfo || { path, type, name: path.split('/').pop() };
 				this.setState({ selectedFile });
+
+				// 如果是文件夹，同时执行展开/折叠操作
+				if (type === 'dir') {
+					// 从文件列表中查找文件夹信息，判断是否有子项
+					const dirInfo = this.state.files.find(f => f.path === path && f.type === 'dir');
+					const hasChildren = dirInfo && dirInfo.children && dirInfo.children.length > 0;
+
+					// 也可以从 dir-toggle 元素获取
+					const dirToggle = e.currentTarget.querySelector('.dir-toggle');
+					const hasChildrenFromToggle = dirToggle ? dirToggle.dataset.hasChildren === 'true' : false;
+
+					if (hasChildren || hasChildrenFromToggle) {
+						// 切换折叠状态
+						const newCollapsedDirs = new Set(this.state.collapsedDirs);
+						if (newCollapsedDirs.has(path)) {
+							newCollapsedDirs.delete(path);
+						} else {
+							newCollapsedDirs.add(path);
+						}
+						this.setState({ collapsedDirs: newCollapsedDirs });
+						this.updateFileListDOM(this.state.files);
+					}
+				}
+
 				this.updateActionButtons();
 			});
 		});
@@ -1344,13 +1389,113 @@ class ProjectDetailPage extends BasePage {
 
 	/**
 	 * 显示项目信息
-	 * @returns {void}
+	 * @returns {Promise<void>}
 	 */
-	showProjectInfo() {
-		// 直接显示项目信息卡片
-		const projectInfoSection = this.element.querySelector('#project-info-section');
-		if (projectInfoSection) {
-			projectInfoSection.style.display = 'block';
+	async showProjectInfo() {
+		// 先显示加载状态
+		const loadingContent = this.renderProjectInfoContent();
+		this.showInfoPanel(loadingContent, this.t('projectDetail.projectInfo', '项目信息'));
+
+		try {
+			// 获取用户信息和仓库信息
+			if (!this.state.user) {
+				throw new Error(this.t('projectDetail.errors.userNotLoggedIn', '用户未登录'));
+			}
+
+			const user = this.state.user;
+			const repoInfo = user.repositoryInfo;
+
+			if (!repoInfo || !user.token) {
+				throw new Error(this.t('projectDetail.errors.repositoryInfoUnavailable', '仓库信息或访问令牌不可用'));
+			}
+
+			// 初始化 GitHubService
+			await window.GitHubService.initFromUser(user);
+
+			// 1. 从 .github/collaborators.txt 读取第一个用户作为创建者，并统计用户数
+			let creator = this.t('common.loading', '载入中...');
+			let contributorsCount = 0;
+
+			if (window.StorageService) {
+				await window.StorageService.initDB();
+				try {
+					const collaboratorsContent = await window.StorageService._execute('fileCache', 'get', '.github/collaborators.txt');
+					if (collaboratorsContent && collaboratorsContent.content) {
+						const lines = collaboratorsContent.content.split('\n');
+						const usernames = [];
+						for (const line of lines) {
+							const trimmedLine = line.trim();
+							if (trimmedLine && !trimmedLine.startsWith('#')) {
+								usernames.push(trimmedLine);
+							}
+						}
+						if (usernames.length > 0) {
+							creator = usernames[0];
+							contributorsCount = usernames.length;
+						}
+					}
+				} catch (error) {
+					console.error('读取 collaborators.txt 失败:', error);
+				}
+			}
+
+			// 2. 从 GitHub 获取仓库描述
+			let description = this.t('common.loading', '载入中...');
+			try {
+				const repoData = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo);
+				description = repoData.description || this.t('projectDetail.noDescription', '无描述');
+			} catch (error) {
+				console.error('获取仓库描述失败:', error);
+				description = this.t('projectDetail.descriptionError', '获取描述失败');
+			}
+
+			// 3. 从本地存储的同步信息获取最后更新时间
+			let lastUpdated = this.t('common.loading', '载入中...');
+			try {
+				const syncInfoStr = localStorage.getItem(`dipcp-sync-${repoInfo.repo}`);
+				if (syncInfoStr) {
+					const syncInfo = JSON.parse(syncInfoStr);
+					if (syncInfo && syncInfo.lastSync) {
+						// 将 ISO 格式的时间转换为本地时间字符串
+						const lastSyncDate = new Date(syncInfo.lastSync);
+						lastUpdated = lastSyncDate.toLocaleString('zh-CN', {
+							year: 'numeric',
+							month: '2-digit',
+							day: '2-digit',
+							hour: '2-digit',
+							minute: '2-digit',
+							second: '2-digit'
+						});
+					} else {
+						lastUpdated = this.t('projectDetail.noUpdateTime', '未知');
+					}
+				} else {
+					lastUpdated = this.t('projectDetail.noUpdateTime', '未知');
+				}
+			} catch (error) {
+				console.error('读取同步信息失败:', error);
+				lastUpdated = this.t('projectDetail.noUpdateTime', '未知');
+			}
+
+			// 渲染最终内容
+			const content = this.renderProjectInfoContent({
+				creator: creator,
+				description: description,
+				contributors: contributorsCount,
+				lastUpdated: lastUpdated
+			});
+			this.showInfoPanel(content, this.t('projectDetail.projectInfo', '项目信息'));
+
+		} catch (error) {
+			console.error('加载项目信息失败:', error);
+			const errorContent = `
+				<div class="info-section">
+					<div class="error-message">
+						<p>${this.t('projectDetail.errors.loadFailed', '加载项目信息失败')}: ${error.message}</p>
+					</div>
+				</div>
+			`;
+			this.showInfoPanel(errorContent, this.t('projectDetail.projectInfo', '项目信息'));
 		}
 	}
 
@@ -1359,9 +1504,9 @@ class ProjectDetailPage extends BasePage {
 	 * @returns {void}
 	 */
 	hideProjectInfo() {
-		const projectInfoSection = this.element.querySelector('#project-info-section');
-		if (projectInfoSection) {
-			projectInfoSection.style.display = 'none';
+		// 如果项目信息在信息面板中显示，关闭信息面板
+		if (this.state.showInfoPanel) {
+			this.hideInfoPanel();
 		}
 		// 更新状态
 		this.updateModuleState('projectInfo', false);
@@ -1615,89 +1760,6 @@ class ProjectDetailPage extends BasePage {
 		return { displayName: icon };
 	}
 
-	/**
-	 * 切换活动信息显示状态
-	 * @returns {void}
-	 */
-	toggleActivity() {
-		const isCurrentlyVisible = this.state.moduleStates.activity;
-
-		if (!isCurrentlyVisible) {
-			this.updateModuleState('activity', true);
-			this.showActivity();
-		} else {
-			this.hideActivity();
-		}
-	}
-
-	/**
-	 * 显示活动信息
-	 * @returns {void}
-	 */
-	showActivity() {
-		const content = `
-			<div class="info-section">
-				<h4>${this.t('projectDetail.recentActivity', '最近活动')}</h4>
-				<p>${this.t('projectDetail.activityDescription', '这里显示项目最近的活动记录，包括提交、合并等。')}</p>
-			</div>
-		`;
-		this.showInfoPanel(content, this.t('projectDetail.recentActivity', '最近活动'));
-	}
-
-	/**
-	 * 隐藏活动信息
-	 * @returns {void}
-	 */
-	hideActivity() {
-		// 如果活动信息在信息面板中显示，关闭信息面板
-		if (this.state.showInfoPanel) {
-			this.hideInfoPanel();
-		}
-		// 更新状态
-		this.updateModuleState('activity', false);
-	}
-
-	/**
-	 * 切换待审核内容显示状态
-	 * @returns {void}
-	 */
-	togglePendingReviews() {
-		const isCurrentlyVisible = this.state.moduleStates.pending;
-
-		if (!isCurrentlyVisible) {
-			this.updateModuleState('pending', true);
-			this.showPendingReviews();
-		} else {
-			this.hidePendingReviews();
-		}
-	}
-
-	/**
-	 * 显示待审核内容
-	 * @returns {void}
-	 */
-	showPendingReviews() {
-		const content = `
-			<div class="info-section">
-				<h4>${this.t('projectDetail.pendingReviews', '待审核内容')}</h4>
-				<p>${this.t('projectDetail.pendingDescription', '这里显示待审核的内容列表。')}</p>
-			</div>
-		`;
-		this.showInfoPanel(content, this.t('projectDetail.pendingReviews', '待审核内容'));
-	}
-
-	/**
-	 * 隐藏待审核内容
-	 * @returns {void}
-	 */
-	hidePendingReviews() {
-		// 如果待审核信息在信息面板中显示，关闭信息面板
-		if (this.state.showInfoPanel) {
-			this.hideInfoPanel();
-		}
-		// 更新状态
-		this.updateModuleState('pending', false);
-	}
 
 	/**
 	 * 处理创建文件

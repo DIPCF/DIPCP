@@ -357,7 +357,7 @@ class Header extends Component {
 			await window.GitHubService.initFromUser(currentUser);
 
 			// 获取main分支的最新提交SHA
-			const branchData = await window.GitHubService.getBranch(repoInfo.owner, repoInfo.repo, 'main', true);
+			const branchData = await window.GitHubService.getBranch(repoInfo.owner, repoInfo.repo, 'main');
 
 			const latestCommitSha = branchData.commit.sha;
 
@@ -448,6 +448,20 @@ class Header extends Component {
 			await window.GitHubService.initFromUser(currentUser);
 
 			const username = currentUsername.toLowerCase();
+
+			// 获取用户角色信息，判断是否是访客
+			const userRoles = user?.userRoles || user?.permissionInfo?.roles || [];
+			const isVisitor = userRoles.includes('visitor') || userRoles.length === 0 || (userRoles.length === 1 && userRoles[0] === 'visitor');
+
+			// 如果是访客，不检查未读通知
+			if (isVisitor) {
+				// 清除未读通知标记
+				localStorage.removeItem('discussions_unread_mentions');
+				localStorage.removeItem('issues_unread_mentions');
+				// 更新导航项显示
+				this.updateNavigationItems();
+				return;
+			}
 
 			// 检查 Discussions
 			try {

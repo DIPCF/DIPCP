@@ -9,6 +9,22 @@ window.GitHubService = {
 	_token: null,
 	// 速率限制状态
 	_rateLimitState: null,
+	// 速率限制限额
+	_rateLimitLimit: null,
+
+	/**
+	 * 获取翻译文本
+	 * @param {string} key - 翻译键
+	 * @param {Object} params - 参数对象（可选）
+	 * @returns {string} 翻译后的文本
+	 */
+	_t(key, params = {}) {
+		if (window.I18nService && window.I18nService.t) {
+			return window.I18nService.t(key, params);
+		}
+		// 如果没有 i18n 服务，返回键本身
+		return key;
+	},
 
 	/**
 	 * 初始化 GitHub 服务
@@ -36,6 +52,9 @@ window.GitHubService = {
 			// 创建 Octokit 实例
 			this._octokit = new window.Octokit({ auth: token });
 			this._token = token;
+
+			// 设置 Octokit 钩子，拦截所有响应以读取速率限制信息
+			this._setupRateLimitHook();
 
 			console.log('GitHub 服务初始化成功');
 			return true;
@@ -102,18 +121,92 @@ window.GitHubService = {
 	},
 
 	/**
+	 * 获取速率限制限额
+	 * @returns {number|null} 限额，如果未获取则返回 null
+	 */
+	getRateLimitLimit() {
+		return this._rateLimitLimit;
+	},
+
+	/**
+	 * 检查API速率限制（使用rate_limit API端点）
+	 * @returns {Promise<Object>} 速率限制信息 { limit: number, remaining: number }
+	 */
+	async checkRateLimit() {
+		try {
+			// 确保已初始化
+			if (!this._octokit) {
+				const userInfo = window.app?.getUserFromStorage();
+				if (userInfo?.user?.token) {
+					await this.initFromUser(userInfo.user);
+				} else {
+					throw new Error('GitHub服务未初始化');
+				}
+			}
+
+			// 使用专门的rate_limit API端点获取速率限制信息
+			const response = await this._octokit.rest.rateLimit.get();
+			const { rate } = response.data;
+
+			const limit = rate.limit || 0;
+			const remaining = rate.remaining || 0;
+
+			// 保存限额
+			if (limit) {
+				this._rateLimitLimit = limit;
+			}
+
+			return {
+				limit: limit,
+				remaining: remaining
+			};
+		} catch (error) {
+			console.error('检查速率限制失败:', error);
+			throw error;
+		}
+	},
+
+	/**
 	 * 处理 GitHub API 速率限制错误
 	 * @param {Error} error - 错误对象
 	 * @returns {boolean} 是否是速率限制错误
 	 */
 	handleRateLimitError(error) {
 		// 检查是否是速率限制错误
-		const isRateLimitError = error && (
-			(error.message && error.message.includes('API rate limit exceeded')) ||
-			(error.status === 403 && error.headers &&
-				(error.headers['x-ratelimit-remaining'] === '0' ||
-					error.headers['retry-after']))
-		);
+		let isRateLimitError = false;
+
+		if (!error) {
+			return false;
+		}
+
+		// 检查错误消息（GraphQL 和 REST）
+		if (error.message && (
+			error.message.includes('API rate limit exceeded') ||
+			error.message.includes('rate limit already exceeded')
+		)) {
+			isRateLimitError = true;
+		}
+
+		// 检查 REST API 错误状态码
+		if (error.status === 403 && error.headers &&
+			(error.headers['x-ratelimit-remaining'] === '0' ||
+				error.headers['retry-after'])) {
+			isRateLimitError = true;
+		}
+
+		// 检查 GraphQL 错误响应
+		if (error.response && error.response.data && error.response.data.errors) {
+			const errors = error.response.data.errors;
+			for (const gqlError of errors) {
+				if (gqlError.message && (
+					gqlError.message.includes('API rate limit exceeded') ||
+					gqlError.message.includes('rate limit already exceeded')
+				)) {
+					isRateLimitError = true;
+					break;
+				}
+			}
+		}
 
 		if (!isRateLimitError) {
 			return false;
@@ -135,86 +228,88 @@ window.GitHubService = {
 			});
 		}
 
-		// 显示用户提示
-		this.showRateLimitNotification();
-
-		console.warn('GitHub API 速率限制已触发，将暂停 1 小时');
+		// 记录速率限制头信息以便调试
+		if (error.response && error.response.headers) {
+			const limit = error.response.headers['x-ratelimit-limit'];
+			console.warn(`⚠️ GitHub API 速率限制已触发，将暂停 1 小时 - 限额: ${limit}/小时`);
+		} else {
+			console.warn('GitHub API 速率限制已触发，将暂停 1 小时');
+		}
 		return true;
 	},
 
 	/**
-	 * 显示速率限制通知
+	 * 设置 Octokit 钩子以拦截响应头
+	 * 在每个 API 调用后自动记录速率限制信息
 	 */
-	showRateLimitNotification() {
-		// 如果 Modal 组件可用，使用它显示通知
-		if (window.Modal) {
-			const modal = new window.Modal();
-			const remainingTime = this.getRateLimitRemainingTime();
-			const hours = Math.floor(remainingTime / (60 * 60 * 1000));
-			const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
-
-			const message = `
-				<div style="line-height: 1.6;">
-					<p style="margin-bottom: 15px;">
-						⚠️ GitHub API 请求次数已超过限制，系统将暂停 GitHub API 请求 1 小时。
-					</p>
-					<p style="margin-bottom: 15px;">
-						预计恢复时间：${hours} 小时 ${minutes} 分钟后
-					</p>
-					<p style="margin-bottom: 15px;">
-						<strong>建议：</strong>
-					</p>
-					<ul style="margin-left: 20px; margin-bottom: 15px;">
-						<li>加入 <a href="https://github.com/developers" target="_blank" style="color: var(--primary-color);">GitHub Developer Program</a> 以获得更高的 API 请求限制</li>
-						<li>等待限制重置后再继续使用</li>
-						<li>在此期间，您可以继续使用本地功能</li>
-					</ul>
-					<p style="font-size: 0.9em; color: var(--text-secondary);">
-						如需帮助，请联系 GitHub 支持：<a href="https://support.github.com" target="_blank" style="color: var(--primary-color);">https://support.github.com</a>
-					</p>
-				</div>
-			`;
-
-			modal.showInfo(
-				'⚠️ GitHub API 速率限制',
-				message,
-				{ showCancel: false }
-			);
+	_setupRateLimitHook() {
+		if (!this._octokit) {
+			return;
 		}
+
+		// 使用 Octokit 的钩子系统
+		// 拦截所有响应以读取速率限制头部
+		this._octokit.hook.before('request', async (options) => {
+			// 可以在这里记录请求信息（可选）
+		});
+
+		this._octokit.hook.after('request', async (response, options) => {
+			// 在所有 API 调用后记录速率限制信息
+			//this._logRateLimitInfo(response.headers);
+		});
+
+		this._octokit.hook.error('request', async (error, options) => {
+			// 错误响应也可能包含速率限制头部
+			if (error.response && error.response.headers) {
+				this._logRateLimitInfo(error.response.headers);
+			}
+		});
+
+		console.log('✅ Octokit 钩子已设置');
 	},
 
 	/**
-	 * 公开 API 调用（不需要 token）
-	 * 用于访问公开仓库和用户信息
-	 * @param {Function} apiCall - 要执行的 API 调用函数（返回 Promise）
-	 * @returns {Promise} API 调用的结果
+	 * 记录速率限制信息到控制台
+	 * @param {Object} headers - 响应头对象
 	 */
-	async publicCall(apiCall) {
-		// 创建无 token 的 Octokit 实例用于公开 API
-		const octokitPublic = new window.Octokit();
+	_logRateLimitInfo(headers) {
+		if (!headers) {
+			return;
+		}
 
-		try {
-			return await apiCall(octokitPublic);
-		} catch (error) {
-			// 检查是否是速率限制错误
-			if (this.handleRateLimitError(error)) {
-				const remainingTime = this.getRateLimitRemainingTime();
-				const hours = Math.floor(remainingTime / (60 * 60 * 1000));
-				const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
+		// 读取速率限制头部
+		const remaining = headers['x-ratelimit-remaining'];
+		const limit = headers['x-ratelimit-limit'];
+		const reset = headers['x-ratelimit-reset'];
+		const used = headers['x-ratelimit-used'];
 
-				const rateLimitError = new Error(`GitHub API 速率限制中，请等待 ${hours} 小时 ${minutes} 分钟后重试`);
-				rateLimitError.isRateLimited = true;
-				rateLimitError.remainingTime = remainingTime;
-				throw rateLimitError;
+		// 只有在有有效数据时才显示
+		if (remaining !== undefined && limit !== undefined && reset !== undefined) {
+			// 保存限额
+			this._rateLimitLimit = parseInt(limit);
+
+			// 计算重置时间
+			const resetDate = new Date(parseInt(reset) * 1000);
+			const resetTime = resetDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+			// 计算使用率百分比
+			const percentage = ((parseInt(used) / parseInt(limit)) * 100).toFixed(1);
+
+			// 根据剩余次数决定日志级别
+			const remainingInt = parseInt(remaining);
+
+			// 如果limit只有60，说明可能没有使用token认证
+			if (parseInt(limit) === 60) {
+				console.warn(`⚠️ GitHub API 速率限制: ${remaining}/${limit} (${percentage}% 已使用), 重置时间: ${resetTime} - 这可能表示未使用token认证！`);
+			} else {
+				console.log(`GitHub API 速率限制: ${remaining}/${limit} (${percentage}% 已使用), 重置时间: ${resetTime}`);
 			}
 
-			// 如果不是速率限制错误，直接抛出
-			throw error;
 		}
 	},
 
 	/**
-	 * 安全的 GitHub API 调用包装器（需要认证）
+	 * 安全的 GitHub API 调用包装器
 	 * 自动检查速率限制并处理错误
 	 * @param {Function} apiCall - 要执行的 API 调用函数（返回 Promise）
 	 * @returns {Promise} API 调用的结果
@@ -226,7 +321,7 @@ window.GitHubService = {
 			if (userInfo?.user?.token) {
 				await this.initFromUser(userInfo.user);
 			} else {
-				throw new Error('GitHub 服务未初始化，请先登录');
+				throw new Error(this._t('common.serviceNotInitialized'));
 			}
 		}
 
@@ -236,7 +331,7 @@ window.GitHubService = {
 			const hours = Math.floor(remainingTime / (60 * 60 * 1000));
 			const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
 
-			const error = new Error(`GitHub API 速率限制中，请等待 ${hours} 小时 ${minutes} 分钟后重试`);
+			const error = new Error(this._t('common.rateLimitExceeded', { hours, minutes }));
 			error.isRateLimited = true;
 			error.remainingTime = remainingTime;
 			throw error;
@@ -252,7 +347,7 @@ window.GitHubService = {
 				const hours = Math.floor(remainingTime / (60 * 60 * 1000));
 				const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
 
-				const rateLimitError = new Error(`GitHub API 速率限制中，请等待 ${hours} 小时 ${minutes} 分钟后重试`);
+				const rateLimitError = new Error(this._t('common.rateLimitExceeded', { hours, minutes }));
 				rateLimitError.isRateLimited = true;
 				rateLimitError.remainingTime = remainingTime;
 				throw rateLimitError;
@@ -278,25 +373,10 @@ window.GitHubService = {
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {Object} options - 选项 (state, sort, direction等)
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Array>} Issues 列表
 	 */
-	async listIssues(owner, repo, options = {}, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.issues.listForRepo({
-					owner,
-					repo,
-					state: options.state || 'open',
-					sort: options.sort || 'created',
-					direction: options.direction || 'desc',
-					...options
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async listIssues(owner, repo, options = {}) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.issues.listForRepo({
 				owner,
 				repo,
@@ -314,22 +394,10 @@ window.GitHubService = {
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {number} issueNumber - Issue 编号
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Object>} Issue 对象
 	 */
-	async getIssue(owner, repo, issueNumber, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.issues.get({
-					owner,
-					repo,
-					issue_number: issueNumber
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async getIssue(owner, repo, issueNumber) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.issues.get({
 				owner,
 				repo,
@@ -362,22 +430,10 @@ window.GitHubService = {
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {number} issueNumber - Issue 编号
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Array>} 评论列表
 	 */
-	async listIssueComments(owner, repo, issueNumber, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.issues.listComments({
-					owner,
-					repo,
-					issue_number: issueNumber
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async listIssueComments(owner, repo, issueNumber) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.issues.listComments({
 				owner,
 				repo,
@@ -433,21 +489,10 @@ window.GitHubService = {
 	 * 获取仓库信息
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Object>} 仓库信息
 	 */
-	async getRepo(owner, repo, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.repos.get({
-					owner,
-					repo
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async getRepo(owner, repo) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.repos.get({
 				owner,
 				repo
@@ -461,22 +506,10 @@ window.GitHubService = {
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {string} path - 文件路径
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Object>} 文件内容
 	 */
-	async getRepoContent(owner, repo, path, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.repos.getContent({
-					owner,
-					repo,
-					path
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async getRepoContent(owner, repo, path) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.repos.getContent({
 				owner,
 				repo,
@@ -487,26 +520,66 @@ window.GitHubService = {
 	},
 
 	/**
+	 * 检查用户是否已为仓库加星
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @returns {Promise<boolean>} 是否已加星
+	 */
+	async isStarred(owner, repo) {
+		try {
+			// 确保已初始化
+			if (!this._octokit) {
+				const userInfo = window.app?.getUserFromStorage();
+				if (userInfo?.user?.token) {
+					await this.initFromUser(userInfo.user);
+				} else {
+					return false; // 未登录，默认未加星
+				}
+			}
+
+			// 直接调用 API，404 是正常情况（表示未加星）
+			await this._octokit.rest.activity.checkRepoIsStarredByAuthenticatedUser({
+				owner,
+				repo
+			});
+
+			// 如果没有抛出异常，说明已加星（返回 204）
+			return true;
+		} catch (error) {
+			// 404 表示未加星，这是正常情况
+			if (error.status === 404) {
+				return false;
+			}
+			// 其他错误也返回 false，避免阻塞页面显示
+			console.warn('检查加星状态时出错:', error);
+			return false;
+		}
+	},
+
+	/**
+	 * 为仓库加星
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 * @returns {Promise<void>}
+	 */
+	async starRepo(owner, repo) {
+		return await this.safeCall(async (octokit) => {
+			await octokit.rest.activity.starRepoForAuthenticatedUser({
+				owner,
+				repo
+			});
+		});
+	},
+
+	/**
 	 * 获取分支信息
 	 * @param {string} owner - 仓库所有者
 	 * @param {string} repo - 仓库名称
 	 * @param {string} branch - 分支名称
-	 * @param {boolean} requireAuth - 是否必须使用认证（默认 false，使用公开 API）
 	 * @returns {Promise<Object>} 分支信息
 	 */
-	async getBranch(owner, repo, branch, requireAuth = false) {
-		if (requireAuth) {
-			return await this.safeCall(async (octokit) => {
-				const { data } = await octokit.rest.repos.getBranch({
-					owner,
-					repo,
-					branch
-				});
-				return data;
-			});
-		}
-
-		return await this.publicCall(async (octokit) => {
+	async getBranch(owner, repo, branch) {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.repos.getBranch({
 				owner,
 				repo,
@@ -533,12 +606,12 @@ window.GitHubService = {
 	// ========== Users API ==========
 
 	/**
-	 * 根据用户名获取用户信息（公开 API，不需要 token）
+	 * 根据用户名获取用户信息
 	 * @param {string} username - 用户名
 	 * @returns {Promise<Object>} 用户信息
 	 */
 	async getUserByUsername(username) {
-		return await this.publicCall(async (octokit) => {
+		return await this.safeCall(async (octokit) => {
 			const { data } = await octokit.rest.users.getByUsername({
 				username
 			});
@@ -637,8 +710,24 @@ window.GitHubService = {
 	 */
 	async graphql(query, variables = {}) {
 		return await this.safeCall(async () => {
-			const { data } = await this._octokit.graphql(query, variables);
-			return data;
+			try {
+				// 尝试直接调用graphql方法
+				if (typeof this._octokit.graphql === 'function') {
+					const result = await this._octokit.graphql(query, variables);
+					// Octokit.graphql可能返回{data}或直接返回数据
+					return result?.data || result;
+				}
+
+				// 如果graphql方法不存在，使用request方法
+				const { data } = await this._octokit.request('POST /graphql', {
+					query,
+					variables
+				});
+				return data;
+			} catch (error) {
+				console.error('GraphQL请求失败:', error);
+				throw error;
+			}
 		});
 	},
 

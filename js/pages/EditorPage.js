@@ -286,6 +286,13 @@ class EditorPage extends BasePage {
 			return '';
 		}
 
+		// 访客不需要工具栏
+		const userRoles = this.state.permissionInfo?.roles || (this.state.userRole ? [this.state.userRole] : ['visitor']);
+		const isVisitor = userRoles.length === 0 || (userRoles.length === 1 && userRoles[0] === 'visitor');
+		if (isVisitor) {
+			return '';
+		}
+
 		return `
             <div class="editor-toolbar">
                 <button class="btn btn-sm" id="saveBtn" disabled style="${this.state.previewMode ? 'display: none;' : ''}" aria-label="${this.tAttr('editor.save', '保存')}">
@@ -713,7 +720,7 @@ class EditorPage extends BasePage {
 				await window.GitHubService.initFromUser(user);
 
 				// 获取仓库信息，确认默认分支
-				const repo = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo, true);
+				const repo = await window.GitHubService.getRepo(repoInfo.owner, repoInfo.repo);
 				const defaultBranch = repo.default_branch || 'main';
 
 				// 目标分支命名：DIPCP/<username>

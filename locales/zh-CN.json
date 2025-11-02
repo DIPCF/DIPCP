@@ -51,7 +51,10 @@
 		"remove": "移除",
 		"actions": "操作",
 		"preview": "预览",
-		"processing": "处理中..."
+		"processing": "处理中...",
+		"loadFailed": "加载失败",
+		"rateLimitExceeded": "GitHub API 速率限制中，请等待 {{hours}} 小时 {{minutes}} 分钟后重试",
+		"serviceNotInitialized": "GitHub 服务未初始化，请先登录"
 	},
 	"navigation": {
 		"dashboard": "仪表盘",
@@ -67,28 +70,24 @@
 		"pageTitle": "登录 - DIPCP",
 		"subtitle": "去中心化IP协作平台",
 		"whyChoose": "为什么选择 DIPCP？",
-		"feature1": "✅ 零运维成本，无需服务器",
-		"feature2": "✅ 零学习成本，打开即用",
-		"feature3": "✅ 零门槛参与，只需 GitHub 账号",
-		"feature4": "✅ 完全透明，全程可追溯",
+		"feature1": "✅ 永远免费！",
+		"feature2": "✅ 和朋友一起编写故事，由基金会托管共享版权",
+		"feature3": "✅ 根据贡献获得积分，按比例分配版权收益",
+		"feature4": "✅ 积分记录完全公开，全程可追溯",
+		"feature5": "✅ 构建全球最大的协作IP创作社区",
 		"githubUsername": "GitHub用户名",
 		"repositoryUrl": "仓库地址",
 		"loginButton": "登录",
 		"loggingIn": "登录中...",
 		"placeholders": {
-			"githubUsername": "GitHub用户名",
 			"accessToken": "GitHub访问令牌（不是密码！）"
 		},
-		"howToRegister": "如何注册",
 		"howToGetToken": "如何获取令牌",
 		"hint": {
-			"createNewUser": "强烈建议注册一个新用户。",
-			"tokenLocalOnly": "令牌保存在本机，不会上传到服务器。"
+			"tokenLocalOnly": "强烈建议注册一个新用户。令牌保存在本机，不会上传到服务器。"
 		},
 		"registerHelpTitle": "如何注册GitHub账户",
-		"registerHelpContent": "<h3>步骤1：访问GitHub官网</h3><p>打开浏览器，访问 <a href='https://github.com' target='_blank'>https://github.com</a></p><br><h3>步骤2：点击注册</h3><p>在GitHub首页点击右上角的 <strong>Sign up</strong> 按钮</p><br><h3>步骤3：填写注册信息</h3><p>• 输入用户名（Username）<br>• 输入邮箱地址（Email）<br>• 设置密码（Password）<br>• 验证您不是机器人</p><br><h3>步骤4：验证邮箱</h3><p>检查您的邮箱，点击GitHub发送的验证链接</p><br><h3>步骤5：完成注册</h3><p>验证完成后，您就可以使用GitHub账户了！</p>",
-		"tokenHelpTitle": "如何获取GitHub访问令牌",
-		"tokenHelpContent": "<h3>快速获取令牌</h3><p>直接访问：<a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>生成步骤</h3><p>• 点击 <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• 填写Note（备注）：DIPCP应用<br>• 选择Expiration（过期时间）：<strong>建议选择\"Never\"（永远）</strong><br>• <strong>重要：勾选所有权限选项（全选）</strong><br>• 点击 <strong>Generate token</strong></p><br><h3>复制令牌</h3><p>• <strong>立即复制令牌并保存</strong>（只显示一次）<br>• 将令牌粘贴到登录页面的令牌字段中</p><br><p><strong>注意：</strong>令牌只显示一次，请务必保存好！</p>",
+		"registerHelpContent": "<h3>步骤1：访问GitHub官网</h3><p>打开浏览器，访问 <a href='https://github.com' target='_blank'>https://github.com</a></p><br><h3>步骤2：点击注册</h3><p>在GitHub首页点击右上角的 <strong>Sign up</strong> 按钮</p><br><h3>步骤3：填写注册信息</h3><p>• 输入用户名（Username）<br>• 输入邮箱地址（Email）<br>• 设置密码（Password）<br>• 验证您不是机器人</p><br><h3>步骤4：验证邮箱</h3><p>检查您的邮箱，点击GitHub发送的验证链接</p><br><h3>步骤5：获取令牌</h3><p>直接访问：<a href='https://github.com/settings/tokens' target='_blank'><strong>https://github.com/settings/tokens</strong></a></p><br><h3>生成步骤</h3><p>• 点击 <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong><br>• 填写Note（备注）：DIPCP应用<br>• 选择Expiration（过期时间）：<strong>建议选择\"Never\"（永远）</strong><br>• <strong>重要：勾选所有权限选项（全选）</strong><br>• 点击 <strong>Generate token</strong></p><br><h3>复制令牌</h3><p>• <strong>立即复制令牌并保存</strong>（只显示一次）<br>• 将令牌粘贴到登录页面的令牌字段中</p><br><p><strong>注意：</strong>令牌只显示一次，请务必保存好！</p>",
 		"terms": "登录即表示您同意我们的",
 		"termsLink": "服务条款",
 		"and": "和",
@@ -211,6 +210,7 @@
 		"creator": "创建者",
 		"description": "描述",
 		"contributors": "贡献者",
+		"collaborators": "协作者人数",
 		"lastUpdated": "最后更新",
 		"status": "状态",
 		"noMembers": "暂无项目成员",
@@ -502,11 +502,20 @@
 		"viewDetails": "查看详情",
 		"reviewSuccess": "审核完成",
 		"reviewFailed": "审核失败",
-		"noReviews": "暂无审核内容",
+		"noReviews": "暂无待打分内容",
+		"comments": "评论",
+		"noComments": "暂无评论",
+		"commentPlaceholder": "添加评论...",
+		"status": {
+			"merged": "已合并"
+		},
 		"notImplemented": {
 			"approve": "审核通过功能暂未实现",
 			"reject": "审核拒绝功能暂未实现",
 			"comment": "添加评论功能暂未实现"
+		},
+		"errors": {
+			"apiNotConfigured": "GitHub API 未配置"
 		}
 	},
 	"maintainers": {
@@ -567,6 +576,18 @@
 	},
 	"settings": {
 		"title": "设置",
+		"star": {
+			"title": "支持项目",
+			"description": "如果这个项目对您有帮助，请考虑为 GitHub 仓库加星以支持我们的工作！",
+			"button": "为 DIPCF/DIPCP 加星",
+			"processing": "处理中...",
+			"success": "感谢您的支持！已成功为仓库加星。",
+			"currentStars": "当前星数：⭐ {count}",
+			"error": {
+				"notLoggedIn": "请先登录",
+				"failed": "加星失败：{error}"
+			}
+		},
 		"language": "语言设置",
 		"account": "账户设置",
 		"notifications": "通知设置",
@@ -685,7 +706,7 @@
 		"title": "贡献者许可协议",
 		"content": "作为DIPCP平台的贡献者，您需要签署贡献者许可协议，将知识产权所有权完全转让给DIPCF基金会。由由基金会统一管理，并负责知识产权的维护和运营。请完整阅读后签署协议。",
 		"realNameLabel": "请输入您的真实姓名",
-		"realNamePlaceholder": "请输入您的真实姓名（用于法律文件）",
+		"realNamePlaceholder": "作为签名",
 		"agree": "同意并签署",
 		"disagree": "不同意",
 		"rejected": "用户拒绝签署CLA协议",
@@ -754,6 +775,12 @@
 				"workflowRunning": "GitHub Actions 工作流正在执行...",
 				"acceptingInvitation": "正在接受协作者邀请...",
 				"finalizing": "正在完成最终设置..."
+			},
+			"error": {
+				"rateLimitLow": "您的GitHub API访问限额为60次/小时，这是新用户的基础限额。GitHub通常需要1-2天时间才会提升您的访问限额。请稍等1-2天后再尝试申请，届时您的访问限额将提升至5000次/小时。",
+				"insufficientPermissions": "申请提交失败：权限不足。您的Token可能没有足够的权限在GitHub仓库中创建Issue。请检查Token权限设置。",
+				"authenticationFailed": "申请提交失败：认证失败。请检查您的GitHub Token是否有效。",
+				"general": "申请提交失败：{errorMessage}"
 			}
 		},
 		"userRole": {

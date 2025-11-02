@@ -24,6 +24,9 @@ class SettingsPage extends BasePage {
 		// 从localStorage读取同步时间间隔（默认30秒）
 		const syncInterval = parseInt(localStorage.getItem('dipcp-sync-interval')) || 30;
 
+		// 从本地存储读取加星状态
+		const isStarred = localStorage.getItem('dipcp-repo-starred-DIPCF-DIPCP') === 'true';
+
 		this.state = {
 			user: userInfo.user,
 			userRole: userInfo.userRole,
@@ -31,6 +34,8 @@ class SettingsPage extends BasePage {
 			language: props.language || currentLanguage,
 			theme: props.theme || currentTheme,
 			syncInterval: syncInterval, // 同步时间间隔（秒）
+			isStarred: isStarred, // 是否已为仓库加星（仅从本地存储读取）
+			modal: null, // 模态框实例
 		};
 	}
 
@@ -39,12 +44,19 @@ class SettingsPage extends BasePage {
 	 * @returns {HTMLElement} 渲染后的DOM元素
 	 */
 	render() {
+		// 在渲染时重新读取本地存储，确保状态是最新的
+		const localStarStatus = localStorage.getItem('dipcp-repo-starred-DIPCF-DIPCP');
+		const isStarred = localStarStatus === 'true';
+		// 更新 state，确保与本地存储一致
+		this.setState({ isStarred });
+
 		const container = document.createElement('div');
 		container.className = 'dashboard';
 		container.innerHTML = `
 			${this.renderHeader()}
 			<div class="content">
 				<div class="settings-container">
+					${this.renderStarSection()}
 					${this.renderLanguageSection()}
 					${this.renderThemeSection()}
 					${this.renderSyncSection()}
@@ -62,6 +74,31 @@ class SettingsPage extends BasePage {
 	renderHeader() {
 		// 使用BasePage的renderHeader方法
 		return super.renderHeader('settings', false, null);
+	}
+
+	/**
+	 * 渲染 GitHub 加星区域
+	 * @returns {string} GitHub 加星HTML字符串
+	 */
+	renderStarSection() {
+		// 如果已加星，返回空字符串
+		if (this.state.isStarred) {
+			return '';
+		}
+
+		return `
+            <div class="settings-section" id="star-section">
+                <h2>${this.t('settings.star.title', '支持项目')}</h2>
+                <div class="star-settings">
+                    <div class="setting-item">
+                        <p>${this.t('settings.star.description', '如果这个项目对您有帮助，请考虑为 GitHub 仓库加星以支持我们的工作！')}</p>
+                        <button id="star-repo-btn" class="btn btn-primary">
+                            ⭐ ${this.t('settings.star.button', '为 DIPCF/DIPCP 加星')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
 	}
 
 	/**
@@ -142,14 +179,14 @@ class SettingsPage extends BasePage {
                             type="range" 
                             id="sync-interval-input" 
                             min="10" 
-                            max="60" 
+                            max="100" 
                             step="10"
                             value="${this.state.syncInterval}" 
                             class="range-input"
                         />
                         <div class="range-info">
                             <span>${this.t('settings.min', '最小')}: 10</span>
-                            <span>${this.t('settings.max', '最大')}: 60</span>
+                            <span>${this.t('settings.max', '最大')}: 100</span>
                         </div>
                     </div>
                 </div>
@@ -194,6 +231,71 @@ class SettingsPage extends BasePage {
 
 		// 绑定事件
 		this.bindEvents();
+	}
+
+
+	/**
+	 * 处理为仓库加星
+	 * @returns {Promise<void>}
+	 */
+	async handleStarRepo() {
+		const user = this.state.user;
+		const starBtn = this.element.querySelector('#star-repo-btn');
+		if (starBtn) {
+			starBtn.disabled = true;
+			starBtn.textContent = '⏳ ' + this.t('settings.star.processing', '处理中...');
+		}
+
+		try {
+			await window.GitHubService.initFromUser(user);
+			await window.GitHubService.starRepo('DIPCF', 'DIPCP');
+
+			// 更新状态
+			this.setState({ isStarred: true });
+
+			// 保存到本地存储
+			localStorage.setItem('dipcp-repo-starred-DIPCF-DIPCP', 'true');
+
+			// 移除加星区域
+			const starSection = this.element.querySelector('#star-section');
+			if (starSection) {
+				starSection.remove();
+			}
+
+			// 尝试获取当前星数
+			let starCount = null;
+			try {
+				const repoInfo = await window.GitHubService.getRepo('DIPCF', 'DIPCP');
+				if (repoInfo && typeof repoInfo.stargazers_count === 'number') {
+					starCount = repoInfo.stargazers_count;
+				}
+			} catch (error) {
+				// 获取星数失败，忽略，不显示星数
+			}
+
+			// 构建成功消息
+			let successMessage = this.t('settings.star.success', '感谢您的支持！已成功为仓库加星。');
+			if (starCount !== null) {
+				successMessage += '\n\n' + this.t('settings.star.currentStars', '当前星数：⭐ {count}').replace('{count}', starCount);
+			}
+
+			// 显示成功提示
+			this.showModal(
+				this.t('common.success', '成功'),
+				successMessage
+			);
+		} catch (error) {
+			this.showModal(
+				this.t('common.error', '错误'),
+				this.t('settings.star.error.failed', '加星失败：{error}').replace('{error}', error.message)
+			);
+
+			// 恢复按钮状态
+			if (starBtn) {
+				starBtn.disabled = false;
+				starBtn.textContent = '⭐ ' + this.t('settings.star.button', '为 DIPCF/DIPCP 加星');
+			}
+		}
 	}
 
 	/**
@@ -323,6 +425,14 @@ class SettingsPage extends BasePage {
 			});
 		});
 
+		// 加星按钮
+		const starRepoBtn = this.element.querySelector('#star-repo-btn');
+		if (starRepoBtn) {
+			starRepoBtn.addEventListener('click', async () => {
+				await this.handleStarRepo();
+			});
+		}
+
 		// 同步时间间隔滑块
 		const syncIntervalInput = this.element.querySelector('#sync-interval-input');
 		if (syncIntervalInput) {
@@ -428,6 +538,21 @@ class SettingsPage extends BasePage {
 	}
 
 	/**
+	 * 显示模态框
+	 * @param {string} title - 标题
+	 * @param {string} message - 消息内容
+	 * @param {Object} [options] - 可选配置
+	 */
+	showModal(title, message, options = {}) {
+		// 如果没有创建过modal，创建一个新的
+		if (!this.state.modal) {
+			this.state.modal = new window.Modal();
+		}
+		// 默认不显示取消按钮（信息提示只需要关闭按钮）
+		this.state.modal.showInfo(title, message, { showCancel: false, ...options });
+	}
+
+	/**
 	 * 显示退出项目确认对话框
 	 */
 	showLogoutModal() {
@@ -528,7 +653,8 @@ class SettingsPage extends BasePage {
 					key === 'dipcp-language' ||
 					key === 'dipcp-theme' ||
 					key === 'dipcp-sync-interval' ||
-					key === 'dipcp-repository-history') {
+					key === 'dipcp-repository-history' ||
+					key === 'dipcp-repo-starred-DIPCF-DIPCP') {
 					continue; // 跳过这些重要的数据
 				}
 				keysToRemove.push(key);

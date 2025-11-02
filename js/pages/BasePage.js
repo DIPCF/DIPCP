@@ -27,6 +27,17 @@ class BasePage extends Component {
 		if (window.I18nService) {
 			window.I18nService.translatePage();
 		}
+
+		// 确保在页面挂载后应用导航权限控制
+		// 使用多次延迟确保DOM完全渲染和Header组件的事件绑定完成
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 100);
+
+		// 再次延迟调用，确保所有异步操作完成
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 500);
 	}
 
 	/**
@@ -78,14 +89,12 @@ class BasePage extends Component {
 	}
 
 	// 辅助方法：获取i18n文本，如果服务不可用则返回默认值
-	// 自动进行HTML转义以防止XSS攻击
 	t(key, defaultValue = '') {
 		let text = defaultValue;
 		if (window.I18nService && window.I18nService.t) {
 			text = window.I18nService.t(key, defaultValue);
 		}
-		// 自动转义HTML，确保安全
-		return this.escapeHtml(text);
+		return text;
 	}
 
 	// 获取i18n文本用于HTML属性（placeholder、value等）
@@ -120,32 +129,20 @@ class BasePage extends Component {
 			}
 		}
 
-		// 基础导航项
+		// 所有导航项（根据权限设置显示/隐藏）
 		const navigationItems = [
-			{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘') },
-			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情') }
+			{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] },
+			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] },
+			{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核'), requiresRole: ['reviewer'] },
+			{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护'), requiresRole: ['maintainer'] },
+			{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题'), requiresRole: ['maintainer', 'reviewer', 'contributor'] },
+			{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论'), requiresRole: ['maintainer', 'reviewer', 'contributor'] },
+			{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] }
 		];
 
-		// 只有具有审核权限的用户才显示审核菜单项（owner也具备审核权限）
-		if (userRoles.includes('reviewer') || userRoles.includes('owner')) {
-			navigationItems.push(
-				{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核') },
-			);
-		}
-
-		// 只有具有维护权限的用户才显示维护菜单项（owner也具备维护权限）
-		if (userRoles.includes('maintainer') || userRoles.includes('owner')) {
-			navigationItems.push(
-				{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护') },
-			);
-		}
-
-		// 添加讨论和设置菜单项
-		navigationItems.push(
-			{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题') },
-			{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论') },
-			{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置') }
-		);
+		// 保存用户角色和导航项，以便后续设置显示状态
+		this._userRoles = userRoles;
+		this._navigationItems = navigationItems;
 
 		// 使用Header组件
 		this.headerComponent = new window.Header({
@@ -162,13 +159,56 @@ class BasePage extends Component {
 		return headerElement.outerHTML;
 	}
 
+	/**
+	 * 根据权限设置导航项的显示/隐藏状态
+	 */
+	applyNavigationVisibility() {
+		if (!this.element || !this._navigationItems || !this._userRoles) return;
+
+		const headerElement = this.element.querySelector('header');
+		if (!headerElement) return;
+
+		// 遍历所有导航项，根据权限设置显示状态
+		this._navigationItems.forEach((item) => {
+			// 通过 data-route 属性查找对应的导航元素
+			const navElement = headerElement.querySelector(`.nav-item[data-route="${item.href}"]`);
+			if (!navElement) return;
+
+			// 检查用户是否具有所需权限（所有导航项都有明确的权限要求）
+			const hasPermission = item.requiresRole && item.requiresRole.some(role =>
+				this._userRoles.includes(role)
+			);
+
+			// 根据权限设置显示/隐藏
+			navElement.style.display = hasPermission ? '' : 'none';
+		});
+	}
+
 	// 绑定Header组件的事件
 	bindHeaderEvents() {
 		if (this.headerComponent && this.element) {
 			const headerElement = this.element.querySelector('header');
 			if (headerElement) {
 				this.headerComponent.element = headerElement;
+
+				// 保存原始的 updateNavigationItems 方法
+				const originalUpdateNavigationItems = this.headerComponent.updateNavigationItems.bind(this.headerComponent);
+
+				// 覆盖 updateNavigationItems 方法，在更新后自动应用权限控制
+				this.headerComponent.updateNavigationItems = () => {
+					originalUpdateNavigationItems();
+					// 在导航项更新后，重新应用权限控制
+					setTimeout(() => {
+						this.applyNavigationVisibility();
+					}, 0);
+				};
+
 				this.headerComponent.bindEvents();
+				// 绑定事件后，根据权限设置导航项的显示状态
+				// 使用 setTimeout 确保 Header 内部的 DOM 完全渲染
+				setTimeout(() => {
+					this.applyNavigationVisibility();
+				}, 0);
 			}
 		}
 	}
@@ -415,7 +455,7 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 	 */
 	async getFileSha(owner, repo, path) {
 		try {
-			const content = await window.GitHubService.getRepoContent(owner, repo, path, true);
+			const content = await window.GitHubService.getRepoContent(owner, repo, path);
 			return content.sha;
 		} catch (error) {
 			// 如果文件不存在，返回null
@@ -423,6 +463,58 @@ ${this.t('cla.signingStatement', '我，**{realName}** (GitHub用户名: {userna
 				return null;
 			}
 			throw error;
+		}
+	}
+
+	/**
+	 * 获取并缓存Discussions分类列表
+	 * @async
+	 * @param {string} owner - 仓库所有者
+	 * @param {string} repo - 仓库名称
+	 */
+	async cacheDiscussionCategories(owner, repo) {
+		try {
+			console.log('🔧 正在获取Discussions分类列表...');
+
+			// 获取Discussions分类列表
+			const categoriesResult = await window.GitHubService.graphql(`
+				query GetDiscussionCategories($owner: String!, $name: String!) {
+					repository(owner: $owner, name: $name) {
+						discussionCategories(first: 10) {
+							edges {
+								node {
+									id
+									name
+								}
+							}
+						}
+					}
+				}
+			`, {
+				owner: owner,
+				name: repo
+			});
+
+			const categories = categoriesResult.repository.discussionCategories.edges.map(edge => edge.node);
+
+			if (categories.length === 0) {
+				console.warn('⚠️ 未找到任何Discussions分类');
+				return;
+			}
+
+			// 保存到本地存储
+			const cacheKey = `dipcp-discussion-categories-${owner}-${repo}`;
+			try {
+				localStorage.setItem(cacheKey, JSON.stringify(categories));
+				console.log(`✅ 已缓存 ${categories.length} 个Discussions分类`);
+			} catch (error) {
+				console.warn('⚠️ 保存分类列表到缓存失败:', error);
+			}
+
+		} catch (error) {
+			console.error('❌ 获取Discussions分类列表失败:', error);
+			// 不抛出错误，因为分类列表缓存不是关键功能，不应该阻止其他设置
+			console.log('⚠️ 继续执行后续设置...');
 		}
 	}
 

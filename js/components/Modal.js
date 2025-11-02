@@ -15,11 +15,9 @@ class Modal extends Component {
 			callback: props.callback || null,
 			inputValue: props.defaultValue || '',
 			showCancel: props.showCancel !== false,
-			confirmText: props.confirmText || '确认',
-			cancelText: props.cancelText || '取消',
 			inputLabel: props.inputLabel || '',
 			inputPlaceholder: props.inputPlaceholder || '',
-			claContent: props.claContent || ''
+			claContent: props.claContent || '',
 		};
 
 		// 事件处理器的引用，用于正确移除事件监听器
@@ -84,7 +82,7 @@ class Modal extends Component {
 			type: 'info',
 			title,
 			message,
-			showCancel: options.showCancel !== undefined ? options.showCancel : false
+			showCancel: options.showCancel !== undefined ? options.showCancel : false,
 		});
 		this.updateModal();
 	}
@@ -113,7 +111,7 @@ class Modal extends Component {
 			placeholder: '',
 			defaultValue: '',
 			callback: null,
-			inputValue: ''
+			inputValue: '',
 		});
 	}
 
@@ -188,8 +186,7 @@ class Modal extends Component {
 		modalElement.innerHTML = `
 			<div class="modal-content">
 				<div class="modal-header">
-					<h3>${this.escapeHtml(this.state.title)}</h3>
-					<button class="btn-close" id="modal-close">×</button>
+					<h3>${this.state.title}</h3>
 				</div>
 				<div class="modal-body">
 					${this.renderBody()}
@@ -218,8 +215,8 @@ class Modal extends Component {
 						<input
 							type="text"
 							id="modal-input"
-							placeholder="${this.escapeHtmlAttribute(this.state.placeholder)}"
-							value="${this.escapeHtmlAttribute(this.state.inputValue)}"
+							placeholder="${this.state.placeholder}"
+							value="${this.state.inputValue}"
 						/>
 					</div>
 				`;
@@ -227,7 +224,7 @@ class Modal extends Component {
 				return `
 					<div class="cla-content">
 						<div class="cla-message">
-							<p>${this.escapeHtml(this.state.message)}</p>
+							<p>${this.state.message}</p>
 						</div>
 					<div class="cla-agreement" id="cla-agreement-container">
 						<div class="cla-text" id="cla-markdown-content">${this.markdownToHtml(this.state.claContent)}</div>
@@ -237,8 +234,8 @@ class Modal extends Component {
 							<input
 								type="text"
 								id="modal-input"
-								placeholder="${this.escapeHtmlAttribute(this.state.inputPlaceholder)}"
-								value="${this.escapeHtmlAttribute(this.state.inputValue)}"
+								placeholder="${this.state.inputPlaceholder}"
+								value="${this.state.inputValue}"
 							/>
 						</div>
 					</div>
@@ -248,7 +245,7 @@ class Modal extends Component {
 					<div class="confirm-message">
 						<div class="confirm-icon">⚠️</div>
 						<div class="confirm-content">
-							<p>${this.escapeHtml(this.state.message)}</p>
+							<p>${this.state.message}</p>
 						</div>
 					</div>
 				`;
@@ -257,7 +254,7 @@ class Modal extends Component {
 					<div class="info-message">
 						<div class="info-icon">ℹ️</div>
 						<div class="info-content">
-							<p>${this.escapeHtml(this.state.message)}</p>
+							${this.state.message}
 						</div>
 					</div>
 				`;
@@ -285,8 +282,8 @@ class Modal extends Component {
 				`;
 			case 'cla':
 				return `
-				<button class="btn btn-secondary" id="modal-cancel">${this.escapeHtml(this.state.cancelText || t('common.cancel', '取消'))}</button>
-				<button class="btn btn-primary" id="modal-confirm" disabled>${this.escapeHtml(this.state.confirmText || t('common.confirm', '确认'))}</button>
+					<button class="btn btn-secondary" id="modal-cancel">${t('common.cancel', '取消')}</button>
+				<button class="btn btn-primary" id="modal-confirm" disabled>${t('common.confirm', '确认')}</button>
 			`;
 			case 'confirm':
 				return `
@@ -296,8 +293,8 @@ class Modal extends Component {
 			case 'info':
 				if (this.state.showCancel) {
 					return `
-					<button class="btn btn-secondary" id="modal-cancel">${this.escapeHtml(this.state.cancelText || t('common.cancel', '取消'))}</button>
-					<button class="btn btn-primary" id="modal-confirm">${this.escapeHtml(this.state.confirmText || t('common.confirm', '确认'))}</button>
+					<button class="btn btn-secondary" id="modal-cancel">${t('common.cancel', '取消')}</button>
+					<button class="btn btn-primary" id="modal-confirm">${t('common.confirm', '确认')}</button>
 				`;
 				} else {
 					return `
@@ -315,8 +312,12 @@ class Modal extends Component {
 	updateModal() {
 		// 如果模态框元素不存在或不在DOM中，创建新的模态框
 		if (!this.element || !this.element.parentNode) {
+			// 只有在 show 为 true 时才渲染
+			if (!this.state.show) {
+				return;
+			}
 			const newElement = this.render();
-			if (newElement) {
+			if (newElement && newElement instanceof Node) {
 				document.body.appendChild(newElement);
 				this.element = newElement;
 				this.bindEvents();
@@ -350,12 +351,6 @@ class Modal extends Component {
 
 		// 先移除所有现有的事件监听器，避免重复绑定
 		this.unbindEvents();
-
-		// 关闭按钮（右上角）
-		const closeBtn = this.element.querySelector('#modal-close');
-		if (closeBtn) {
-			closeBtn.addEventListener('click', this.eventHandlers.handleCancel);
-		}
 
 		// 关闭按钮（底部）
 		const closeFooterBtn = this.element.querySelector('#modal-close-footer');
@@ -419,12 +414,6 @@ class Modal extends Component {
 
 	unbindEvents() {
 		if (!this.element) return;
-
-		// 移除所有事件监听器
-		const closeBtn = this.element.querySelector('#modal-close');
-		if (closeBtn) {
-			closeBtn.removeEventListener('click', this.eventHandlers.handleCancel);
-		}
 
 		const closeFooterBtn = this.element.querySelector('#modal-close-footer');
 		if (closeFooterBtn) {

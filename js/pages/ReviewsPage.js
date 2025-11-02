@@ -177,7 +177,6 @@ class ReviewsPage extends BasePage {
 			this.setLoading(false);
 
 		} catch (error) {
-			console.error('加载已合并的 Pull Requests 失败:', error);
 			this.setLoading(false);
 			// 显示错误信息
 			if (this.element) {
@@ -216,73 +215,48 @@ class ReviewsPage extends BasePage {
 			if (this.state.loading) {
 				return `<div class="loading" style="color: var(--text-primary); padding: 2rem; text-align: center;">${this.t('common.loading', '载入中...')}</div>`;
 			}
-			return `<div class="empty" style="color: var(--text-secondary); padding: 2rem; text-align: center;">${this.t('reviews.noReviews', '暂无待打分内容')}</div>`;
+			return `
+				<div style="color: var(--text-secondary); padding: 2rem; text-align: center;">
+					<div>${this.t('reviews.noReviews', '暂无待打分内容')}</div>
+					<button class="btn btn-sm btn-secondary" id="refreshBtn" data-action="refresh" style="margin-top: 1rem;">
+						🔄 ${this.t('common.refresh', '刷新')}
+					</button>
+				</div>
+			`;
 		}
 
 		const review = this.state.selectedReview;
 		return `
             <div class="review-detail">
-				<div class="review-detail-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h2 style="margin: 0;">${this.t('reviews.pendingScoring', '待打分内容')}</h2>
-                    <button class="btn btn-sm btn-secondary" id="refreshBtn" data-action="refresh">
-                        🔄 ${this.t('common.refresh', '刷新')}
-                    </button>
-                </div>
-                <div class="review-detail-header">
-                    <h2>${this.escapeHtml(review.title)}</h2>
-                    <div class="review-detail-actions">
-                        <button class="btn btn-success" data-action="approve-detail">
-                            ✅ ${this.t('reviews.approve', '通过审核')}
-                        </button>
-                        <button class="btn btn-danger" data-action="reject-detail">
-                            ❌ ${this.t('reviews.reject', '拒绝审核')}
-                        </button>
-                    </div>
+				<div class="review-detail-header" style="margin-bottom: 0.625rem;">
+                    <h2 style="margin: 0;">${this.escapeHtml(review.author)} - ${this.escapeHtml(review.date)}</h2>
                 </div>
                 <div class="review-detail-content">
-                    <div class="review-info">
-                        <div class="info-item">
-                            <label>${this.t('reviews.author', '作者')}:</label>
-                            <span>${this.escapeHtml(review.author)}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>${this.t('reviews.submitTime', '提交时间')}:</label>
-                            <span>${this.escapeHtml(review.date)}</span>
-                        </div>
-                        ${review.mergedDate ? `
-                        <div class="info-item">
-                            <label>${this.t('reviews.mergeTime', '合并时间')}:</label>
-                            <span>${this.escapeHtml(review.mergedDate)}</span>
-                        </div>
-                        ` : ''}
-                        <div class="info-item">
-                            <label>${this.t('reviews.status', '状态')}:</label>
-                            <span class="status status-${this.escapeHtmlAttribute(review.status)}">${this.escapeHtml(review.status)}</span>
-                        </div>
-                        ${review.pr ? `
-                        <div class="info-item">
-                            <label>${this.t('reviews.githubLink', 'GitHub 链接')}:</label>
-                            <a href="${this.escapeHtmlAttribute(review.pr.html_url)}" target="_blank" rel="noopener noreferrer">
-                                ${this.t('reviews.viewOnGitHub', '在 GitHub 上查看')}
-                            </a>
-                        </div>
-                        ` : ''}
-                    </div>
-                    <div class="review-content">
-                        <h3>${this.t('reviews.contentPreview', '内容预览')}</h3>
-                        <div class="content-preview">
+                    <div class="review-content" style="margin-bottom: 0.625rem;">
+                        <div class="content-preview" style="color: var(--text-primary); padding: 0.625rem; background: var(--bg-secondary, var(--bg-primary)); border: 1px solid var(--border-primary); border-radius: 4px;">
                             ${this.escapeHtml(review.content)}
                         </div>
                     </div>
-                    <div class="review-comments">
-                        <h3>${this.t('reviews.comments', '评论')}</h3>
-                        <div class="comments-list">
+                    <div class="review-comments" style="margin-bottom: 0.625rem;">
+                        <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">${this.t('reviews.comments', '评论')}</h3>
+                        <div class="comments-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
                             ${this.renderComments(review.comments || [])}
                         </div>
-                        <div class="comment-form">
-                            <textarea placeholder="${this.tAttr('reviews.commentPlaceholder', '添加评论...')}" id="commentText"></textarea>
-                            <button class="btn btn-primary" data-action="add-comment">${this.t('reviews.addComment', '添加评论')}</button>
+                    </div>
+                    <div class="review-comments">
+                        <div class="comment-form" style="margin-bottom: 0.625rem;">
+                            <textarea id="commentText" placeholder="${this.tAttr('reviews.commentPlaceholder', '添加评论...')}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; resize: vertical; font-family: inherit; margin-bottom: 0.5rem;"></textarea>
                         </div>
+                        <div class="review-detail-actions" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button class="btn btn-success" data-action="approve-detail">
+                                ✅ ${this.t('reviews.approve', '通过审核')}
+                            </button>
+                            <button class="btn btn-danger" data-action="reject-detail">
+                                ❌ ${this.t('reviews.reject', '拒绝审核')}
+                            </button>
+                        </div>
+                        <div id="rejectError" class="error-message" style="display: none; color: var(--error-color, #dc3545); margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-secondary, rgba(220, 53, 69, 0.1)); border-radius: 4px; font-size: 0.9rem;"></div>
+                        <div id="approveError" class="error-message" style="display: none; color: var(--error-color, #dc3545); margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-secondary, rgba(220, 53, 69, 0.1)); border-radius: 4px; font-size: 0.9rem;"></div>
                     </div>
                 </div>
             </div>
@@ -295,12 +269,12 @@ class ReviewsPage extends BasePage {
 		}
 
 		return comments.map(comment => `
-            <div class="comment-item">
-                <div class="comment-header">
+            <div class="comment-item" style="padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-secondary, var(--bg-primary));">
+                <div class="comment-header" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
                     <span class="comment-author">${this.escapeHtml(comment.author)}</span>
                     <span class="comment-date">${this.escapeHtml(comment.date)}</span>
                 </div>
-                <div class="comment-content">
+                <div class="comment-content" style="color: var(--text-primary); word-wrap: break-word;">
                     ${this.escapeHtml(comment.content)}
                 </div>
             </div>
@@ -340,14 +314,6 @@ class ReviewsPage extends BasePage {
 				this.handleAction(action, reviewId);
 			});
 		});
-
-		// 添加评论
-		const addCommentBtn = this.element.querySelector('[data-action="add-comment"]');
-		if (addCommentBtn) {
-			addCommentBtn.addEventListener('click', () => {
-				this.handleAddComment();
-			});
-		}
 
 		// 刷新按钮
 		const refreshBtn = this.element.querySelector('#refreshBtn');
@@ -461,6 +427,75 @@ class ReviewsPage extends BasePage {
 		console.log('添加评论', review, comment);
 		// TODO: 实现添加评论逻辑
 		alert(this.t('reviews.notImplemented.comment', '添加评论功能暂未实现'));
+	}
+
+	/**
+	 * 显示拒绝错误提示
+	 * @param {string} message - 错误消息
+	 */
+	showRejectError(message) {
+		const errorDiv = this.element.querySelector('#rejectError');
+		if (errorDiv) {
+			errorDiv.textContent = message;
+			errorDiv.style.display = 'block';
+		}
+	}
+
+	/**
+	 * 隐藏拒绝错误提示
+	 */
+	hideRejectError() {
+		const errorDiv = this.element.querySelector('#rejectError');
+		if (errorDiv) {
+			errorDiv.style.display = 'none';
+			errorDiv.textContent = '';
+		}
+	}
+
+	/**
+	 * 显示通过审核错误提示
+	 * @param {string} message - 错误消息
+	 */
+	showApproveError(message) {
+		const errorDiv = this.element.querySelector('#approveError');
+		if (errorDiv) {
+			errorDiv.textContent = message;
+			errorDiv.style.display = 'block';
+		}
+	}
+
+	/**
+	 * 隐藏通过审核错误提示
+	 */
+	hideApproveError() {
+		const errorDiv = this.element.querySelector('#approveError');
+		if (errorDiv) {
+			errorDiv.style.display = 'none';
+			errorDiv.textContent = '';
+		}
+	}
+
+	/**
+	 * 设置按钮为处理中状态或恢复正常状态
+	 * @param {boolean} processing - 是否处理中
+	 */
+	setButtonsProcessing(processing) {
+		const approveBtn = this.element.querySelector('[data-action="approve-detail"]');
+		const rejectBtn = this.element.querySelector('[data-action="reject-detail"]');
+
+		if (approveBtn) {
+			approveBtn.disabled = processing;
+			approveBtn.textContent = processing
+				? this.t('common.processing', '处理中...')
+				: `✅ ${this.t('reviews.approve', '通过审核')}`;
+		}
+
+		if (rejectBtn) {
+			rejectBtn.disabled = processing;
+			rejectBtn.textContent = processing
+				? this.t('common.processing', '处理中...')
+				: `❌ ${this.t('reviews.reject', '拒绝审核')}`;
+		}
 	}
 
 	/**
