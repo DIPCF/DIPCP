@@ -798,13 +798,18 @@ class EditorPage extends BasePage {
 										try {
 											// 从 PR 的 head 分支（用户分支）读取文件内容
 											const fileContent = await window.GitHubService.safeCall(async (octokit) => {
-												const { data } = await octokit.rest.repos.getContent({
+												const response = await octokit.rest.repos.getContent({
 													owner: repoInfo.owner,
 													repo: repoInfo.repo,
 													path: file.filename,
 													ref: branchName
 												});
-												return data;
+												// 检查响应是否存在且有 data 属性
+												if (!response || !response.data) {
+													// 文件不存在，返回 null
+													return null;
+												}
+												return response.data;
 											});
 
 											if (fileContent && !Array.isArray(fileContent) && fileContent.content) {
@@ -855,23 +860,39 @@ class EditorPage extends BasePage {
 				}
 
 				// 获取默认分支最新提交SHA
-				const baseRef = await window.GitHubService.safeCall(async (octokit) => {
-					const response = await octokit.rest.git.getRef({
-						owner: repoInfo.owner,
-						repo: repoInfo.repo,
-						ref: `heads/${defaultBranch}`
+				let baseSha;
+				try {
+					const baseRef = await window.GitHubService.safeCall(async (octokit) => {
+						try {
+							const response = await octokit.rest.git.getRef({
+								owner: repoInfo.owner,
+								repo: repoInfo.repo,
+								ref: `heads/${defaultBranch}`
+							});
+							// 检查响应是否存在且有 data 属性
+							if (!response || !response.data) {
+								console.error('获取默认分支引用响应格式异常:', { 
+									response, 
+									hasData: !!response?.data,
+									responseType: typeof response
+								});
+								throw new Error('获取默认分支引用失败：响应格式异常');
+							}
+							return response.data;
+						} catch (apiError) {
+							// 重新抛出，让外层处理
+							throw apiError;
+						}
 					});
-					// 检查响应是否存在且有 data 属性
-					if (!response || !response.data) {
-						throw new Error('获取默认分支引用失败：响应格式异常');
+					// 检查返回结果是否有效
+					if (!baseRef || !baseRef.object || !baseRef.object.sha) {
+						throw new Error('默认分支引用数据格式异常');
 					}
-					return response.data;
-				});
-				// 检查返回结果是否有效
-				if (!baseRef || !baseRef.object || !baseRef.object.sha) {
-					throw new Error('默认分支引用数据格式异常');
+					baseSha = baseRef.object.sha;
+				} catch (err) {
+					console.error('获取默认分支失败:', err);
+					throw new Error(`无法获取默认分支 ${defaultBranch}: ${err?.message || err}`);
 				}
-				const baseSha = baseRef.object.sha;
 
 				// 尝试读取目标分支，不存在则创建
 				let branchExists = true;
@@ -885,7 +906,18 @@ class EditorPage extends BasePage {
 						});
 						// 检查响应是否存在且有 data 属性
 						if (!response || !response.data) {
-							throw new Error('获取分支引用失败：响应格式异常');
+							// 如果响应格式异常，这不应该发生在正常的 API 调用中
+							console.error('获取分支引用响应格式异常:', { 
+								response, 
+								hasData: !!response?.data,
+								responseType: typeof response,
+								responseKeys: response ? Object.keys(response) : []
+							});
+							// 如果 response 是 undefined，可能是 API 调用失败但没有抛出错误
+							// 这种情况下，我们抛出 404 错误，让外层 catch 处理
+							const error = new Error('获取分支引用失败：分支不存在');
+							error.status = 404;
+							throw error;
 						}
 						return response.data;
 					});
@@ -895,9 +927,43 @@ class EditorPage extends BasePage {
 					}
 					branchHeadSha = branchRef.object.sha;
 				} catch (err) {
-					if (err && (err.status === 404 || (err.response && err.response.status === 404))) {
+					// 记录错误详情以便调试
+					console.log('捕获到错误:', {
+						error: err,
+						message: err?.message,
+						status: err?.status,
+						statusCode: err?.statusCode,
+						name: err?.name,
+						responseStatus: err?.response?.status,
+						constructor: err?.constructor?.name,
+						allKeys: err ? Object.keys(err) : []
+					});
+
+					// 检查是否是 404 错误（分支不存在）
+					// 需要检查多种可能的错误格式
+					const is404 = err && (
+						err.status === 404 || 
+						(err.response && err.response.status === 404) ||
+						err.statusCode === 404 ||
+						(err.name === 'HttpError' && err.status === 404) ||
+						// 检查错误消息中是否包含 404
+						(err.message && err.message.includes('404'))
+					);
+					
+					if (is404) {
+						console.log(`分支 ${branchName} 不存在（404），将在后续创建`);
 						branchExists = false;
 					} else {
+						// 如果不是 404，记录详细错误信息并抛出
+						console.error('获取分支引用失败（非404错误）:', {
+							error: err,
+							message: err?.message,
+							status: err?.status,
+							statusCode: err?.statusCode,
+							name: err?.name,
+							responseStatus: err?.response?.status,
+							stack: err?.stack
+						});
 						throw err;
 					}
 				}
@@ -935,22 +1001,36 @@ class EditorPage extends BasePage {
 					let fileSha = undefined;
 					try {
 						const existing = await window.GitHubService.safeCall(async (octokit) => {
-							const { data } = await octokit.rest.repos.getContent({
+							const response = await octokit.rest.repos.getContent({
 								owner: repoInfo.owner,
 								repo: repoInfo.repo,
 								path: filePath,
 								ref: branchName
 							});
-							return data;
+							// 检查响应是否存在且有 data 属性
+							if (!response || !response.data) {
+								// 如果响应格式异常，可能是 404 错误（文件不存在）
+								const error = new Error('文件不存在于分支');
+								error.status = 404;
+								throw error;
+							}
+							return response.data;
 						});
 						if (existing && !Array.isArray(existing) && existing.sha) {
 							fileSha = existing.sha;
 						}
 					} catch (err) {
 						// 404 表示文件不存在于该分支，忽略
-						if (err.status !== 404 && (!err.response || err.response.status !== 404)) {
+						const is404 = err && (
+							err.status === 404 || 
+							(err.response && err.response.status === 404) ||
+							err.statusCode === 404 ||
+							(err.name === 'HttpError' && err.status === 404)
+						);
+						if (!is404) {
 							throw err;
 						}
+						// 404 错误，文件不存在，继续处理
 					}
 					filesToInclude.set(filePath, {
 						path: filePath,
@@ -1234,20 +1314,31 @@ class EditorPage extends BasePage {
 				let fileSha = null;
 				try {
 					const existingFile = await window.GitHubService.safeCall(async (octokit) => {
-						const { data } = await octokit.rest.repos.getContent({
+						const response = await octokit.rest.repos.getContent({
 							owner,
 							repo,
 							path: file.path,
 							ref: `heads/${branchName}`
 						});
-						return data;
+						// 检查响应是否存在且有 data 属性
+						if (!response || !response.data) {
+							// 文件不存在，返回 null
+							return null;
+						}
+						return response.data;
 					});
 					if (existingFile && !Array.isArray(existingFile) && existingFile.sha) {
 						fileSha = existingFile.sha;
 					}
 				} catch (err) {
 					// 如果文件不存在（404），说明已经删除，跳过
-					if (err.status !== 404 && (!err.response || err.response.status !== 404)) {
+					const is404 = err && (
+						err.status === 404 || 
+						(err.response && err.response.status === 404) ||
+						err.statusCode === 404 ||
+						(err.name === 'HttpError' && err.status === 404)
+					);
+					if (!is404) {
 						console.warn(`获取文件 ${file.path} 的 SHA 失败:`, err);
 					}
 				}
