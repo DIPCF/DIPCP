@@ -646,6 +646,20 @@ class ProjectDetailPage extends BasePage {
 		// 检查并更新用户信息（从 localStorage 读取最新状态）
 		this.checkAndUpdateUserInfo();
 
+		// 立即应用导航可见性（applyNavigationVisibility 内部会重新读取最新权限）
+		// 使用多个延迟确保 DOM 完全渲染和权限信息已更新
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 0);
+
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 100);
+
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 300);
+
 		// 加载项目数据，loadProjectData方法内部会调用bindEvents
 		this.loadProjectData();
 	}
@@ -851,10 +865,19 @@ class ProjectDetailPage extends BasePage {
 		// 绑定Header组件的事件
 		this.bindHeaderEvents();
 
-		// 延迟再次应用导航可见性，确保DOM完全渲染
+		// 延迟再次应用导航可见性，确保DOM完全渲染和权限信息已更新
+		// 使用多个延迟确保在不同时机都能应用
 		setTimeout(() => {
 			this.applyNavigationVisibility();
 		}, 0);
+
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 200);
+
+		setTimeout(() => {
+			this.applyNavigationVisibility();
+		}, 500);
 		// 绑定文件项事件
 		this.bindFileItemEvents();
 

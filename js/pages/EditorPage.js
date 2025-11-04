@@ -856,13 +856,21 @@ class EditorPage extends BasePage {
 
 				// 获取默认分支最新提交SHA
 				const baseRef = await window.GitHubService.safeCall(async (octokit) => {
-					const { data } = await octokit.rest.git.getRef({
+					const response = await octokit.rest.git.getRef({
 						owner: repoInfo.owner,
 						repo: repoInfo.repo,
 						ref: `heads/${defaultBranch}`
 					});
-					return data;
+					// 检查响应是否存在且有 data 属性
+					if (!response || !response.data) {
+						throw new Error('获取默认分支引用失败：响应格式异常');
+					}
+					return response.data;
 				});
+				// 检查返回结果是否有效
+				if (!baseRef || !baseRef.object || !baseRef.object.sha) {
+					throw new Error('默认分支引用数据格式异常');
+				}
 				const baseSha = baseRef.object.sha;
 
 				// 尝试读取目标分支，不存在则创建
@@ -870,13 +878,21 @@ class EditorPage extends BasePage {
 				let branchHeadSha = baseSha; // 保存分支当前的 HEAD SHA
 				try {
 					const branchRef = await window.GitHubService.safeCall(async (octokit) => {
-						const { data } = await octokit.rest.git.getRef({
+						const response = await octokit.rest.git.getRef({
 							owner: repoInfo.owner,
 							repo: repoInfo.repo,
 							ref: `heads/${branchName}`
 						});
-						return data;
+						// 检查响应是否存在且有 data 属性
+						if (!response || !response.data) {
+							throw new Error('获取分支引用失败：响应格式异常');
+						}
+						return response.data;
 					});
+					// 检查返回结果是否有效
+					if (!branchRef || !branchRef.object || !branchRef.object.sha) {
+						throw new Error('分支引用数据格式异常');
+					}
 					branchHeadSha = branchRef.object.sha;
 				} catch (err) {
 					if (err && (err.status === 404 || (err.response && err.response.status === 404))) {
@@ -1174,24 +1190,40 @@ class EditorPage extends BasePage {
 
 		// 2. 获取分支最新的提交SHA
 		const refData = await window.GitHubService.safeCall(async (octokit) => {
-			const { data } = await octokit.rest.git.getRef({
+			const response = await octokit.rest.git.getRef({
 				owner,
 				repo,
 				ref: `heads/${branchName}`
 			});
-			return data;
+			// 检查响应是否存在且有 data 属性
+			if (!response || !response.data) {
+				throw new Error('获取分支引用失败：响应格式异常');
+			}
+			return response.data;
 		});
+		// 检查返回结果是否有效
+		if (!refData || !refData.object || !refData.object.sha) {
+			throw new Error('分支引用数据格式异常');
+		}
 		const baseTreeSHA = refData.object.sha;
 
 		// 3. 获取基础tree的SHA
 		const commitData = await window.GitHubService.safeCall(async (octokit) => {
-			const { data } = await octokit.rest.git.getCommit({
+			const response = await octokit.rest.git.getCommit({
 				owner,
 				repo,
 				commit_sha: baseTreeSHA
 			});
-			return data;
+			// 检查响应是否存在且有 data 属性
+			if (!response || !response.data) {
+				throw new Error('获取提交信息失败：响应格式异常');
+			}
+			return response.data;
 		});
+		// 检查返回结果是否有效
+		if (!commitData || !commitData.tree || !commitData.tree.sha) {
+			throw new Error('提交数据格式异常');
+		}
 		const treeSha = commitData.tree.sha;
 
 		// 4. 为每个文件创建blob（或标记为删除）

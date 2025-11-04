@@ -28,6 +28,22 @@ class BasePage extends Component {
 			window.I18nService.translatePage();
 		}
 
+		// 确保权限信息是最新的（从 localStorage 重新读取）
+		const userInfo = window.app ? window.app.getUserFromStorage() : null;
+		if (userInfo) {
+			let userRoles = ['visitor'];
+			// 优先从 permissionInfo.roles 获取（这是最新同步的权限）
+			if (userInfo.permissionInfo && userInfo.permissionInfo.roles) {
+				userRoles = userInfo.permissionInfo.roles;
+			} else if (userInfo.userRoles) {
+				userRoles = Array.isArray(userInfo.userRoles) ? userInfo.userRoles : [userInfo.userRoles];
+			} else if (userInfo.userRole) {
+				userRoles = [userInfo.userRole];
+			}
+			// 更新权限信息
+			this._userRoles = userRoles;
+		}
+
 		// 确保在页面挂载后应用导航权限控制
 		// 使用多次延迟确保DOM完全渲染和Header组件的事件绑定完成
 		setTimeout(() => {
@@ -163,10 +179,46 @@ class BasePage extends Component {
 	 * 根据权限设置导航项的显示/隐藏状态
 	 */
 	applyNavigationVisibility() {
-		if (!this.element || !this._navigationItems || !this._userRoles) return;
+		if (!this.element) return;
 
 		const headerElement = this.element.querySelector('header');
 		if (!headerElement) return;
+
+		// 每次调用时都重新读取最新的权限信息，确保使用最新的数据
+		const userInfo = window.app ? window.app.getUserFromStorage() : null;
+		let userRoles = ['visitor'];
+		if (userInfo) {
+			// 优先从 permissionInfo.roles 获取（这是最新同步的权限）
+			if (userInfo.permissionInfo && userInfo.permissionInfo.roles) {
+				userRoles = userInfo.permissionInfo.roles;
+			} else if (userInfo.userRoles) {
+				userRoles = Array.isArray(userInfo.userRoles) ? userInfo.userRoles : [userInfo.userRoles];
+			} else if (userInfo.userRole) {
+				userRoles = [userInfo.userRole];
+			}
+		}
+
+		// 更新 _userRoles 以便后续使用
+		this._userRoles = userRoles;
+
+		// 如果没有导航项配置，尝试从 Header 组件获取
+		if (!this._navigationItems) {
+			// 如果 headerComponent 存在，从它获取导航项
+			if (this.headerComponent && this.headerComponent.state && this.headerComponent.state.navigationItems) {
+				this._navigationItems = this.headerComponent.state.navigationItems;
+			} else {
+				// 如果没有，使用默认的导航项配置
+				this._navigationItems = [
+					{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] },
+					{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] },
+					{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核'), requiresRole: ['reviewer'] },
+					{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护'), requiresRole: ['maintainer'] },
+					{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题'), requiresRole: ['maintainer', 'reviewer', 'collaborator'] },
+					{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论'), requiresRole: ['maintainer', 'reviewer', 'collaborator'] },
+					{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] }
+				];
+			}
+		}
 
 		// 遍历所有导航项，根据权限设置显示状态
 		this._navigationItems.forEach((item) => {
@@ -176,7 +228,7 @@ class BasePage extends Component {
 
 			// 检查用户是否具有所需权限（所有导航项都有明确的权限要求）
 			const hasPermission = item.requiresRole && item.requiresRole.some(role =>
-				this._userRoles.includes(role)
+				userRoles.includes(role)
 			);
 
 			// 根据权限设置显示/隐藏
