@@ -104,6 +104,11 @@ class ProjectDetailPage extends BasePage {
 			return '';
 		}
 
+		// 判断是否有编辑权限（只有 collaborator 权限才可以编辑）
+		const canEdit = userRoles.some(role =>
+			['collaborator'].includes(role)
+		);
+
 		return `
             <div class="editor-toolbar">
                 ${canEdit ? `

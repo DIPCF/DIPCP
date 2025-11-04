@@ -131,13 +131,13 @@ class BasePage extends Component {
 
 		// 所有导航项（根据权限设置显示/隐藏）
 		const navigationItems = [
-			{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] },
-			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] },
+			{ href: '/', key: 'navigation.dashboard', text: this.t('navigation.dashboard', '仪表盘'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] },
+			{ href: '/project-detail', key: 'navigation.projectDetail', text: this.t('navigation.projectDetail', '项目详情'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] },
 			{ href: '/reviews', key: 'navigation.reviews', text: this.t('navigation.reviews', '审核'), requiresRole: ['reviewer'] },
 			{ href: '/maintainers', key: 'navigation.maintainers', text: this.t('navigation.maintainers', '维护'), requiresRole: ['maintainer'] },
-			{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题'), requiresRole: ['maintainer', 'reviewer', 'contributor'] },
-			{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论'), requiresRole: ['maintainer', 'reviewer', 'contributor'] },
-			{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置'), requiresRole: ['maintainer', 'reviewer', 'contributor', 'visitor'] }
+			{ href: '/issues', key: 'navigation.issues', text: this.t('navigation.issues', '问题'), requiresRole: ['maintainer', 'reviewer', 'collaborator'] },
+			{ href: '/discussions', key: 'navigation.discussions', text: this.t('navigation.discussions', '讨论'), requiresRole: ['maintainer', 'reviewer', 'collaborator'] },
+			{ href: '/settings', key: 'navigation.settings', text: this.t('navigation.settings', '设置'), requiresRole: ['maintainer', 'reviewer', 'collaborator', 'visitor'] }
 		];
 
 		// 保存用户角色和导航项，以便后续设置显示状态

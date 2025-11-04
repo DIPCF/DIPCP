@@ -56,7 +56,6 @@ window.GitHubService = {
 			// 设置 Octokit 钩子，拦截所有响应以读取速率限制信息
 			this._setupRateLimitHook();
 
-			console.log('GitHub 服务初始化成功');
 			return true;
 		} catch (error) {
 			console.error('初始化 GitHub 服务失败:', error);
@@ -264,8 +263,6 @@ window.GitHubService = {
 				this._logRateLimitInfo(error.response.headers);
 			}
 		});
-
-		console.log('✅ Octokit 钩子已设置');
 	},
 
 	/**
@@ -714,18 +711,38 @@ window.GitHubService = {
 				// 尝试直接调用graphql方法
 				if (typeof this._octokit.graphql === 'function') {
 					const result = await this._octokit.graphql(query, variables);
+					// 检查 result 是否存在
+					if (!result) {
+						console.warn('GraphQL 请求返回了 undefined');
+						return null;
+					}
 					// Octokit.graphql可能返回{data}或直接返回数据
-					return result?.data || result;
+					// 如果返回的是 {data: {...}} 格式，提取 data
+					// 如果返回的是直接的数据，直接返回
+					if (result.data !== undefined) {
+						return result.data;
+					}
+					return result;
 				}
 
 				// 如果graphql方法不存在，使用request方法
-				const { data } = await this._octokit.request('POST /graphql', {
+				const response = await this._octokit.request('POST /graphql', {
 					query,
 					variables
 				});
-				return data;
+				// 检查响应是否存在
+				if (!response || !response.data) {
+					console.warn('GraphQL 请求返回了无效的响应');
+					return null;
+				}
+				return response.data;
 			} catch (error) {
 				console.error('GraphQL请求失败:', error);
+				// 如果是 GraphQL 错误，检查是否有 data 字段
+				if (error.data) {
+					console.warn('GraphQL 错误响应包含 data:', error.data);
+					return error.data;
+				}
 				throw error;
 			}
 		});

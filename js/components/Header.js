@@ -65,15 +65,54 @@ class Header extends Component {
 
 	/**
 	 * 更新导航项（用于刷新通知徽章）
+	 * 只更新需要变化的部分，避免重新渲染整个菜单
 	 */
 	updateNavigationItems() {
 		const navMenu = this.element.querySelector('.nav-menu');
-		if (navMenu) {
-			navMenu.innerHTML = this.renderNavigationItems();
-			this.bindEvents();
-			// 更新菜单的显示状态
-			this.updateMenuVisibility();
-		}
+		if (!navMenu) return;
+
+		// 检查是否有未读的讨论和Issues通知
+		const hasUnreadDiscussions = this.hasUnreadDiscussions();
+		const hasUnreadIssues = this.hasUnreadIssues();
+
+		// 遍历现有的导航项，只更新需要变化的部分
+		const navItems = navMenu.querySelectorAll('.nav-item');
+		navItems.forEach(navItem => {
+			const href = navItem.getAttribute('href');
+			if (!href) return;
+
+			// 更新 active 状态
+			const isActive = href.includes(this.state.currentPage);
+			if (isActive) {
+				navItem.classList.add('active');
+			} else {
+				navItem.classList.remove('active');
+			}
+
+			// 更新通知徽章（只针对 discussions 和 issues）
+			let shouldShowBadge = false;
+			if (href === '/discussions' && hasUnreadDiscussions) {
+				shouldShowBadge = true;
+			} else if (href === '/issues' && hasUnreadIssues) {
+				shouldShowBadge = true;
+			}
+
+			// 查找现有的徽章
+			const existingBadge = navItem.querySelector('.nav-notification-badge');
+
+			if (shouldShowBadge && !existingBadge) {
+				// 需要显示但没有徽章，添加徽章
+				const badge = document.createElement('span');
+				badge.className = 'nav-notification-badge';
+				navItem.appendChild(badge);
+			} else if (!shouldShowBadge && existingBadge) {
+				// 不需要显示但有徽章，移除徽章
+				existingBadge.remove();
+			}
+		});
+
+		// 更新菜单的显示状态
+		this.updateMenuVisibility();
 	}
 
 	/**
@@ -487,34 +526,37 @@ class Header extends Component {
 					name: repoInfo.repo
 				});
 
-				const discussions = result.repository?.discussions?.edges || [];
-				const unreadDiscussions = [];
+				// 检查 result 是否存在，如果不存在则跳过处理
+				if (result) {
+					const discussions = result.repository?.discussions?.edges || [];
+					const unreadDiscussions = [];
 
-				discussions.forEach(edge => {
-					const discussion = edge.node;
-					if (!discussion) return;
+					discussions.forEach(edge => {
+						const discussion = edge.node;
+						if (!discussion) return;
 
-					// 检查作者是否是当前用户（如果是，则不显示红点）
-					const authorLogin = discussion.author?.login?.toLowerCase();
-					if (authorLogin === username) {
-						return; // 自己是作者，不显示红点
+						// 检查作者是否是当前用户（如果是，则不显示红点）
+						const authorLogin = discussion.author?.login?.toLowerCase();
+						if (authorLogin === username) {
+							return; // 自己是作者，不显示红点
+						}
+
+						// 检查讨论标题或内容中是否@了当前用户
+						const title = (discussion.title || '').toLowerCase();
+						const body = (discussion.body || '').toLowerCase();
+						const mentionPattern = new RegExp(`@${username}\\b`);
+
+						if (mentionPattern.test(title) || mentionPattern.test(body)) {
+							unreadDiscussions.push(discussion.number);
+						}
+					});
+
+					// 更新localStorage
+					if (unreadDiscussions.length > 0) {
+						localStorage.setItem('discussions_unread_mentions', JSON.stringify(unreadDiscussions));
+					} else {
+						localStorage.removeItem('discussions_unread_mentions');
 					}
-
-					// 检查讨论标题或内容中是否@了当前用户
-					const title = (discussion.title || '').toLowerCase();
-					const body = (discussion.body || '').toLowerCase();
-					const mentionPattern = new RegExp(`@${username}\\b`);
-
-					if (mentionPattern.test(title) || mentionPattern.test(body)) {
-						unreadDiscussions.push(discussion.number);
-					}
-				});
-
-				// 更新localStorage
-				if (unreadDiscussions.length > 0) {
-					localStorage.setItem('discussions_unread_mentions', JSON.stringify(unreadDiscussions));
-				} else {
-					localStorage.removeItem('discussions_unread_mentions');
 				}
 			} catch (error) {
 				// 静默处理错误
@@ -579,7 +621,8 @@ class Header extends Component {
 
 	setCurrentPage(page) {
 		this.setState({ currentPage: page });
-		this.bindEvents();
+		// 更新导航项的 active 状态（不重新渲染，只更新 DOM）
+		this.updateNavigationItems();
 	}
 }
 
