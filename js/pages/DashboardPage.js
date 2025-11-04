@@ -119,10 +119,10 @@ class DashboardPage extends BasePage {
 					<div class="application-card">
 						<div class="application-icon">🤝</div>
 						<div class="application-content">
-							<h3>${this.t('dashboard.application.title', '成为贡献者')}</h3>
-							<p>${this.t('dashboard.application.description', '申请成为项目贡献者，参与内容创作和项目维护。')}</p>
+							<h3>${this.t('dashboard.application.title', '成为协作者')}</h3>
+							<p>${this.t('dashboard.application.description', '申请成为项目协作者，参与内容创作和项目维护。')}</p>
 							<button id="apply-contribution-btn" class="btn btn-primary">
-								${this.t('dashboard.application.applyButton', '申请成为贡献者')}
+								${this.t('dashboard.application.applyButton', '申请成为协作者')}
 							</button>
 						</div>
 					</div>
@@ -261,7 +261,7 @@ class DashboardPage extends BasePage {
 				className: 'role-maintainer'
 			},
 			'collaborator': {
-				displayName: '✏️' + this.t('dashboard.userRole.collaborator', '贡献者'),
+				displayName: '✏️' + this.t('dashboard.userRole.collaborator', '协作者'),
 				className: 'role-collaborator'
 			},
 			'visitor': {

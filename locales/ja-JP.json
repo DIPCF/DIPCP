@@ -3,7 +3,7 @@
 		"maintainer": "メンテナー",
 		"reviewer": "審査委員",
 		"director": "理事",
-		"contributor": "貢献者"
+		"collaborator": "協作者"
 	},
 	"common": {
 		"title": "I18n テスト",
@@ -210,8 +210,7 @@
 		"pendingReviews": "保留中のレビュー",
 		"creator": "作成者",
 		"description": "説明",
-		"contributors": "貢献者",
-		"collaborators": "コラボレーター人数",
+		"collaborators": "協作者人数",
 		"lastUpdated": "最終更新",
 		"status": "ステータス",
 		"noMembers": "プロジェクトメンバーがいません",
@@ -223,7 +222,7 @@
 		"roleDirector": "ディレクター",
 		"roleMaintainer": "メンテナー",
 		"roleReviewer": "レビュアー",
-		"roleCollaborator": "コラボレーター",
+		"roleCollaborator": "協作者",
 		"roleVisitor": "訪問者",
 		"roleUnknown": "不明",
 		"pendingDescription": "ここにレビュー待ちのコンテンツリストが表示されます。",
@@ -653,11 +652,11 @@
 		"noProjects": "利用可能なプロジェクトがありません",
 		"noActivity": "最近のアクティビティがありません",
 		"application": {
-			"title": "貢献者になる",
-			"description": "プロジェクト貢献者に応募し、コンテンツ制作とプロジェクトメンテナンスに参加します。",
+			"title": "協作者になる",
+			"description": "プロジェクト協作者に応募し、コンテンツ制作とプロジェクトメンテナンスに参加します。",
 			"applyButton": "貢献に応募",
 			"pendingTitle": "応募済み",
-			"pendingMessage": "貢献者応募が審査中です。お待ちください。",
+			"pendingMessage": "協作者応募が審査中です。お待ちください。",
 			"checkStatusButton": "審査状況を確認",
 			"reviewing": {
 				"title": "審査中",
@@ -1068,7 +1067,7 @@
 	},
 	"cla": {
 		"title": "コントリビューターライセンス契約",
-		"content": "DIPCPプラットフォームの貢献者として、知的財産権の所有権を完全にDIPCF財団に移転するためのコントリビューターライセンス契約に署名する必要があります。財団が統一管理し、知的財産権の維持と運営を担当します。全文を読んだ後、契約に署名してください。",
+		"content": "DIPCPプラットフォームの協作者として、知的財産権の所有権を完全にDIPCF財団に移転するためのコントリビューターライセンス契約に署名する必要があります。財団が統一管理し、知的財産権の維持と運営を担当します。全文を読んだ後、契約に署名してください。",
 		"realNameLabel": "実名を入力してください",
 		"realNamePlaceholder": "署名者の実名",
 		"agree": "同意して署名",

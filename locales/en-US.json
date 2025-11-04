@@ -3,7 +3,7 @@
 		"maintainer": "Maintainer",
 		"reviewer": "Reviewer",
 		"director": "Director",
-		"contributor": "Contributor"
+		"collaborator": "Collaborator"
 	},
 	"common": {
 		"title": "I18n Test",
@@ -210,7 +210,6 @@
 		"pendingReviews": "Pending Reviews",
 		"creator": "Creator",
 		"description": "Description",
-		"contributors": "Contributors",
 		"collaborators": "Number of Collaborators",
 		"lastUpdated": "Last Updated",
 		"status": "Status",
@@ -1068,8 +1067,8 @@
 		}
 	},
 	"cla": {
-		"title": "Contributor License Agreement",
-		"content": "As a contributor to the DIPCP platform, you need to sign a Contributor License Agreement to transfer intellectual property ownership completely to the DIPCF Foundation. The foundation will uniformly manage and be responsible for the maintenance and operation of intellectual property. Please read through before signing the agreement.",
+		"title": "Collaborator License Agreement",
+		"content": "As a collaborator to the DIPCP platform, you need to sign a Collaborator License Agreement to transfer intellectual property ownership completely to the DIPCF Foundation. The foundation will uniformly manage and be responsible for the maintenance and operation of intellectual property. Please read through before signing the agreement.",
 		"realNameLabel": "Please enter your real name",
 		"realNamePlaceholder": "Your real name as a signature",
 		"agree": "Agree and Sign",
@@ -1081,7 +1080,7 @@
 		"repository": "Repository",
 		"agreementContent": "CLA Agreement Content",
 		"signingConfirmation": "Signing Confirmation",
-		"signingStatement": "I, **{realName}** (GitHub username: {username}), confirm that I have read and agree to all terms of the above Contributor License Agreement.",
+		"signingStatement": "I, **{realName}** (GitHub username: {username}), confirm that I have read and agree to all terms of the above Collaborator License Agreement.",
 		"signerRealName": "Signer Real Name",
 		"githubUsername": "GitHub Username",
 		"email": "Email",

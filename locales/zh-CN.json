@@ -3,7 +3,7 @@
 		"maintainer": "维护者",
 		"reviewer": "审核委员",
 		"director": "理事",
-		"contributor": "贡献者"
+		"collaborator": "协作者"
 	},
 	"common": {
 		"title": "多语言测试",
@@ -209,7 +209,6 @@
 		"pendingReviews": "待审核内容",
 		"creator": "创建者",
 		"description": "描述",
-		"contributors": "贡献者",
 		"collaborators": "协作者人数",
 		"lastUpdated": "最后更新",
 		"status": "状态",
@@ -703,8 +702,8 @@
 		}
 	},
 	"cla": {
-		"title": "贡献者许可协议",
-		"content": "作为DIPCP平台的贡献者，您需要签署贡献者许可协议，将知识产权所有权完全转让给DIPCF基金会。由由基金会统一管理，并负责知识产权的维护和运营。请完整阅读后签署协议。",
+		"title": "协作者许可协议",
+		"content": "作为DIPCP平台的协作者，您需要签署协作者许可协议，将知识产权所有权完全转让给DIPCF基金会。由由基金会统一管理，并负责知识产权的维护和运营。请完整阅读后签署协议。",
 		"realNameLabel": "请输入您的真实姓名",
 		"realNamePlaceholder": "作为签名",
 		"agree": "同意并签署",
@@ -716,7 +715,7 @@
 		"repository": "仓库",
 		"agreementContent": "CLA协议内容",
 		"signingConfirmation": "签署确认",
-		"signingStatement": "我，**{realName}** (GitHub用户名: {username})，确认已阅读并同意上述贡献者许可协议的所有条款。",
+		"signingStatement": "我，**{realName}** (GitHub用户名: {username})，确认已阅读并同意上述协作者许可协议的所有条款。",
 		"signerRealName": "签署者真实姓名",
 		"githubUsername": "GitHub用户名",
 		"email": "邮箱",
@@ -750,9 +749,9 @@
 		"noProjects": "暂无项目",
 		"noActivity": "暂无活动",
 		"application": {
-			"title": "成为贡献者",
-			"description": "申请成为项目贡献者，参与内容创作和项目维护。",
-			"applyButton": "申请成为贡献者",
+			"title": "成为协作者",
+			"description": "申请成为项目协作者，参与内容创作和项目维护。",
+			"applyButton": "申请成为协作者",
 			"waiting": {
 				"title": "申请已提交",
 				"message": "您的申请已成功提交，等待仓库管理员审核...",
@@ -765,7 +764,7 @@
 				"details": "Issue #{issueNumber} 已处理完成<br>您已获得协作者权限"
 			},
 			"pendingTitle": "申请已提交",
-			"pendingMessage": "您的贡献者申请正在审核中，请耐心等待。",
+			"pendingMessage": "您的协作者申请正在审核中，请耐心等待。",
 			"checkStatusButton": "确认审核状态",
 			"reviewing": {
 				"title": "正在审核中",
@@ -789,7 +788,7 @@
 			"director": "理事",
 			"maintainer": "维护者",
 			"reviewer": "审核委员",
-			"collaborator": "贡献者",
+			"collaborator": "协作者",
 			"visitor": "访客"
 		},
 		"logout": {

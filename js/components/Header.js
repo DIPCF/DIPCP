@@ -54,8 +54,9 @@ class Header extends Component {
 				(item.href === '/issues' && hasUnreadIssues))
 				? '<span class="nav-notification-badge"></span>' : '';
 
+			// 默认隐藏，等待权限检查后显示
 			return `
-                <a href="${item.href}" class="nav-item ${isActive}" data-route="${item.href}" style="position: relative;">
+                <a href="${item.href}" class="nav-item ${isActive}" data-route="${item.href}" style="position: relative; display: none;">
                     ${translatedText}
                     ${notificationBadge}
                 </a>
